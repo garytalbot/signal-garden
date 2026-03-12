@@ -6,6 +6,9 @@ const moodEl = document.getElementById('mood');
 const weatherModeEl = document.getElementById('weatherMode');
 const lastNameEl = document.getElementById('lastName');
 const sourceLabelEl = document.getElementById('sourceLabel');
+const residentNameEl = document.getElementById('residentName');
+const residentMoodEl = document.getElementById('residentMood');
+const gardenCritterEl = document.getElementById('gardenCritter');
 const randomizeBtn = document.getElementById('randomize');
 const dailySignalBtn = document.getElementById('dailySignal');
 const cycleWeatherBtn = document.getElementById('cycleWeather');
@@ -27,6 +30,17 @@ const themeColorMeta = document.querySelector('meta[name="theme-color"]');
 
 const adjectives = ['velvet', 'neon', 'hollow', 'lunar', 'midnight', 'feral', 'opal', 'echo', 'solar', 'ghost'];
 const nouns = ['orchid', 'signal', 'lantern', 'murmur', 'crown', 'spire', 'feather', 'petal', 'relic', 'flare'];
+const critterTitles = ['moth', 'slug', 'oracle', 'goblin', 'herald', 'pigeon', 'ghost', 'gremlin', 'beast', 'saint'];
+const critterMoods = [
+  'collecting rumors from the ferns',
+  'pretending to supervise the weather',
+  'glowing for no documented reason',
+  'acting like the moon owes it money',
+  'guarding the weird little pageant',
+  'eating static like kettle corn',
+  'loitering with ceremonial intent',
+  'being suspiciously adorable about it',
+];
 const WEATHER_PRESETS = [
   {
     id: 'violet-hush',
@@ -263,6 +277,7 @@ let hashMode = 'garden';
 let fieldSourceMode = 'open';
 let currentBroadcastKey = null;
 let currentWeatherPreset = WEATHER_PRESETS[0];
+let currentCritterSpec = null;
 
 function rand(min, max, randomFn = Math.random) {
   return randomFn() * (max - min) + min;
@@ -314,6 +329,7 @@ function setWeatherPreset(weatherId, options = {}) {
   currentWeatherPreset = getWeatherPresetById(weatherId);
   document.body.dataset.weather = currentWeatherPreset.id;
   themeColorMeta?.setAttribute('content', currentWeatherPreset.themeColor);
+  updateCritterUi();
 
   if (bloomHistory.length) {
     const lastSpec = bloomHistory[bloomHistory.length - 1];
@@ -348,6 +364,88 @@ function shiftUtcDate(date, offsetDays) {
   const shifted = new Date(date);
   shifted.setUTCDate(shifted.getUTCDate() + offsetDays);
   return shifted;
+}
+
+function getCritterSeed() {
+  const lastSpec = bloomHistory[bloomHistory.length - 1];
+  const anchor = lastSpec
+    ? `${lastSpec.adjectiveIndex}:${lastSpec.nounIndex}:${lastSpec.accentIndex}:${bloomHistory.length}`
+    : `${fieldSourceMode}:${currentBroadcastKey ?? 'open'}:${currentWeatherPreset.id}`;
+  return `signal-garden:critter:${anchor}`;
+}
+
+function buildCritterSpec() {
+  const rng = makeSeededRandom(getCritterSeed());
+  const adjectiveIndex = Math.floor(rand(0, adjectives.length, rng));
+  const titleIndex = Math.floor(rand(0, critterTitles.length, rng));
+  const accentIndex = Math.floor(rand(0, ACCENT_SLOT_COUNT, rng));
+  const laneX = Math.round(rand(14, 84, rng));
+  const laneY = Math.round(rand(18, 72, rng));
+  const scale = rand(0.84, 1.24, rng);
+  const drift = rand(7, 16, rng);
+  const duration = rand(8.5, 16.5, rng);
+  const tilt = rand(-7, 7, rng);
+  const bodyHue = getAccentColor(accentIndex, currentWeatherPreset);
+  const ringHue = getAccentColor((accentIndex + 2) % ACCENT_SLOT_COUNT, currentWeatherPreset);
+  const blink = rand(2.8, 5.6, rng);
+  const mood = critterMoods[Math.floor(rand(0, critterMoods.length, rng))];
+  const title = `${adjectives[adjectiveIndex]} ${critterTitles[titleIndex]}`;
+
+  return {
+    title,
+    mood,
+    laneX,
+    laneY,
+    scale: Number(scale.toFixed(2)),
+    drift: Number(drift.toFixed(1)),
+    duration: Number(duration.toFixed(2)),
+    tilt: Number(tilt.toFixed(1)),
+    bodyHue,
+    ringHue,
+    blink: Number(blink.toFixed(2)),
+  };
+}
+
+function updateCritterUi() {
+  currentCritterSpec = buildCritterSpec();
+  const hasBlooms = bloomHistory.length > 0;
+  const critterName = hasBlooms ? currentCritterSpec.title : 'vacant terrarium';
+  const critterMood = hasBlooms ? currentCritterSpec.mood : 'waiting for a reason to exist';
+
+  if (residentNameEl) residentNameEl.textContent = critterName;
+  if (residentMoodEl) residentMoodEl.textContent = critterMood;
+  if (!gardenCritterEl) return;
+
+  gardenCritterEl.hidden = !hasBlooms;
+  gardenCritterEl.disabled = !hasBlooms;
+  gardenCritterEl.setAttribute('aria-label', hasBlooms ? `${critterName}, ${critterMood}` : 'Garden resident is waiting');
+  gardenCritterEl.dataset.visible = String(hasBlooms);
+  gardenCritterEl.style.setProperty('--critter-x', `${currentCritterSpec.laneX}%`);
+  gardenCritterEl.style.setProperty('--critter-y', `${currentCritterSpec.laneY}%`);
+  gardenCritterEl.style.setProperty('--critter-scale', String(currentCritterSpec.scale));
+  gardenCritterEl.style.setProperty('--critter-drift', `${currentCritterSpec.drift}px`);
+  gardenCritterEl.style.setProperty('--critter-duration', `${currentCritterSpec.duration}s`);
+  gardenCritterEl.style.setProperty('--critter-tilt', `${currentCritterSpec.tilt}deg`);
+  gardenCritterEl.style.setProperty('--critter-body', currentCritterSpec.bodyHue);
+  gardenCritterEl.style.setProperty('--critter-ring', currentCritterSpec.ringHue);
+  gardenCritterEl.style.setProperty('--critter-blink', `${currentCritterSpec.blink}s`);
+  gardenCritterEl.innerHTML = `
+    <span class="critter-body">
+      <span class="critter-orbit"></span>
+      <span class="critter-eye critter-eye-a"></span>
+      <span class="critter-eye critter-eye-b"></span>
+      <span class="critter-blush critter-blush-a"></span>
+      <span class="critter-blush critter-blush-b"></span>
+      <span class="critter-mouth"></span>
+      <span class="critter-antenna critter-antenna-a"></span>
+      <span class="critter-antenna critter-antenna-b"></span>
+      <span class="critter-shadow"></span>
+    </span>
+    <span class="critter-caption">
+      <strong>${currentCritterSpec.title}</strong>
+      <em>${currentCritterSpec.mood}</em>
+    </span>
+  `;
 }
 
 function formatBroadcastDate(key) {
@@ -570,6 +668,7 @@ function renderBloom(spec, options = {}) {
 
   syncControls();
   syncArchiveStatus();
+  updateCritterUi();
   if (syncUrl) syncShareState();
 }
 
@@ -670,6 +769,7 @@ function resetField({ logMessage = null, status = 'awaiting first contact', keep
   if (mood) setMood(getIdleMood(currentWeatherPreset));
   syncControls();
   syncArchiveStatus();
+  updateCritterUi();
   if (syncUrl) syncShareState();
 }
 
@@ -714,6 +814,7 @@ function undoLastBloom() {
   logField(pick(transmissions.undo).replace('{name}', removedName), bloomCount === 0 ? 'field standing by' : `tracking ${bloomCount} bloom${bloomCount === 1 ? '' : 's'}`);
   syncControls();
   syncArchiveStatus();
+  updateCritterUi();
   syncShareState();
 }
 
@@ -1557,6 +1658,20 @@ document.addEventListener('keydown', (event) => {
     event.preventDefault();
     cycleWeatherMode();
   }
+});
+
+gardenCritterEl?.addEventListener('click', () => {
+  if (!currentCritterSpec || !bloomHistory.length) return;
+  gardenCritterEl.dataset.bumped = 'true';
+  window.setTimeout(() => {
+    gardenCritterEl.dataset.bumped = 'false';
+  }, 520);
+
+  const specimen = bloomHistory[bloomHistory.length - 1];
+  const specimenName = specimen
+    ? makeNameFromIndexes(specimen.adjectiveIndex, specimen.nounIndex)
+    : 'the nearest bloom';
+  logField(`${currentCritterSpec.title} inspected ${specimenName} and approved it with deeply unserious authority.`, `resident awake • ${currentCritterSpec.title}`);
 });
 
 window.exportGardenPng = exportGardenPng;

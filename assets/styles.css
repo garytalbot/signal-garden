@@ -423,6 +423,14 @@ button[data-state="working"] {
 .hud div { padding: 14px 16px; }
 .hud span { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); }
 .hud strong { display: block; margin-top: 6px; font-size: 1.1rem; }
+.resident-mood {
+  display: block;
+  margin-top: 8px;
+  font-style: normal;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--text) 78%, var(--accent-soft));
+}
 .hud .hint-card {
   min-width: 0;
 }
@@ -503,6 +511,191 @@ button[data-state="working"] {
   z-index: 0;
 }
 
+.garden-critter {
+  --critter-x: 78%;
+  --critter-y: 28%;
+  --critter-scale: 1;
+  --critter-drift: 10px;
+  --critter-duration: 12s;
+  --critter-tilt: 0deg;
+  --critter-body: var(--accent-soft);
+  --critter-ring: var(--weather-accent-2);
+  --critter-blink: 4.1s;
+  position: absolute;
+  left: var(--critter-x);
+  top: var(--critter-y);
+  z-index: 3;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.garden-critter[data-visible="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.garden-critter:hover {
+  transform: translate(-50%, -52%);
+}
+
+.garden-critter .critter-body {
+  position: relative;
+  display: block;
+  width: 86px;
+  height: 70px;
+  border-radius: 58% 42% 52% 48% / 56% 46% 54% 44%;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255,255,255,0.85), transparent 24%),
+    radial-gradient(circle at 70% 22%, color-mix(in srgb, var(--critter-ring) 76%, white), transparent 30%),
+    linear-gradient(180deg, color-mix(in srgb, var(--critter-body) 82%, white), color-mix(in srgb, var(--critter-body) 78%, black));
+  border: 1px solid color-mix(in srgb, var(--critter-body) 72%, white);
+  box-shadow:
+    0 0 26px color-mix(in srgb, var(--critter-body) 30%, transparent),
+    0 18px 32px rgba(0, 0, 0, 0.18);
+  animation: critter-float var(--critter-duration) ease-in-out infinite;
+  transform: rotate(var(--critter-tilt)) scale(var(--critter-scale));
+}
+
+.garden-critter[data-bumped="true"] .critter-body {
+  animation: critter-bump 520ms ease, critter-float var(--critter-duration) ease-in-out infinite;
+}
+
+.garden-critter .critter-orbit {
+  position: absolute;
+  inset: -9px;
+  border-radius: 999px;
+  border: 1px dashed color-mix(in srgb, var(--critter-ring) 58%, transparent);
+  opacity: 0.68;
+}
+
+.garden-critter .critter-eye,
+.garden-critter .critter-blush,
+.garden-critter .critter-mouth,
+.garden-critter .critter-antenna,
+.garden-critter .critter-shadow {
+  position: absolute;
+  display: block;
+}
+
+.garden-critter .critter-eye {
+  top: 26px;
+  width: 10px;
+  height: 12px;
+  border-radius: 999px;
+  background: #09111b;
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,0.3);
+  animation: critter-blink var(--critter-blink) steps(1, end) infinite;
+}
+
+.garden-critter .critter-eye-a { left: 24px; }
+.garden-critter .critter-eye-b { right: 24px; }
+
+.garden-critter .critter-blush {
+  top: 39px;
+  width: 14px;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--critter-ring) 38%, transparent);
+}
+
+.garden-critter .critter-blush-a { left: 15px; }
+.garden-critter .critter-blush-b { right: 15px; }
+
+.garden-critter .critter-mouth {
+  left: 50%;
+  bottom: 16px;
+  width: 16px;
+  height: 8px;
+  border-bottom: 2px solid rgba(7, 12, 20, 0.92);
+  border-radius: 0 0 14px 14px;
+  transform: translateX(-50%);
+}
+
+.garden-critter .critter-antenna {
+  top: -14px;
+  width: 18px;
+  height: 24px;
+  border-top: 2px solid color-mix(in srgb, var(--critter-ring) 72%, white);
+  border-left: 2px solid color-mix(in srgb, var(--critter-ring) 72%, white);
+  border-radius: 18px 0 0 0;
+}
+
+.garden-critter .critter-antenna::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--critter-ring) 80%, white);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--critter-ring) 48%, transparent);
+}
+
+.garden-critter .critter-antenna-a {
+  left: 21px;
+  transform: rotate(-14deg);
+}
+
+.garden-critter .critter-antenna-a::after {
+  top: -4px;
+  left: -6px;
+}
+
+.garden-critter .critter-antenna-b {
+  right: 21px;
+  transform: scaleX(-1) rotate(-14deg);
+}
+
+.garden-critter .critter-antenna-b::after {
+  top: -4px;
+  left: -6px;
+}
+
+.garden-critter .critter-shadow {
+  left: 50%;
+  bottom: -15px;
+  width: 52px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.24);
+  filter: blur(5px);
+  transform: translateX(-50%);
+}
+
+.garden-critter .critter-caption {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  margin-top: 12px;
+  pointer-events: none;
+}
+
+.garden-critter .critter-caption strong,
+.garden-critter .critter-caption em {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--status-fill) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--badge-line) 92%, transparent);
+  white-space: nowrap;
+}
+
+.garden-critter .critter-caption strong {
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.garden-critter .critter-caption em {
+  font-style: normal;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
 .signal-line {
   stroke: color-mix(in srgb, var(--accent, var(--accent-soft)) 72%, white);
   stroke-width: 1.5;
@@ -517,6 +710,23 @@ button[data-state="working"] {
   0% { opacity: 0; stroke-dashoffset: 0; }
   18% { opacity: 0.72; }
   100% { opacity: 0; stroke-dashoffset: -36; }
+}
+
+@keyframes critter-float {
+  0%, 100% { transform: rotate(var(--critter-tilt)) translateY(calc(var(--critter-drift) * -0.35)) scale(var(--critter-scale)); }
+  50% { transform: rotate(calc(var(--critter-tilt) * -0.8)) translateY(var(--critter-drift)) scale(calc(var(--critter-scale) * 1.02)); }
+}
+
+@keyframes critter-bump {
+  0% { transform: rotate(var(--critter-tilt)) translateY(0) scale(var(--critter-scale)); }
+  32% { transform: rotate(calc(var(--critter-tilt) + 6deg)) translateY(calc(var(--critter-drift) * -0.8)) scale(calc(var(--critter-scale) * 1.08)); }
+  100% { transform: rotate(var(--critter-tilt)) translateY(0) scale(var(--critter-scale)); }
+}
+
+@keyframes critter-blink {
+  0%, 44%, 100% { transform: scaleY(1); }
+  46%, 48% { transform: scaleY(0.18); }
+  50%, 52% { transform: scaleY(1); }
 }
 
 .bloom {

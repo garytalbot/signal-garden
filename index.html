@@ -50,11 +50,13 @@
         <div><span>weather mode</span><strong id="weatherMode">violet hush</strong></div>
         <div><span>last specimen</span><strong id="lastName">none yet</strong></div>
         <div><span>field source</span><strong id="sourceLabel">open field</strong></div>
+        <div><span>resident</span><strong id="residentName">vacant terrarium</strong><em id="residentMood" class="resident-mood">waiting for a reason to exist</em></div>
         <div class="hint-card"><span>planting hint</span><strong id="hint">Move your cursor to aim a bloom. Click to plant. Press U to undo.</strong></div>
       </div>
       <div id="stage" class="stage" data-empty="true" aria-label="Signal Garden canvas">
         <div id="preview" class="preview" aria-hidden="true"></div>
         <svg id="signal-overlay" class="signal-overlay" aria-hidden="true"></svg>
+        <button id="gardenCritter" class="garden-critter" type="button" aria-live="polite" aria-label="Garden resident is waiting"></button>
       </div>
     </section>
 
