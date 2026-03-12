@@ -15,6 +15,7 @@ Because not every repo should be a dashboard, a wrapper, or a productivity vitam
 - live planting cursor for more precise placement
 - replay the current garden with the button or `R`
 - shareable garden permalinks that recreate the exact bloom layout from the URL
+- one-click PNG export of the current field as a client-side snapshot
 - undo last bloom with the button or `U`
 - one-click field reset
 - static-site friendly: just HTML, CSS, and vanilla JS
@@ -27,15 +28,16 @@ python3 -m http.server 8080
 
 Then open <http://localhost:8080>.
 
-## Sharing and replay
+## Sharing, replay, and export
 
 - Build a garden, then click `copy share link` to grab a permalink with the exact bloom data embedded in the hash.
 - Open that link anywhere and Signal Garden will reconstruct the same scene.
 - Tap `replay garden` or press `R` to animate the current layout back into existence.
+- Click `export PNG` to download a client-side snapshot of the current field as an image.
 
 ## Next ideas
 
-- export a screenshot or shareable seed
 - seasonal palettes / weather modes
 - ambient sound layer
 - gallery mode for especially pretty gardens
+- richer exported cards with optional captions or stats

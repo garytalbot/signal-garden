@@ -13,6 +13,7 @@ const fieldLogEl = document.getElementById('fieldLog');
 const logStatusEl = document.getElementById('logStatus');
 const copyLinkBtn = document.getElementById('copyLink');
 const replayBtn = document.getElementById('replay');
+const exportPngBtn = document.getElementById('exportPng');
 
 const adjectives = ['velvet', 'neon', 'hollow', 'lunar', 'midnight', 'feral', 'opal', 'echo', 'solar', 'ghost'];
 const nouns = ['orchid', 'signal', 'lantern', 'murmur', 'crown', 'spire', 'feather', 'petal', 'relic', 'flare'];
@@ -83,6 +84,7 @@ let previewVisible = false;
 let bloomHistory = [];
 let replayTimer = null;
 let shareToastTimer = null;
+let exportToastTimer = null;
 let suppressHashSync = false;
 
 function rand(min, max) {
@@ -165,6 +167,7 @@ function syncControls() {
   clearBtn.disabled = disabled;
   replayBtn.disabled = disabled;
   copyLinkBtn.disabled = disabled;
+  exportPngBtn.disabled = disabled;
 
   if (disabled) stage.setAttribute('data-empty', 'true');
   else stage.removeAttribute('data-empty');
@@ -370,6 +373,154 @@ function undoLastBloom() {
   syncShareState();
 }
 
+function escapeXml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+}
+
+function buildExportSvg() {
+  const rect = stage.getBoundingClientRect();
+  const width = Math.max(1, Math.round(rect.width));
+  const height = Math.max(1, Math.round(rect.height));
+  const mood = escapeXml(moodEl.textContent || 'violet hush');
+
+  const links = bloomHistory.slice(1).map((spec, index) => {
+    const previous = bloomHistory[index];
+    const accent = accents[spec.accentIndex] ?? accents[0];
+    return `<line x1="${previous.x}" y1="${previous.y}" x2="${spec.x}" y2="${spec.y}" stroke="${accent}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="6 10" opacity="0.5"/>`;
+  }).join('');
+
+  const blooms = bloomHistory.map((spec) => {
+    const accent = accents[spec.accentIndex] ?? accents[0];
+    const name = escapeXml(makeNameFromIndexes(spec.adjectiveIndex, spec.nounIndex));
+    const centerY = spec.y - spec.stemHeight;
+    const ringAWidth = spec.ringA;
+    const ringAHeight = Math.round(spec.ringA * 0.72);
+    const ringBWidth = spec.ringB;
+    const ringBHeight = Math.round(spec.ringB * 0.5);
+    const sparkAX = spec.x + spec.ringA * 0.45;
+    const sparkAY = centerY - 8;
+    const sparkBX = spec.x - spec.ringA * 0.4;
+    const sparkBY = centerY + 10;
+
+    return `
+      <g>
+        <line x1="${spec.x}" y1="${spec.y - 12}" x2="${spec.x}" y2="${centerY}" stroke="${accent}" stroke-width="4" stroke-linecap="round" opacity="0.9"/>
+        <ellipse cx="${spec.x}" cy="${centerY}" rx="${ringAWidth / 2}" ry="${ringAHeight / 2}" fill="none" stroke="${accent}" stroke-width="2" opacity="0.72" transform="rotate(${spec.tilt} ${spec.x} ${centerY})"/>
+        <ellipse cx="${spec.x}" cy="${centerY}" rx="${ringBWidth / 2}" ry="${ringBHeight / 2}" fill="none" stroke="${accent}" stroke-width="1" stroke-dasharray="5 6" opacity="0.52" transform="rotate(${spec.tilt * -1.4} ${spec.x} ${centerY})"/>
+        <circle cx="${spec.x}" cy="${centerY}" r="11" fill="url(#coreGlow-${spec.accentIndex})"/>
+        <circle cx="${sparkAX}" cy="${sparkAY}" r="5" fill="${accent}" opacity="0.9"/>
+        <circle cx="${sparkBX}" cy="${sparkBY}" r="5" fill="${accent}" opacity="0.82"/>
+        <text x="${spec.x}" y="${spec.y + 8}" text-anchor="middle" fill="#ebf5ff" font-size="12" font-family="Inter, system-ui, sans-serif">${name}</text>
+      </g>
+    `;
+  }).join('');
+
+  const moodLabel = bloomHistory.length
+    ? `<text x="24" y="36" fill="#bcefff" font-size="14" font-family="Inter, system-ui, sans-serif" letter-spacing="2">${mood.toUpperCase()}</text>`
+    : '<text x="24" y="36" fill="#ebf5ff" fill-opacity="0.6" font-size="14" font-family="Inter, system-ui, sans-serif">Your garden is empty. Plant the first signal.</text>';
+
+  return {
+    width,
+    height,
+    svg: `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+        <defs>
+          <linearGradient id="bgGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#091420"/>
+            <stop offset="100%" stop-color="#020910"/>
+          </linearGradient>
+          <radialGradient id="groundGlow" cx="50%" cy="110%" r="40%">
+            <stop offset="0%" stop-color="#00ffaa" stop-opacity="0.22"/>
+            <stop offset="100%" stop-color="#00ffaa" stop-opacity="0"/>
+          </radialGradient>
+          <pattern id="fieldDots" width="24" height="24" patternUnits="userSpaceOnUse">
+            <circle cx="1.2" cy="1.2" r="1" fill="#ffffff" fill-opacity="0.22"/>
+          </pattern>
+          ${accents.map((accent, index) => `
+            <radialGradient id="coreGlow-${index}" cx="50%" cy="50%" r="60%">
+              <stop offset="0%" stop-color="#ffffff"/>
+              <stop offset="30%" stop-color="#ffffff"/>
+              <stop offset="65%" stop-color="${accent}"/>
+              <stop offset="100%" stop-color="${accent}" stop-opacity="0"/>
+            </radialGradient>
+          `).join('')}
+        </defs>
+        <rect width="${width}" height="${height}" fill="url(#bgGradient)" rx="18" ry="18"/>
+        <rect width="${width}" height="${height}" fill="url(#groundGlow)" rx="18" ry="18"/>
+        <rect width="${width}" height="${height}" fill="url(#fieldDots)" opacity="0.08" rx="18" ry="18"/>
+        ${moodLabel}
+        ${links}
+        ${blooms}
+      </svg>
+    `,
+  };
+}
+
+async function exportGardenPng() {
+  if (!bloomHistory.length) return;
+
+  exportPngBtn.disabled = true;
+  exportPngBtn.dataset.state = 'working';
+  exportPngBtn.textContent = 'rendering...';
+
+  let blobUrl = null;
+
+  try {
+    const { width, height, svg } = buildExportSvg();
+    const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+    blobUrl = URL.createObjectURL(blob);
+    const image = new Image();
+
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = () => reject(new Error('image-render-failed'));
+      image.src = blobUrl;
+    });
+
+    const canvas = document.createElement('canvas');
+    const scale = window.devicePixelRatio > 1 ? 2 : 1;
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('canvas-unavailable');
+    context.scale(scale, scale);
+    context.drawImage(image, 0, 0, width, height);
+
+    const pngUrl = canvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    link.href = pngUrl;
+    link.download = `signal-garden-${timestamp}.png`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    exportPngBtn.dataset.state = 'done';
+    exportPngBtn.textContent = 'PNG exported';
+    logField('Garden export complete. The field has been pressed into a glowing postcard.', 'png ready');
+    window.clearTimeout(exportToastTimer);
+    exportToastTimer = window.setTimeout(() => {
+      exportPngBtn.dataset.state = 'idle';
+      exportPngBtn.textContent = 'export PNG';
+      syncControls();
+    }, 2200);
+  } catch (error) {
+    console.error(error);
+    exportPngBtn.dataset.state = 'idle';
+    exportPngBtn.textContent = 'export PNG';
+    syncControls();
+    logField('PNG export hit a weird patch of weather on this browser. Reload and try again.', 'export needs retry');
+  } finally {
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+  }
+}
+
 async function copyShareLink() {
   const url = makeShareUrl();
   try {
@@ -478,6 +629,7 @@ clearBtn.addEventListener('click', () => {
 
 undoBtn.addEventListener('click', undoLastBloom);
 copyLinkBtn.addEventListener('click', copyShareLink);
+exportPngBtn.addEventListener('click', exportGardenPng);
 replayBtn.addEventListener('click', () => replayGarden());
 
 document.addEventListener('keydown', (event) => {
@@ -491,6 +643,8 @@ document.addEventListener('keydown', (event) => {
     replayGarden();
   }
 });
+
+window.exportGardenPng = exportGardenPng;
 
 window.addEventListener('hashchange', () => {
   if (!suppressHashSync) loadGardenFromHash();

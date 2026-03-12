@@ -71,10 +71,17 @@ button:disabled {
   cursor: not-allowed;
 }
 
-button[data-state="copied"] {
+button[data-state="copied"],
+button[data-state="done"] {
   background: rgba(124, 255, 143, 0.18);
   border-color: rgba(124, 255, 143, 0.45);
   color: #d7ffe0;
+}
+
+button[data-state="working"] {
+  background: rgba(141, 220, 255, 0.16);
+  border-color: rgba(141, 220, 255, 0.52);
+  color: #dff7ff;
 }
 
 .stage-wrap { margin-top: 18px; }
