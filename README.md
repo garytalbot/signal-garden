@@ -39,6 +39,14 @@ Then open <http://localhost:8080>.
 - Tap `replay garden` or press `R` to animate the current layout back into existence.
 - Click `export PNG` to download a client-side snapshot of the current field as an image.
 
+## Launch + sharing kit
+
+- Ready-made launch copy lives in [`docs/launch-kit.md`](docs/launch-kit.md).
+- Reusable poster assets live in [`assets/launch/community-poster.svg`](assets/launch/community-poster.svg) and [`assets/launch/community-poster.png`](assets/launch/community-poster.png).
+- A real interface screenshot for posts lives in [`assets/launch/demo-ui.png`](assets/launch/demo-ui.png).
+- Recommended demo garden: <https://garytalbot.github.io/signal-garden/#garden=qe.24e.2.2.5.2e.1q.30.78~1e0.1jk.3.0.0.22.1m.34.g4~1xg.2cq.0.8.4.2k.1u.3e.4g~2p8.1b8.6.4.2.1y.1i.38.eg~3bg.24e.9.9.1.2c.1o.3a.8c~47e.1mc.8.2.3.24.1k.32.go~4s8.2bc.7.7.5.2o.1w.3g.64~5aa.1e0.5.5.0.20.1g.30.dc>
+- For follow-up replies, the best move is still making a fresh garden and posting the exact permalink or a PNG export from the live app.
+
 ## Next ideas
 
 - seasonal palettes / weather modes
