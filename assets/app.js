@@ -1,4 +1,5 @@
 const stage = document.getElementById('stage');
+const signalOverlay = document.getElementById('signal-overlay');
 const template = document.getElementById('bloom-template');
 const countEl = document.getElementById('count');
 const moodEl = document.getElementById('mood');
@@ -10,8 +11,11 @@ const adjectives = ['velvet', 'neon', 'hollow', 'lunar', 'midnight', 'feral', 'o
 const nouns = ['orchid', 'signal', 'lantern', 'murmur', 'crown', 'spire', 'feather', 'petal', 'relic', 'flare'];
 const moods = ['violet hush', 'teal static', 'rose voltage', 'amber drift', 'ion mist', 'midnight bloom'];
 const accents = ['#9d7bff', '#55e6ff', '#ff6ec7', '#7cff8f', '#ffd166', '#7ee7ff'];
+const maxBlooms = 60;
 
 let bloomCount = 0;
+let bloomId = 0;
+const plantedBlooms = [];
 
 function rand(min, max) {
   return Math.random() * (max - min) + min;
@@ -29,10 +33,58 @@ function setMood() {
   moodEl.textContent = pick(moods);
 }
 
+function syncOverlay() {
+  const { width, height } = stage.getBoundingClientRect();
+  signalOverlay.setAttribute('viewBox', `0 0 ${width} ${height}`);
+}
+
+function drawSignalLink(fromBloom, toBloom, accent) {
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', fromBloom.x.toFixed(1));
+  line.setAttribute('y1', fromBloom.y.toFixed(1));
+  line.setAttribute('x2', toBloom.x.toFixed(1));
+  line.setAttribute('y2', toBloom.y.toFixed(1));
+  line.style.setProperty('--accent', accent);
+  line.setAttribute('class', 'signal-line');
+  signalOverlay.appendChild(line);
+
+  window.setTimeout(() => {
+    line.remove();
+  }, 2300);
+}
+
+function connectBloom(newBloom) {
+  const nearby = plantedBlooms
+    .filter((bloom) => bloom.id !== newBloom.id)
+    .map((bloom) => ({
+      bloom,
+      distance: Math.hypot(bloom.x - newBloom.x, bloom.y - newBloom.y),
+    }))
+    .filter(({ distance }) => distance < 220)
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, 2);
+
+  nearby.forEach(({ bloom }) => drawSignalLink(newBloom, bloom, newBloom.accent));
+}
+
+function removeOldestBloom() {
+  const oldestBloom = plantedBlooms.shift();
+  oldestBloom?.node.remove();
+  bloomCount = plantedBlooms.length;
+  countEl.textContent = String(bloomCount);
+}
+
 function plant(x, y) {
   const node = template.content.firstElementChild.cloneNode(true);
   const name = makeName();
   const accent = pick(accents);
+  const bloom = {
+    id: ++bloomId,
+    x,
+    y,
+    accent,
+    node,
+  };
 
   node.style.left = `${x}px`;
   node.style.top = `${y}px`;
@@ -44,15 +96,15 @@ function plant(x, y) {
   node.querySelector('.label').textContent = name;
 
   stage.appendChild(node);
-  bloomCount += 1;
+  plantedBlooms.push(bloom);
+  bloomCount = plantedBlooms.length;
   countEl.textContent = String(bloomCount);
   lastNameEl.textContent = name;
   setMood();
+  connectBloom(bloom);
 
-  if (bloomCount > 60) {
-    stage.firstElementChild?.remove();
-    bloomCount -= 1;
-    countEl.textContent = String(bloomCount);
+  if (plantedBlooms.length > maxBlooms) {
+    removeOldestBloom();
   }
 }
 
@@ -73,7 +125,8 @@ randomizeBtn.addEventListener('click', () => {
 });
 
 clearBtn.addEventListener('click', () => {
-  stage.innerHTML = '';
+  plantedBlooms.splice(0).forEach(({ node }) => node.remove());
+  signalOverlay.replaceChildren();
   bloomCount = 0;
   countEl.textContent = '0';
   lastNameEl.textContent = 'none yet';
@@ -89,6 +142,9 @@ function seedGarden() {
 }
 
 window.addEventListener('load', () => {
+  syncOverlay();
   setMood();
   seedGarden();
 });
+
+window.addEventListener('resize', syncOverlay);
