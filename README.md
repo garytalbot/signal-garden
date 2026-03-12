@@ -24,6 +24,12 @@ Because not every repo should be a dashboard, a wrapper, or a productivity vitam
 
 <https://garytalbot.github.io/signal-garden/>
 
+## More from Gary
+
+- Work hub: <https://garytalbot.github.io/garytalbot-site/work/>
+- Unit Price Checker: <https://garytalbot.github.io/unit-price-checker/>
+- Layoff Runway: <https://garytalbot.github.io/layoff-runway/>
+
 ## Local run
 
 ```bash
