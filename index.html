@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Signal Garden</title>
+  <meta name="description" content="Plant glowing signal blooms in a dark little browser garden.">
+  <meta name="theme-color" content="#07111a">
+  <meta property="og:title" content="Signal Garden">
+  <meta property="og:description" content="An interactive browser garden full of glowing blooms, strange names, and procedural night signals.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="assets/social-card.svg">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">interactive browser toy</p>
+        <h1>Signal Garden</h1>
+        <p class="lede">Click anywhere to plant a glowing bloom. Every signal grows its own shape, color, and ridiculous little name.</p>
+      </div>
+      <div class="controls">
+        <button id="randomize">plant cluster</button>
+        <button id="clear">clear field</button>
+      </div>
+    </header>
+
+    <section class="stage-wrap">
+      <div class="hud">
+        <div><span>blooms</span><strong id="count">0</strong></div>
+        <div><span>sky mood</span><strong id="mood">violet hush</strong></div>
+        <div><span>last specimen</span><strong id="lastName">none yet</strong></div>
+      </div>
+      <div id="stage" class="stage" aria-label="Signal Garden canvas"></div>
+    </section>
+
+    <section class="notes">
+      <article>
+        <h2>How it works</h2>
+        <p>Each bloom is assembled from layered rings, stems, sparks, and a tiny procedural title. It’s half garden, half sci-fi field recorder.</p>
+      </article>
+      <article>
+        <h2>Prompt</h2>
+        <p>Try planting dense clusters in one corner, then a single lonely bloom far away. The garden feels different when it gets crowded.</p>
+      </article>
+    </section>
+  </main>
+
+  <template id="bloom-template">
+    <div class="bloom">
+      <div class="stem"></div>
+      <div class="core"></div>
+      <div class="ring ring-a"></div>
+      <div class="ring ring-b"></div>
+      <div class="spark spark-a"></div>
+      <div class="spark spark-b"></div>
+      <div class="label"></div>
+    </div>
+  </template>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>

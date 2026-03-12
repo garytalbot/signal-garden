@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#08111a"/>
+      <stop offset="100%" stop-color="#101f34"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="250" cy="140" r="220" fill="#7b4dff" fill-opacity="0.16"/>
+  <circle cx="980" cy="90" r="180" fill="#24d8ff" fill-opacity="0.12"/>
+  <ellipse cx="600" cy="350" rx="170" ry="80" stroke="#9d7bff" stroke-width="6"/>
+  <ellipse cx="600" cy="350" rx="250" ry="42" stroke="#ff6ec7" stroke-width="4"/>
+  <line x1="600" y1="500" x2="600" y2="360" stroke="#7ee7ff" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="600" cy="340" r="32" fill="#ffffff"/>
+  <text x="90" y="470" fill="#EBF5FF" font-size="88" font-family="Inter, Arial, sans-serif" font-weight="700">Signal Garden</text>
+  <text x="90" y="535" fill="#95ABC0" font-size="34" font-family="Inter, Arial, sans-serif">Plant glowing procedural blooms in a dark little browser field.</text>
+</svg>
