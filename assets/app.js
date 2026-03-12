@@ -733,8 +733,32 @@ function buildExportSvg() {
   const mood = escapeXml(moodEl.textContent || getIdleMood(currentWeatherPreset));
   const weatherLabel = escapeXml(currentWeatherPreset.label.toUpperCase());
   const sourceLabel = escapeXml(sourceLabelEl.textContent || 'open field');
-  const footerCopy = escapeXml(`${bloomHistory.length} blooms • ${fieldSourceMode === 'broadcast' && currentBroadcastKey ? currentBroadcastKey : 'portable garden'}`);
   const exportTheme = currentWeatherPreset.export;
+  const lastBloom = bloomHistory[bloomHistory.length - 1] ?? null;
+  const lastBloomName = lastBloom
+    ? escapeXml(makeNameFromIndexes(lastBloom.adjectiveIndex, lastBloom.nounIndex))
+    : 'none yet';
+  const exportDateKey = currentBroadcastKey ?? getUtcDateKey();
+  const exportDateLabel = escapeXml(formatBroadcastDate(exportDateKey));
+  const gardenTitle = escapeXml(
+    fieldSourceMode === 'broadcast' && currentBroadcastKey
+      ? `Daily signal • ${exportDateLabel}`
+      : fieldSourceMode === 'shared'
+        ? 'Shared garden postcard'
+        : 'Signal Garden postcard'
+  );
+  const gardenSubtitle = escapeXml(
+    fieldSourceMode === 'broadcast' && currentBroadcastKey
+      ? `UTC broadcast ${currentBroadcastKey} • ${bloomHistory.length} blooms`
+      : `${bloomHistory.length} blooms • weather set to ${currentWeatherPreset.label}`
+  );
+  const footerCopy = escapeXml(`signal.garden • ${fieldSourceMode === 'broadcast' && currentBroadcastKey ? currentBroadcastKey : 'portable field'}`);
+  const summaryItems = [
+    { label: 'WEATHER', value: weatherLabel },
+    { label: 'SOURCE', value: sourceLabel },
+    { label: 'LAST BLOOM', value: lastBloomName },
+    { label: 'COUNT', value: String(bloomHistory.length) },
+  ];
 
   const links = bloomHistory.slice(1).map((spec, index) => {
     const previous = bloomHistory[index];
@@ -769,8 +793,19 @@ function buildExportSvg() {
   }).join('');
 
   const moodLabel = bloomHistory.length
-    ? `<text x="24" y="36" fill="${exportTheme.text}" font-size="14" font-family="Inter, system-ui, sans-serif" letter-spacing="2">${mood.toUpperCase()}</text>`
-    : `<text x="24" y="36" fill="${exportTheme.muted}" font-size="14" font-family="Inter, system-ui, sans-serif">Your garden is empty. Plant the first signal.</text>`;
+    ? `<text x="36" y="48" fill="${exportTheme.brand}" font-size="12" font-family="Inter, system-ui, sans-serif" letter-spacing="3">${mood.toUpperCase()}</text>`
+    : `<text x="36" y="48" fill="${exportTheme.muted}" font-size="14" font-family="Inter, system-ui, sans-serif">Your garden is empty. Plant the first signal.</text>`;
+
+  const summaryMarkup = summaryItems.map((item, index) => {
+    const columnWidth = Math.max(140, Math.floor((width - 112) / summaryItems.length));
+    const x = 40 + columnWidth * index;
+    return `
+      <g transform="translate(${x} 32)">
+        <text x="0" y="0" fill="${exportTheme.brand}" font-size="10" font-family="Inter, system-ui, sans-serif" letter-spacing="2">${item.label}</text>
+        <text x="0" y="24" fill="${exportTheme.text}" font-size="15" font-family="Inter, system-ui, sans-serif">${item.value}</text>
+      </g>
+    `;
+  }).join('');
 
   return {
     width,
@@ -794,6 +829,10 @@ function buildExportSvg() {
             <stop offset="0%" stop-color="${exportTheme.haloB}"/>
             <stop offset="100%" stop-color="${exportTheme.haloB}" stop-opacity="0"/>
           </radialGradient>
+          <linearGradient id="topPanelGlow" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="${exportTheme.badgeFill}"/>
+            <stop offset="100%" stop-color="rgba(255,255,255,0.02)"/>
+          </linearGradient>
           <pattern id="fieldDots" width="24" height="24" patternUnits="userSpaceOnUse">
             <circle cx="1.2" cy="1.2" r="1" fill="#ffffff" fill-opacity="0.22"/>
           </pattern>
@@ -811,13 +850,20 @@ function buildExportSvg() {
         <rect width="${width}" height="${height}" fill="url(#skyHaloB)" rx="18" ry="18"/>
         <rect width="${width}" height="${height}" fill="url(#groundGlow)" rx="18" ry="18"/>
         <rect width="${width}" height="${height}" fill="url(#fieldDots)" opacity="0.08" rx="18" ry="18"/>
-        ${moodLabel}
-        <text x="${width - 24}" y="36" text-anchor="end" fill="${exportTheme.brand}" font-size="12" font-family="Inter, system-ui, sans-serif" letter-spacing="2">SIGNAL GARDEN</text>
+        <g transform="translate(24 24)">
+          <rect width="${Math.max(220, width - 48)}" height="96" rx="22" ry="22" fill="url(#topPanelGlow)" stroke="${exportTheme.badgeStroke}"/>
+          ${moodLabel}
+          <text x="36" y="78" fill="${exportTheme.text}" font-size="30" font-weight="700" font-family="Inter, system-ui, sans-serif">${gardenTitle}</text>
+          <text x="36" y="104" fill="${exportTheme.muted}" font-size="14" font-family="Inter, system-ui, sans-serif">${gardenSubtitle}</text>
+          <text x="${Math.max(220, width - 84)}" y="48" text-anchor="end" fill="${exportTheme.brand}" font-size="12" font-family="Inter, system-ui, sans-serif" letter-spacing="2">SIGNAL GARDEN</text>
+        </g>
         ${links}
         ${blooms}
-        <g transform="translate(24 ${height - 58})">
-          <rect width="${Math.max(120, width - 48)}" height="34" rx="17" ry="17" fill="${exportTheme.badgeFill}" stroke="${exportTheme.badgeStroke}"/>
-          <text x="16" y="22" fill="${exportTheme.muted}" font-size="12" font-family="Inter, system-ui, sans-serif">weather • ${weatherLabel}   ·   source • ${sourceLabel}   ·   ${footerCopy}</text>
+        <g transform="translate(24 ${height - 138})">
+          <rect width="${Math.max(220, width - 48)}" height="98" rx="24" ry="24" fill="${exportTheme.badgeFill}" stroke="${exportTheme.badgeStroke}"/>
+          ${summaryMarkup}
+          <text x="16" y="82" fill="${exportTheme.muted}" font-size="12" font-family="Inter, system-ui, sans-serif">${footerCopy}</text>
+          <text x="${Math.max(200, width - 80)}" y="82" text-anchor="end" fill="${exportTheme.muted}" font-size="12" font-family="Inter, system-ui, sans-serif">captured ${exportDateLabel}</text>
         </g>
       </svg>
     `,
