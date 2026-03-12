@@ -204,6 +204,22 @@ body[data-weather="storm-glass"] {
   padding: 24px;
 }
 
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand-mark {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--badge-line) 92%, transparent);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.24), 0 0 24px color-mix(in srgb, var(--accent-soft) 26%, transparent);
+  background: rgba(3, 10, 18, 0.82);
+  flex: 0 0 auto;
+}
+
 .eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.22em;
@@ -872,6 +888,14 @@ button[data-state="working"] {
 
 @media (max-width: 760px) {
   .topbar, .notes { grid-template-columns: 1fr; display: grid; }
+  .brand-lockup {
+    align-items: start;
+  }
+  .brand-mark {
+    width: 54px;
+    height: 54px;
+    border-radius: 16px;
+  }
   .hud { grid-template-columns: 1fr; }
   .stage { height: 62vh; }
   .archive-head,
