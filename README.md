@@ -20,6 +20,10 @@ Because not every repo should be a dashboard, a wrapper, or a productivity vitam
 - one-click field reset
 - static-site friendly: just HTML, CSS, and vanilla JS
 
+## Live site
+
+<https://garytalbot.github.io/signal-garden/>
+
 ## Local run
 
 ```bash
