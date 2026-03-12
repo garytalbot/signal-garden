@@ -19,6 +19,7 @@ Because not every repo should be a dashboard, a wrapper, or a productivity vitam
 ## What makes it easier to share now
 
 - **Daily signal mode** gives the project one common field per UTC day, so people can gather around the same garden instead of only sharing one-off screenshots.
+- **Gallery picks** gives the page a curated shelf of hand-tuned starter fields across all four weather modes, so there are immediately shareable compositions before anyone even clicks.
 - **The archive strip** turns the latest broadcasts into a lightweight on-page gallery, which makes the project feel alive even before someone plants their own blooms.
 - **Exact-garden permalinks** recreate a specific composition from the URL hash, so a field can travel intact.
 - **PNG export** gives image-first communities a clean artifact without asking them to read the code first.
@@ -29,6 +30,7 @@ Because not every repo should be a dashboard, a wrapper, or a productivity vitam
 - procedural names, ring shapes, stem heights, color accents, and deterministic sky moods
 - reactive field log with atmospheric session notes and milestone transmissions
 - quick cluster generator
+- curated gallery picks with hand-tuned starter fields across all four weather presets
 - a browsable archive/gallery of the latest UTC daily broadcasts, each with its own mini preview card
 - daily signal mode with one shared broadcast garden per UTC day
 - live planting cursor for more precise placement

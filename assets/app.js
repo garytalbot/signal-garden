@@ -17,6 +17,8 @@ const fieldLogEl = document.getElementById('fieldLog');
 const logStatusEl = document.getElementById('logStatus');
 const archiveGridEl = document.getElementById('archiveGrid');
 const archiveStatusEl = document.getElementById('archiveStatus');
+const highlightsGridEl = document.getElementById('highlightsGrid');
+const highlightsStatusEl = document.getElementById('highlightsStatus');
 const copyLinkBtn = document.getElementById('copyLink');
 const sharePostcardBtn = document.getElementById('sharePostcard');
 const replayBtn = document.getElementById('replay');
@@ -214,6 +216,40 @@ const ARCHIVE_DAYS = 12;
 const ARCHIVE_PREVIEW_WIDTH = 320;
 const ARCHIVE_PREVIEW_HEIGHT = 240;
 const BROADCAST_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const GALLERY_HIGHLIGHTS = [
+  {
+    id: 'midnight-promenade',
+    title: 'midnight promenade',
+    tag: 'slow parade',
+    weatherId: 'violet-hush',
+    description: 'A balanced walking-path field with enough empty space to feel expensive.',
+    encodedGarden: 'qe.24e.2.2.5.2e.1q.30.78~1e0.1jk.3.0.0.22.1m.34.g4~1xg.2cq.0.8.4.2k.1u.3e.4g~2p8.1b8.6.4.2.1y.1i.38.eg~3bg.24e.9.9.1.2c.1o.3a.8c~47e.1mc.8.2.3.24.1k.32.go~4s8.2bc.7.7.5.2o.1w.3g.64~5aa.1e0.5.5.0.20.1g.30.dc',
+  },
+  {
+    id: 'greenroom-static',
+    title: 'greenroom static',
+    tag: 'aurora pocket',
+    weatherId: 'aurora-tide',
+    description: 'Cooler air, wider drift, and a suspicious amount of northern-lights confidence.',
+    encodedGarden: '10a.1tw.2.2.0.2e.1q.2s.9s~1ro.198.4.7.3.1y.18.32.bi~2hc.22g.1.5.1.2a.1u.36.5w~368.1hy.6.1.4.24.1k.34.ic~3zs.270.0.8.2.2m.20.3i.ek~4o0.1o8.5.9.5.22.1g.30.90~5d4.2ak.3.4.1.2g.1w.38.cg',
+  },
+  {
+    id: 'lantern-laundry',
+    title: 'lantern laundry',
+    tag: 'ember parade',
+    weatherId: 'ember-rain',
+    description: 'Warm sodium-rain nonsense. Looks like a small town art fair got struck by meteorology.',
+    encodedGarden: 's0.23c.1.0.0.28.1s.36.jo~1kg.1e0.7.4.3.22.1i.34.ao~2b4.260.2.8.1.2c.20.3a.b4~32w.1ls.8.1.5.24.1g.2w.i8~3ua.27g.0.9.4.2k.1u.3g.d4~4ni.1cq.6.3.2.20.1m.32.6o~5b8.24o.3.5.1.2e.1q.38.fs',
+  },
+  {
+    id: 'storm-ballet',
+    title: 'storm ballet',
+    tag: 'glass thunder',
+    weatherId: 'storm-glass',
+    description: 'A cleaner colder field for people who think weather should arrive in tailored pants.',
+    encodedGarden: 'uu.1yo.4.1.0.24.1o.34.as~1mk.2d8.1.8.3.2g.1u.3c.d0~2f0.1f4.7.5.2.20.1k.30.7k~34q.274.2.2.4.2m.20.3i.b8~3xs.1m8.8.7.5.22.1g.2u.gw~4s0.24o.0.0.1.2e.1w.36.5o~5l4.1be.5.9.4.24.1m.32.f4',
+  },
+];
 
 let bloomCount = 0;
 let previousBloomPoint = null;
@@ -584,6 +620,13 @@ function getBaseUrl() {
 
 function getBroadcastUrl(key) {
   return `${getBaseUrl()}#broadcast=${key}`;
+}
+
+function getGardenUrl(encodedGarden, weatherId = currentWeatherPreset.id) {
+  const params = new URLSearchParams();
+  params.set('garden', encodedGarden);
+  params.set('weather', weatherId);
+  return `${getBaseUrl()}#${params.toString()}`;
 }
 
 function buildHashString() {
@@ -1089,6 +1132,41 @@ function syncArchiveSelection() {
   });
 }
 
+function renderHighlights() {
+  if (!highlightsGridEl) return;
+
+  const cards = GALLERY_HIGHLIGHTS.map((entry) => {
+    const preset = getWeatherPresetById(entry.weatherId);
+    const sequence = entry.encodedGarden.split('~').map(decodeBloom).filter(Boolean).slice(0, MAX_BLOOMS);
+    const mood = getSequenceMood(sequence, preset);
+    const card = document.createElement('article');
+    card.className = 'archive-card';
+    card.dataset.highlightId = entry.id;
+    card.innerHTML = `
+      <div class="archive-preview" aria-hidden="true">${buildArchivePreviewSvg(sequence, preset)}</div>
+      <div class="archive-meta">
+        <span class="highlight-tag">${escapeXml(entry.tag)}</span>
+        <div class="archive-date">
+          <strong>${escapeXml(entry.title)}</strong>
+          <span>${escapeXml(preset.label)}</span>
+        </div>
+        <p class="archive-summary">${sequence.length} blooms • ${escapeXml(mood)}</p>
+        <p class="archive-title">${escapeXml(entry.description)}</p>
+      </div>
+      <div class="archive-actions">
+        <button type="button" data-action="load-highlight" data-id="${entry.id}">load highlight</button>
+        <button type="button" data-action="copy-highlight" data-id="${entry.id}">copy link</button>
+      </div>
+    `;
+    return card;
+  });
+
+  highlightsGridEl.replaceChildren(...cards);
+  if (highlightsStatusEl) {
+    highlightsStatusEl.textContent = `${GALLERY_HIGHLIGHTS.length} curated starter fields across all four weather modes.`;
+  }
+}
+
 function syncArchiveStatus() {
   if (!archiveStatusEl) return;
 
@@ -1153,6 +1231,37 @@ async function copyBroadcastLink(key, button) {
   logField(`Archive link opened manually for ${key}. Clipboard politics remain bleak.`, 'manual copy required');
 }
 
+function loadGalleryHighlight(highlightId) {
+  const entry = GALLERY_HIGHLIGHTS.find((item) => item.id === highlightId);
+  if (!entry) return false;
+
+  const sequence = entry.encodedGarden.split('~').map(decodeBloom).filter(Boolean).slice(0, MAX_BLOOMS);
+  if (!sequence.length) return false;
+
+  return applySharedSequence(sequence, {
+    replay: false,
+    weatherId: entry.weatherId,
+    sourceMode: 'shared',
+    hashShareMode: 'garden',
+    logMessage: `Gallery highlight loaded: ${entry.title}. ${entry.description}`,
+    status: `gallery pick loaded • ${sequence.length} blooms • ${getWeatherPresetById(entry.weatherId).label}`,
+  });
+}
+
+async function copyHighlightLink(highlightId, button) {
+  const entry = GALLERY_HIGHLIGHTS.find((item) => item.id === highlightId);
+  if (!entry) return;
+
+  const copied = await copyTextToClipboard(getGardenUrl(entry.encodedGarden, entry.weatherId), 'Copy this highlight garden link:');
+  if (copied) {
+    if (button) flashButtonCopyState(button, 'copied', 'copy link');
+    logField(`Highlight link copied for ${entry.title}. Pocket museum secured.`, 'gallery link copied');
+    return;
+  }
+
+  logField(`Highlight link opened manually for ${entry.title}. Clipboard union rules remain intense.`, 'manual copy required');
+}
+
 function replayGarden(sequence = bloomHistory, options = {}) {
   const { restoreFromHash = false, shareMode = hashMode, sourceMode = fieldSourceMode, broadcastKey = currentBroadcastKey } = options;
   const blooms = sequence.map((spec) => ({ ...spec }));
@@ -1182,25 +1291,29 @@ function replayGarden(sequence = bloomHistory, options = {}) {
   });
 }
 
-function loadDailyBroadcast(key = getUtcDateKey(), { replay = false } = {}) {
-  if (!isBroadcastKey(key)) return false;
-
-  const blooms = buildDailyGarden(key);
+function applySharedSequence(sequence, {
+  replay = false,
+  weatherId = DEFAULT_WEATHER_ID,
+  sourceMode = 'shared',
+  hashShareMode = 'garden',
+  broadcastKey = null,
+  logMessage = pick(transmissions.loaded),
+  status = null,
+} = {}) {
+  const blooms = sequence.map((spec) => ({ ...spec }));
   if (!blooms.length) return false;
 
-  const weatherPreset = getBroadcastWeatherPreset(key);
-
   suppressHashSync = true;
-  hashMode = 'broadcast';
-  setFieldSource('broadcast', key);
-  setWeatherPreset(weatherPreset.id, { syncUrl: false });
+  hashMode = hashShareMode;
+  setFieldSource(sourceMode, sourceMode === 'broadcast' ? broadcastKey : null);
+  setWeatherPreset(weatherId || DEFAULT_WEATHER_ID, { syncUrl: false });
 
   if (replay) {
     replayGarden(blooms, {
       restoreFromHash: true,
-      shareMode: 'broadcast',
-      sourceMode: 'broadcast',
-      broadcastKey: key,
+      shareMode: hashShareMode,
+      sourceMode,
+      broadcastKey,
     });
     return true;
   }
@@ -1213,13 +1326,28 @@ function loadDailyBroadcast(key = getUtcDateKey(), { replay = false } = {}) {
       animateLink: index !== 0,
     });
   });
-  logField(
-    `${pick(transmissions.daily).replace('{date}', key)} Weather report: ${weatherPreset.label}.`,
-    `daily signal tuned: ${blooms.length} blooms`
-  );
+  logField(logMessage, status ?? `${sourceMode === 'broadcast' ? 'daily signal tuned' : 'shared garden loaded'}: ${blooms.length} blooms • ${currentWeatherPreset.label}`);
   suppressHashSync = false;
   syncShareState();
   return true;
+}
+
+function loadDailyBroadcast(key = getUtcDateKey(), { replay = false } = {}) {
+  if (!isBroadcastKey(key)) return false;
+
+  const blooms = buildDailyGarden(key);
+  if (!blooms.length) return false;
+
+  const weatherPreset = getBroadcastWeatherPreset(key);
+  return applySharedSequence(blooms, {
+    replay,
+    weatherId: weatherPreset.id,
+    sourceMode: 'broadcast',
+    hashShareMode: 'broadcast',
+    broadcastKey: key,
+    logMessage: `${pick(transmissions.daily).replace('{date}', key)} Weather report: ${weatherPreset.label}.`,
+    status: `daily signal tuned: ${blooms.length} blooms`,
+  });
 }
 
 function parseHashState() {
@@ -1260,32 +1388,14 @@ function loadGardenFromHash({ replay = false } = {}) {
   const blooms = parsed.encodedGarden.split('~').map(decodeBloom).filter(Boolean).slice(0, MAX_BLOOMS);
   if (!blooms.length) return false;
 
-  suppressHashSync = true;
-  hashMode = 'garden';
-  setFieldSource('shared');
-  setWeatherPreset(parsed.weatherId || DEFAULT_WEATHER_ID, { syncUrl: false });
-
-  if (replay) {
-    replayGarden(blooms, {
-      restoreFromHash: true,
-      shareMode: 'garden',
-      sourceMode: 'shared',
-    });
-    return true;
-  }
-
-  resetField({ keepLogs: false, syncUrl: false, mood: false });
-  blooms.forEach((spec, index) => {
-    renderBloom(spec, {
-      logPlant: false,
-      syncUrl: false,
-      animateLink: index !== 0,
-    });
+  return applySharedSequence(blooms, {
+    replay,
+    weatherId: parsed.weatherId || DEFAULT_WEATHER_ID,
+    sourceMode: 'shared',
+    hashShareMode: 'garden',
+    logMessage: pick(transmissions.loaded),
+    status: `shared garden loaded: ${blooms.length} blooms • ${getWeatherPresetById(parsed.weatherId || DEFAULT_WEATHER_ID).label}`,
   });
-  logField(pick(transmissions.loaded), `shared garden loaded: ${blooms.length} blooms • ${currentWeatherPreset.label}`);
-  suppressHashSync = false;
-  syncShareState();
-  return true;
 }
 
 stage.addEventListener('pointermove', (event) => {
@@ -1332,6 +1442,23 @@ dailySignalBtn.addEventListener('click', () => {
 });
 
 cycleWeatherBtn?.addEventListener('click', cycleWeatherMode);
+
+highlightsGridEl?.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-action][data-id]');
+  if (!(button instanceof HTMLButtonElement)) return;
+
+  const { action, id } = button.dataset;
+  if (!id) return;
+
+  if (action === 'load-highlight') {
+    loadGalleryHighlight(id);
+    return;
+  }
+
+  if (action === 'copy-highlight') {
+    copyHighlightLink(id, button);
+  }
+});
 
 archiveGridEl?.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-action][data-key]');
@@ -1398,6 +1525,7 @@ window.addEventListener('load', () => {
   setFieldSource('open');
   setWeatherPreset(DEFAULT_WEATHER_ID, { syncUrl: false });
   syncControls();
+  renderHighlights();
   renderArchive();
   logField('Signal Garden online. The soil is listening.', 'awaiting first contact');
   if (!loadGardenFromHash()) {
