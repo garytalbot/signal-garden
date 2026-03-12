@@ -71,6 +71,12 @@ button:disabled {
   cursor: not-allowed;
 }
 
+button[data-state="copied"] {
+  background: rgba(124, 255, 143, 0.18);
+  border-color: rgba(124, 255, 143, 0.45);
+  color: #d7ffe0;
+}
+
 .stage-wrap { margin-top: 18px; }
 .hud {
   display: grid;

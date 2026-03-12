@@ -19,10 +19,12 @@
       <div>
         <p class="eyebrow">interactive browser toy</p>
         <h1>Signal Garden</h1>
-        <p class="lede">Click anywhere to plant a glowing bloom. Every signal grows its own shape, color, and ridiculous little name.</p>
+        <p class="lede">Click anywhere to plant a glowing bloom. Every signal grows its own shape, color, and ridiculous little name. Now you can replay the whole thing or hand someone a link to the exact garden you made.</p>
       </div>
       <div class="controls">
         <button id="randomize">plant cluster</button>
+        <button id="replay" disabled>replay garden</button>
+        <button id="copyLink" disabled>copy share link</button>
         <button id="undo" disabled>undo last</button>
         <button id="clear" disabled>clear field</button>
       </div>
@@ -54,7 +56,7 @@
         <div class="log-head">
           <div>
             <h2>Field log</h2>
-            <p>The garden now keeps a tiny running diary of your session.</p>
+            <p>The garden now keeps a tiny running diary of your session and can preserve the whole layout in a shareable link.</p>
           </div>
           <span class="log-badge" id="logStatus">awaiting first contact</span>
         </div>
