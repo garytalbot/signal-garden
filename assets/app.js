@@ -13,6 +13,8 @@ const hintEl = document.getElementById('hint');
 const previewEl = document.getElementById('preview');
 const fieldLogEl = document.getElementById('fieldLog');
 const logStatusEl = document.getElementById('logStatus');
+const archiveGridEl = document.getElementById('archiveGrid');
+const archiveStatusEl = document.getElementById('archiveStatus');
 const copyLinkBtn = document.getElementById('copyLink');
 const replayBtn = document.getElementById('replay');
 const exportPngBtn = document.getElementById('exportPng');
@@ -88,6 +90,9 @@ const transmissions = {
 const MAX_BLOOMS = 60;
 const CANONICAL_STAGE_WIDTH = 1000;
 const CANONICAL_STAGE_HEIGHT = 680;
+const ARCHIVE_DAYS = 12;
+const ARCHIVE_PREVIEW_WIDTH = 320;
+const ARCHIVE_PREVIEW_HEIGHT = 240;
 const BROADCAST_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 let bloomCount = 0;
@@ -112,6 +117,26 @@ function pick(items, randomFn = Math.random) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function shiftUtcDate(date, offsetDays) {
+  const shifted = new Date(date);
+  shifted.setUTCDate(shifted.getUTCDate() + offsetDays);
+  return shifted;
+}
+
+function formatBroadcastDate(key) {
+  const date = new Date(`${key}T00:00:00Z`);
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+function getRecentBroadcastKeys(total = ARCHIVE_DAYS, fromDate = new Date()) {
+  return Array.from({ length: total }, (_, index) => getUtcDateKey(shiftUtcDate(fromDate, -index)));
 }
 
 function clearReplayTimers() {
@@ -207,6 +232,8 @@ function setFieldSource(mode = 'open', broadcastKey = null) {
   fieldSourceMode = mode;
   currentBroadcastKey = mode === 'broadcast' ? broadcastKey : null;
   updateFieldSourceLabel();
+  syncArchiveSelection();
+  syncArchiveStatus();
 }
 
 function syncControls() {
@@ -320,6 +347,7 @@ function renderBloom(spec, options = {}) {
   }
 
   syncControls();
+  syncArchiveStatus();
   if (syncUrl) syncShareState();
 }
 
@@ -364,10 +392,18 @@ function decodeBloom(chunk) {
   };
 }
 
+function getBaseUrl() {
+  return `${window.location.origin}${window.location.pathname}`;
+}
+
+function getBroadcastUrl(key) {
+  return `${getBaseUrl()}#broadcast=${key}`;
+}
+
 function makeShareUrl() {
-  const base = `${window.location.origin}${window.location.pathname}`;
+  const base = getBaseUrl();
   if (hashMode === 'broadcast' && currentBroadcastKey) {
-    return `${base}#broadcast=${currentBroadcastKey}`;
+    return getBroadcastUrl(currentBroadcastKey);
   }
   if (!bloomHistory.length) return base;
   return `${base}#garden=${bloomHistory.map(encodeBloom).join('~')}`;
@@ -400,6 +436,7 @@ function resetField({ logMessage = null, status = 'awaiting first contact', keep
   if (logMessage) logField(logMessage, status);
   if (mood) setMood();
   syncControls();
+  syncArchiveStatus();
   if (syncUrl) syncShareState();
 }
 
@@ -443,6 +480,7 @@ function undoLastBloom() {
 
   logField(pick(transmissions.undo).replace('{name}', removedName), bloomCount === 0 ? 'field standing by' : `tracking ${bloomCount} bloom${bloomCount === 1 ? '' : 's'}`);
   syncControls();
+  syncArchiveStatus();
   syncShareState();
 }
 
@@ -594,22 +632,44 @@ async function exportGardenPng() {
   }
 }
 
+async function copyTextToClipboard(text, fallbackLabel = 'Copy your Signal Garden link:') {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    window.prompt(fallbackLabel, text);
+    return false;
+  }
+}
+
+function flashButtonCopyState(button, nextLabel = 'link copied', resetLabel = null) {
+  const originalLabel = resetLabel ?? button.textContent;
+  window.clearTimeout(button.copyStateTimer);
+  button.dataset.state = 'copied';
+  button.textContent = nextLabel;
+  button.copyStateTimer = window.setTimeout(() => {
+    button.dataset.state = 'idle';
+    button.textContent = originalLabel;
+  }, 1800);
+}
+
 async function copyShareLink() {
   const url = makeShareUrl();
-  try {
-    await navigator.clipboard.writeText(url);
+  const copied = await copyTextToClipboard(url);
+
+  if (copied) {
+    window.clearTimeout(shareToastTimer);
     copyLinkBtn.dataset.state = 'copied';
     copyLinkBtn.textContent = 'link copied';
     logField(pick(transmissions.share), hashMode === 'broadcast' ? 'daily link copied' : 'share link copied');
-    window.clearTimeout(shareToastTimer);
     shareToastTimer = window.setTimeout(() => {
       copyLinkBtn.dataset.state = 'idle';
       copyLinkBtn.textContent = 'copy share link';
     }, 1800);
-  } catch {
-    window.prompt('Copy your Signal Garden link:', url);
-    logField('Clipboard got stage fright, so the share link opened the old-fashioned way instead.', 'manual copy required');
+    return;
   }
+
+  logField('Clipboard got stage fright, so the share link opened the old-fashioned way instead.', 'manual copy required');
 }
 
 function getUtcDateKey(date = new Date()) {
@@ -640,10 +700,11 @@ function makeSeededRandom(seedText) {
   };
 }
 
-function buildDailyGarden(key) {
+function buildDailyGarden(key, options = {}) {
+  const { width: requestedWidth, height: requestedHeight } = options;
   const rect = stage.getBoundingClientRect();
-  const width = Math.max(320, rect.width || stage.clientWidth || CANONICAL_STAGE_WIDTH);
-  const height = Math.max(260, rect.height || stage.clientHeight || CANONICAL_STAGE_HEIGHT);
+  const width = Math.max(320, requestedWidth || rect.width || stage.clientWidth || CANONICAL_STAGE_WIDTH);
+  const height = Math.max(220, requestedHeight || rect.height || stage.clientHeight || CANONICAL_STAGE_HEIGHT);
   const scaleX = width / CANONICAL_STAGE_WIDTH;
   const scaleY = height / CANONICAL_STAGE_HEIGHT;
   const rng = makeSeededRandom(`signal-garden:${key}`);
@@ -665,6 +726,137 @@ function buildDailyGarden(key) {
   }
 
   return sequence;
+}
+
+function getSequenceMood(sequence) {
+  const referenceSpec = sequence[sequence.length - 1] ?? sequence[0];
+  return referenceSpec ? chooseMoodFromSpec(referenceSpec) : moods[0];
+}
+
+function describeDailyBroadcast(key) {
+  const blooms = buildDailyGarden(key, {
+    width: ARCHIVE_PREVIEW_WIDTH,
+    height: ARCHIVE_PREVIEW_HEIGHT,
+  });
+  const featuredSpec = blooms[Math.floor(blooms.length / 2)] ?? blooms[0];
+  const mood = getSequenceMood(blooms);
+
+  return {
+    key,
+    blooms,
+    count: blooms.length,
+    mood,
+    dateLabel: formatBroadcastDate(key),
+    title: featuredSpec
+      ? `${makeNameFromIndexes(featuredSpec.adjectiveIndex, featuredSpec.nounIndex)} archive`
+      : 'quiet archive',
+  };
+}
+
+function buildArchivePreviewSvg(sequence) {
+  const mood = escapeXml(getSequenceMood(sequence));
+  const links = sequence.slice(1).map((spec, index) => {
+    const previous = sequence[index];
+    const accent = accents[spec.accentIndex] ?? accents[0];
+    return `<line x1="${previous.x}" y1="${previous.y}" x2="${spec.x}" y2="${spec.y}" stroke="${accent}" stroke-width="1.3" stroke-linecap="round" stroke-dasharray="5 8" opacity="0.45"/>`;
+  }).join('');
+
+  const blooms = sequence.map((spec) => {
+    const accent = accents[spec.accentIndex] ?? accents[0];
+    const centerY = spec.y - spec.stemHeight;
+    return `
+      <g>
+        <line x1="${spec.x}" y1="${spec.y - 10}" x2="${spec.x}" y2="${centerY}" stroke="${accent}" stroke-width="3.2" stroke-linecap="round" opacity="0.72"/>
+        <ellipse cx="${spec.x}" cy="${centerY}" rx="${spec.ringA / 2}" ry="${Math.round(spec.ringA * 0.34)}" fill="none" stroke="${accent}" stroke-width="1.4" opacity="0.62" transform="rotate(${spec.tilt} ${spec.x} ${centerY})"/>
+        <ellipse cx="${spec.x}" cy="${centerY}" rx="${spec.ringB / 2.4}" ry="${Math.round(spec.ringB * 0.16)}" fill="none" stroke="${accent}" stroke-width="1" stroke-dasharray="4 6" opacity="0.4" transform="rotate(${spec.tilt * -1.4} ${spec.x} ${centerY})"/>
+        <circle cx="${spec.x}" cy="${centerY}" r="7" fill="${accent}" opacity="0.92"/>
+      </g>
+    `;
+  }).join('');
+
+  return `
+    <svg viewBox="0 0 ${ARCHIVE_PREVIEW_WIDTH} ${ARCHIVE_PREVIEW_HEIGHT}" role="img" aria-label="Archive preview for ${mood}">
+      <rect width="${ARCHIVE_PREVIEW_WIDTH}" height="${ARCHIVE_PREVIEW_HEIGHT}" rx="18" ry="18" fill="#050d16"/>
+      <circle cx="70" cy="40" r="90" fill="rgba(157, 123, 255, 0.16)"/>
+      <circle cx="270" cy="34" r="84" fill="rgba(85, 230, 255, 0.12)"/>
+      <ellipse cx="160" cy="250" rx="180" ry="84" fill="rgba(0, 255, 170, 0.12)"/>
+      ${links}
+      ${blooms}
+      <text x="18" y="28" fill="#bcefff" font-size="11" font-family="Inter, system-ui, sans-serif" letter-spacing="1.8">${mood.toUpperCase()}</text>
+    </svg>
+  `;
+}
+
+function syncArchiveSelection() {
+  if (!archiveGridEl) return;
+
+  archiveGridEl.querySelectorAll('.archive-card').forEach((card) => {
+    const isActive = fieldSourceMode === 'broadcast' && card.dataset.broadcastKey === currentBroadcastKey;
+    card.dataset.active = String(isActive);
+  });
+}
+
+function syncArchiveStatus() {
+  if (!archiveStatusEl) return;
+
+  if (fieldSourceMode === 'broadcast' && currentBroadcastKey) {
+    archiveStatusEl.textContent = `Viewing ${formatBroadcastDate(currentBroadcastKey)} • ${bloomCount} blooms • ${moodEl.textContent}`;
+    return;
+  }
+
+  if (fieldSourceMode === 'shared') {
+    archiveStatusEl.textContent = 'Shared permalink loaded. Plant once and it turns back into your own field.';
+    return;
+  }
+
+  archiveStatusEl.textContent = `Showing the last ${ARCHIVE_DAYS} UTC broadcasts. Today's archive slice is waiting.`;
+}
+
+function renderArchive() {
+  if (!archiveGridEl) return;
+
+  const cards = getRecentBroadcastKeys().map((key, index) => {
+    const entry = describeDailyBroadcast(key);
+    const card = document.createElement('article');
+    const recency = index === 0 ? 'today' : index === 1 ? 'yesterday' : `${index} days back`;
+
+    card.className = 'archive-card';
+    card.dataset.broadcastKey = key;
+    card.dataset.active = 'false';
+    card.innerHTML = `
+      <div class="archive-preview" aria-hidden="true">${buildArchivePreviewSvg(entry.blooms)}</div>
+      <div class="archive-meta">
+        <div class="archive-date">
+          <strong>${escapeXml(entry.dateLabel)}</strong>
+          <span>${key}</span>
+        </div>
+        <p class="archive-title">${escapeXml(entry.title)}</p>
+        <p class="archive-summary">${entry.count} blooms • ${escapeXml(entry.mood)} • ${recency}</p>
+      </div>
+      <div class="archive-actions">
+        <button type="button" data-action="load" data-key="${key}">load signal</button>
+        <button type="button" data-action="copy" data-key="${key}">copy link</button>
+      </div>
+    `;
+
+    return card;
+  });
+
+  archiveGridEl.replaceChildren(...cards);
+  syncArchiveSelection();
+  syncArchiveStatus();
+}
+
+async function copyBroadcastLink(key, button) {
+  const copied = await copyTextToClipboard(getBroadcastUrl(key), 'Copy this daily signal link:');
+
+  if (copied) {
+    if (button) flashButtonCopyState(button, 'copied', 'copy link');
+    logField(`Archive link copied for ${key}. The gallery is now traveling pocket-sized.`, 'daily link copied');
+    return;
+  }
+
+  logField(`Archive link opened manually for ${key}. Clipboard politics remain bleak.`, 'manual copy required');
 }
 
 function replayGarden(sequence = bloomHistory, options = {}) {
@@ -817,6 +1009,23 @@ dailySignalBtn.addEventListener('click', () => {
   loadDailyBroadcast(getUtcDateKey(), { replay: false });
 });
 
+archiveGridEl?.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-action][data-key]');
+  if (!(button instanceof HTMLButtonElement)) return;
+
+  const { action, key } = button.dataset;
+  if (!key) return;
+
+  if (action === 'load') {
+    loadDailyBroadcast(key, { replay: false });
+    return;
+  }
+
+  if (action === 'copy') {
+    copyBroadcastLink(key, button);
+  }
+});
+
 clearBtn.addEventListener('click', () => {
   suppressHashSync = false;
   setOpenFieldMode();
@@ -860,8 +1069,10 @@ window.addEventListener('load', () => {
   setFieldSource('open');
   setMood();
   syncControls();
+  renderArchive();
   logField('Signal Garden online. The soil is listening.', 'awaiting first contact');
   if (!loadGardenFromHash()) {
     copyLinkBtn.textContent = 'copy share link';
   }
+  syncArchiveStatus();
 });

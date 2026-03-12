@@ -23,13 +23,13 @@
   <main class="shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">interactive browser toy</p>
+        <p class="eyebrow">lightweight signal archive</p>
         <h1>Signal Garden</h1>
-        <p class="lede">Click anywhere to plant a glowing bloom. Every signal grows its own shape, color, and ridiculous little name. Replay the whole thing, hand someone the exact garden you made, or tune into the shared daily signal.</p>
+        <p class="lede">Signal Garden is turning into a tiny browser gallery: every UTC day gets a shared field, the newest broadcasts live below as a browsable archive, and you can still plant your own glowing nonsense whenever the mood strikes.</p>
       </div>
       <div class="controls">
         <button id="randomize">plant cluster</button>
-        <button id="dailySignal">daily signal</button>
+        <button id="dailySignal">today's signal</button>
         <button id="replay" disabled>replay garden</button>
         <button id="copyLink" disabled>copy share link</button>
         <button id="exportPng" disabled>export PNG</button>
@@ -52,20 +52,32 @@
       </div>
     </section>
 
+    <section class="archive-shell" aria-labelledby="archiveTitle">
+      <div class="archive-head">
+        <div>
+          <p class="eyebrow archive-eyebrow">recent broadcast archive</p>
+          <h2 id="archiveTitle">Daily signal gallery</h2>
+          <p>Every UTC day gets one shared deterministic field. The archive keeps the latest broadcasts close so the project can behave more like a tiny living gallery than a one-button curiosity.</p>
+        </div>
+        <p class="archive-status" id="archiveStatus">Loading recent signals...</p>
+      </div>
+      <div id="archiveGrid" class="archive-grid" aria-live="polite"></div>
+    </section>
+
     <section class="notes">
       <article>
         <h2>How it works</h2>
-        <p>Each bloom is assembled from layered rings, stems, sparks, and a tiny procedural title. It’s half garden, half sci-fi field recorder.</p>
+        <p>Each bloom is assembled from layered rings, stems, sparks, and a tiny procedural title. The archive reuses that same deterministic language so each day feels like a little saved exhibit.</p>
       </article>
       <article>
         <h2>Prompt</h2>
-        <p>Try planting dense clusters in one corner, then a single lonely bloom far away. Or tune the daily signal and see what the shared night is doing today.</p>
+        <p>Browse the recent archive, load an old broadcast, then start planting on top of it if you want to break the museum glass on purpose.</p>
       </article>
       <article class="log-card">
         <div class="log-head">
           <div>
             <h2>Field log</h2>
-            <p>The garden keeps a tiny running diary of your session, preserves whole layouts in shareable links, and now broadcasts one public signal each UTC day.</p>
+            <p>The garden keeps a tiny running diary of your session, preserves whole layouts in shareable links, and now treats the daily signal like a lightweight public archive.</p>
           </div>
           <span class="log-badge" id="logStatus">awaiting first contact</span>
         </div>
