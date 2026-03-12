@@ -87,7 +87,7 @@ button[data-state="working"] {
 .stage-wrap { margin-top: 18px; }
 .hud {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
   margin-bottom: 12px;
 }
@@ -99,6 +99,9 @@ button[data-state="working"] {
 .hud div { padding: 14px 16px; }
 .hud span { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); }
 .hud strong { display: block; margin-top: 6px; font-size: 1.1rem; }
+.hud .hint-card {
+  min-width: 0;
+}
 .hud .hint-card strong {
   font-size: 0.95rem;
   line-height: 1.35;

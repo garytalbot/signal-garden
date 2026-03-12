@@ -25,10 +25,11 @@
       <div>
         <p class="eyebrow">interactive browser toy</p>
         <h1>Signal Garden</h1>
-        <p class="lede">Click anywhere to plant a glowing bloom. Every signal grows its own shape, color, and ridiculous little name. Now you can replay the whole thing or hand someone a link to the exact garden you made.</p>
+        <p class="lede">Click anywhere to plant a glowing bloom. Every signal grows its own shape, color, and ridiculous little name. Replay the whole thing, hand someone the exact garden you made, or tune into the shared daily signal.</p>
       </div>
       <div class="controls">
         <button id="randomize">plant cluster</button>
+        <button id="dailySignal">daily signal</button>
         <button id="replay" disabled>replay garden</button>
         <button id="copyLink" disabled>copy share link</button>
         <button id="exportPng" disabled>export PNG</button>
@@ -42,6 +43,7 @@
         <div><span>blooms</span><strong id="count">0</strong></div>
         <div><span>sky mood</span><strong id="mood">violet hush</strong></div>
         <div><span>last specimen</span><strong id="lastName">none yet</strong></div>
+        <div><span>field source</span><strong id="sourceLabel">open field</strong></div>
         <div class="hint-card"><span>planting hint</span><strong id="hint">Move your cursor to aim a bloom. Click to plant. Press U to undo.</strong></div>
       </div>
       <div id="stage" class="stage" data-empty="true" aria-label="Signal Garden canvas">
@@ -57,13 +59,13 @@
       </article>
       <article>
         <h2>Prompt</h2>
-        <p>Try planting dense clusters in one corner, then a single lonely bloom far away. The garden feels different when it gets crowded.</p>
+        <p>Try planting dense clusters in one corner, then a single lonely bloom far away. Or tune the daily signal and see what the shared night is doing today.</p>
       </article>
       <article class="log-card">
         <div class="log-head">
           <div>
             <h2>Field log</h2>
-            <p>The garden now keeps a tiny running diary of your session and can preserve the whole layout in a shareable link.</p>
+            <p>The garden keeps a tiny running diary of your session, preserves whole layouts in shareable links, and now broadcasts one public signal each UTC day.</p>
           </div>
           <span class="log-badge" id="logStatus">awaiting first contact</span>
         </div>

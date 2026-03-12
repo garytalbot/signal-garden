@@ -4,7 +4,9 @@ const template = document.getElementById('bloom-template');
 const countEl = document.getElementById('count');
 const moodEl = document.getElementById('mood');
 const lastNameEl = document.getElementById('lastName');
+const sourceLabelEl = document.getElementById('sourceLabel');
 const randomizeBtn = document.getElementById('randomize');
+const dailySignalBtn = document.getElementById('dailySignal');
 const undoBtn = document.getElementById('undo');
 const clearBtn = document.getElementById('clear');
 const hintEl = document.getElementById('hint');
@@ -71,6 +73,11 @@ const transmissions = {
     'Garden restored from link. Extremely strong haunted sticker book energy.',
     'Replay code accepted. The blooms have returned with zero humility.',
   ],
+  daily: [
+    'Daily signal tuned for {date}. Everybody gets the same weird weather until UTC rolls over.',
+    'Broadcast locked to {date}. Shared hallucination, very tidy.',
+    'Public signal received for {date}. The field is on community radio now.',
+  ],
   replay: [
     'Replay started. The field is re-performing its favorite rumors.',
     'Garden replaying now. Like fireworks with emotional baggage.',
@@ -78,21 +85,38 @@ const transmissions = {
   ],
 };
 
+const MAX_BLOOMS = 60;
+const CANONICAL_STAGE_WIDTH = 1000;
+const CANONICAL_STAGE_HEIGHT = 680;
+const BROADCAST_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 let bloomCount = 0;
 let previousBloomPoint = null;
 let previewVisible = false;
 let bloomHistory = [];
-let replayTimer = null;
+let replayTimers = [];
 let shareToastTimer = null;
 let exportToastTimer = null;
 let suppressHashSync = false;
+let hashMode = 'garden';
+let fieldSourceMode = 'open';
+let currentBroadcastKey = null;
 
-function rand(min, max) {
-  return Math.random() * (max - min) + min;
+function rand(min, max, randomFn = Math.random) {
+  return randomFn() * (max - min) + min;
 }
 
-function pick(items) {
-  return items[Math.floor(Math.random() * items.length)];
+function pick(items, randomFn = Math.random) {
+  return items[Math.floor(randomFn() * items.length)];
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function clearReplayTimers() {
+  replayTimers.forEach((timer) => window.clearTimeout(timer));
+  replayTimers = [];
 }
 
 function makeNameFromIndexes(adjectiveIndex, nounIndex) {
@@ -104,6 +128,10 @@ function makeName() {
     Math.floor(rand(0, adjectives.length)),
     Math.floor(rand(0, nouns.length))
   );
+}
+
+function chooseMoodFromSpec(spec) {
+  return moods[(spec.adjectiveIndex * 3 + spec.nounIndex + spec.accentIndex) % moods.length];
 }
 
 function setMood(nextMood = pick(moods)) {
@@ -161,6 +189,26 @@ function choosePlantTransmission(name, hadLink, x, y) {
   return pick(transmissions.regular).replace('{name}', name);
 }
 
+function updateFieldSourceLabel() {
+  if (fieldSourceMode === 'broadcast' && currentBroadcastKey) {
+    sourceLabelEl.textContent = `daily signal • ${currentBroadcastKey}`;
+    return;
+  }
+
+  if (fieldSourceMode === 'shared') {
+    sourceLabelEl.textContent = 'shared permalink';
+    return;
+  }
+
+  sourceLabelEl.textContent = 'open field';
+}
+
+function setFieldSource(mode = 'open', broadcastKey = null) {
+  fieldSourceMode = mode;
+  currentBroadcastKey = mode === 'broadcast' ? broadcastKey : null;
+  updateFieldSourceLabel();
+}
+
 function syncControls() {
   const disabled = bloomCount === 0;
   undoBtn.disabled = disabled;
@@ -210,10 +258,10 @@ function round1(value) {
   return Number(value.toFixed(1));
 }
 
-function makeBloomSpec(x, y) {
-  const adjectiveIndex = Math.floor(rand(0, adjectives.length));
-  const nounIndex = Math.floor(rand(0, nouns.length));
-  const accentIndex = Math.floor(rand(0, accents.length));
+function makeBloomSpec(x, y, randomFn = Math.random) {
+  const adjectiveIndex = Math.floor(rand(0, adjectives.length, randomFn));
+  const nounIndex = Math.floor(rand(0, nouns.length, randomFn));
+  const accentIndex = Math.floor(rand(0, accents.length, randomFn));
 
   return {
     x: round1(x),
@@ -221,10 +269,10 @@ function makeBloomSpec(x, y) {
     adjectiveIndex,
     nounIndex,
     accentIndex,
-    stemHeight: Math.round(rand(48, 110)),
-    ringA: Math.round(rand(44, 90)),
-    ringB: Math.round(rand(80, 128)),
-    tilt: round1(rand(-40, 40)),
+    stemHeight: Math.round(rand(48, 110, randomFn)),
+    ringA: Math.round(rand(44, 90, randomFn)),
+    ringB: Math.round(rand(80, 128, randomFn)),
+    tilt: round1(rand(-40, 40, randomFn)),
   };
 }
 
@@ -254,13 +302,13 @@ function renderBloom(spec, options = {}) {
   bloomCount += 1;
   countEl.textContent = String(bloomCount);
   lastNameEl.textContent = name;
-  setMood();
+  setMood(chooseMoodFromSpec(spec));
 
   if (logPlant) {
     logField(choosePlantTransmission(name, hadLink, spec.x, spec.y), `tracking ${bloomCount} bloom${bloomCount === 1 ? '' : 's'}`);
   }
 
-  if (bloomCount > 60) {
+  if (bloomCount > MAX_BLOOMS) {
     stage.querySelector('.bloom')?.remove();
     bloomHistory.shift();
     bloomCount -= 1;
@@ -318,18 +366,29 @@ function decodeBloom(chunk) {
 
 function makeShareUrl() {
   const base = `${window.location.origin}${window.location.pathname}`;
+  if (hashMode === 'broadcast' && currentBroadcastKey) {
+    return `${base}#broadcast=${currentBroadcastKey}`;
+  }
   if (!bloomHistory.length) return base;
   return `${base}#garden=${bloomHistory.map(encodeBloom).join('~')}`;
 }
 
 function syncShareState() {
   if (suppressHashSync) return;
-  const nextHash = bloomHistory.length ? `garden=${bloomHistory.map(encodeBloom).join('~')}` : '';
+
+  let nextHash = '';
+  if (hashMode === 'broadcast' && currentBroadcastKey) {
+    nextHash = `broadcast=${currentBroadcastKey}`;
+  } else if (bloomHistory.length) {
+    nextHash = `garden=${bloomHistory.map(encodeBloom).join('~')}`;
+  }
+
   const nextUrl = nextHash ? `${window.location.pathname}#${nextHash}` : window.location.pathname;
   history.replaceState(null, '', nextUrl);
 }
 
 function resetField({ logMessage = null, status = 'awaiting first contact', keepLogs = false, syncUrl = true, mood = true } = {}) {
+  clearReplayTimers();
   stage.querySelectorAll('.bloom').forEach((bloom) => bloom.remove());
   signalOverlay.innerHTML = '';
   previousBloomPoint = null;
@@ -342,6 +401,19 @@ function resetField({ logMessage = null, status = 'awaiting first contact', keep
   if (mood) setMood();
   syncControls();
   if (syncUrl) syncShareState();
+}
+
+function setOpenFieldMode() {
+  hashMode = 'garden';
+  setFieldSource('open');
+}
+
+function prepareEditableField() {
+  suppressHashSync = false;
+  clearReplayTimers();
+  if (fieldSourceMode !== 'open' || hashMode !== 'garden' || currentBroadcastKey) {
+    setOpenFieldMode();
+  }
 }
 
 function undoLastBloom() {
@@ -362,13 +434,14 @@ function undoLastBloom() {
   if (bloomHistory.length) {
     const lastSpec = bloomHistory[bloomHistory.length - 1];
     previousBloomPoint = { x: lastSpec.x, y: lastSpec.y };
+    setMood(chooseMoodFromSpec(lastSpec));
   } else {
     previousBloomPoint = null;
     signalOverlay.innerHTML = '';
+    setMood();
   }
 
   logField(pick(transmissions.undo).replace('{name}', removedName), bloomCount === 0 ? 'field standing by' : `tracking ${bloomCount} bloom${bloomCount === 1 ? '' : 's'}`);
-  setMood();
   syncControls();
   syncShareState();
 }
@@ -527,7 +600,7 @@ async function copyShareLink() {
     await navigator.clipboard.writeText(url);
     copyLinkBtn.dataset.state = 'copied';
     copyLinkBtn.textContent = 'link copied';
-    logField(pick(transmissions.share), 'share link copied');
+    logField(pick(transmissions.share), hashMode === 'broadcast' ? 'daily link copied' : 'share link copied');
     window.clearTimeout(shareToastTimer);
     shareToastTimer = window.setTimeout(() => {
       copyLinkBtn.dataset.state = 'idle';
@@ -539,51 +612,166 @@ async function copyShareLink() {
   }
 }
 
-function loadGardenFromHash({ replay = false } = {}) {
-  const hash = window.location.hash.replace(/^#/, '');
-  if (!hash.startsWith('garden=')) return false;
+function getUtcDateKey(date = new Date()) {
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, '0'),
+    String(date.getUTCDate()).padStart(2, '0'),
+  ].join('-');
+}
 
-  const encoded = hash.slice('garden='.length).trim();
-  if (!encoded) return false;
+function isBroadcastKey(value) {
+  return BROADCAST_KEY_RE.test(value);
+}
 
-  const blooms = encoded.split('~').map(decodeBloom).filter(Boolean).slice(0, 60);
+function makeSeededRandom(seedText) {
+  let seed = 2166136261;
+  for (const char of seedText) {
+    seed ^= char.charCodeAt(0);
+    seed = Math.imul(seed, 16777619);
+  }
+
+  return () => {
+    seed += 0x6D2B79F5;
+    let t = seed;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function buildDailyGarden(key) {
+  const rect = stage.getBoundingClientRect();
+  const width = Math.max(320, rect.width || stage.clientWidth || CANONICAL_STAGE_WIDTH);
+  const height = Math.max(260, rect.height || stage.clientHeight || CANONICAL_STAGE_HEIGHT);
+  const scaleX = width / CANONICAL_STAGE_WIDTH;
+  const scaleY = height / CANONICAL_STAGE_HEIGHT;
+  const rng = makeSeededRandom(`signal-garden:${key}`);
+  const total = 8 + Math.floor(rand(0, 5, rng));
+  const centerX = rand(CANONICAL_STAGE_WIDTH * 0.3, CANONICAL_STAGE_WIDTH * 0.7, rng);
+  const centerY = rand(CANONICAL_STAGE_HEIGHT * 0.34, CANONICAL_STAGE_HEIGHT * 0.68, rng);
+  const baseAngle = rand(0, Math.PI * 2, rng);
+  const verticalDrift = rand(-32, 32, rng);
+  const sequence = [];
+
+  for (let i = 0; i < total; i += 1) {
+    const angle = baseAngle + i * 2.399963229728653 + rand(-0.5, 0.5, rng);
+    const orbit = 42 + i * rand(22, 38, rng);
+    const rawX = centerX + Math.cos(angle) * orbit + rand(-36, 36, rng);
+    const rawY = centerY + Math.sin(angle) * orbit * 0.68 + verticalDrift + rand(-28, 28, rng);
+    const x = clamp(rawX, 72, CANONICAL_STAGE_WIDTH - 72) * scaleX;
+    const y = clamp(rawY, 118, CANONICAL_STAGE_HEIGHT - 28) * scaleY;
+    sequence.push(makeBloomSpec(x, y, rng));
+  }
+
+  return sequence;
+}
+
+function replayGarden(sequence = bloomHistory, options = {}) {
+  const { restoreFromHash = false, shareMode = hashMode, sourceMode = fieldSourceMode, broadcastKey = currentBroadcastKey } = options;
+  const blooms = sequence.map((spec) => ({ ...spec }));
+  if (!blooms.length) return;
+
+  clearReplayTimers();
+  hashMode = shareMode;
+  setFieldSource(sourceMode, sourceMode === 'broadcast' ? broadcastKey : null);
+  resetField({ keepLogs: false, syncUrl: false, mood: false });
+  logField(pick(transmissions.replay), `replaying ${blooms.length} blooms`);
+
+  blooms.forEach((spec, index) => {
+    const timer = window.setTimeout(() => {
+      renderBloom(spec, {
+        logPlant: false,
+        syncUrl: false,
+        animateLink: index !== 0,
+      });
+
+      if (index === blooms.length - 1) {
+        if (restoreFromHash) suppressHashSync = false;
+        syncShareState();
+      }
+    }, index * 140);
+
+    replayTimers.push(timer);
+  });
+}
+
+function loadDailyBroadcast(key = getUtcDateKey(), { replay = false } = {}) {
+  if (!isBroadcastKey(key)) return false;
+
+  const blooms = buildDailyGarden(key);
   if (!blooms.length) return false;
 
   suppressHashSync = true;
-  resetField({ keepLogs: false, syncUrl: false, mood: false });
+  hashMode = 'broadcast';
+  setFieldSource('broadcast', key);
+
   if (replay) {
-    replayGarden(blooms, { restoreFromHash: true });
-  } else {
-    blooms.forEach((spec, index) => renderBloom(spec, { logPlant: index === blooms.length - 1, syncUrl: false, animateLink: index !== 0 }));
-    logField(pick(transmissions.loaded), `shared garden loaded: ${blooms.length} blooms`);
+    replayGarden(blooms, {
+      restoreFromHash: true,
+      shareMode: 'broadcast',
+      sourceMode: 'broadcast',
+      broadcastKey: key,
+    });
+    return true;
   }
+
+  resetField({ keepLogs: false, syncUrl: false, mood: false });
+  blooms.forEach((spec, index) => {
+    renderBloom(spec, {
+      logPlant: false,
+      syncUrl: false,
+      animateLink: index !== 0,
+    });
+  });
+  logField(pick(transmissions.daily).replace('{date}', key), `daily signal tuned: ${blooms.length} blooms`);
   suppressHashSync = false;
   syncShareState();
   return true;
 }
 
-function replayGarden(sequence = bloomHistory, options = {}) {
-  const { restoreFromHash = false } = options;
-  const blooms = sequence.map((spec) => ({ ...spec }));
-  if (!blooms.length) return;
+function loadGardenFromHash({ replay = false } = {}) {
+  const hash = window.location.hash.replace(/^#/, '');
+  if (!hash) return false;
 
-  window.clearTimeout(replayTimer);
-  resetField({ keepLogs: false, syncUrl: !restoreFromHash, mood: false });
-  logField(pick(transmissions.replay), `replaying ${blooms.length} blooms`);
+  if (hash.startsWith('broadcast=')) {
+    const key = hash.slice('broadcast='.length).trim();
+    return loadDailyBroadcast(key, { replay });
+  }
 
+  if (!hash.startsWith('garden=')) return false;
+
+  const encoded = hash.slice('garden='.length).trim();
+  if (!encoded) return false;
+
+  const blooms = encoded.split('~').map(decodeBloom).filter(Boolean).slice(0, MAX_BLOOMS);
+  if (!blooms.length) return false;
+
+  suppressHashSync = true;
+  hashMode = 'garden';
+  setFieldSource('shared');
+
+  if (replay) {
+    replayGarden(blooms, {
+      restoreFromHash: true,
+      shareMode: 'garden',
+      sourceMode: 'shared',
+    });
+    return true;
+  }
+
+  resetField({ keepLogs: false, syncUrl: false, mood: false });
   blooms.forEach((spec, index) => {
-    replayTimer = window.setTimeout(() => {
-      renderBloom(spec, {
-        logPlant: index === blooms.length - 1,
-        syncUrl: !restoreFromHash && index === blooms.length - 1,
-        animateLink: index !== 0,
-      });
-      if (restoreFromHash && index === blooms.length - 1) {
-        suppressHashSync = false;
-        syncShareState();
-      }
-    }, index * 140);
+    renderBloom(spec, {
+      logPlant: false,
+      syncUrl: false,
+      animateLink: index !== 0,
+    });
   });
+  logField(pick(transmissions.loaded), `shared garden loaded: ${blooms.length} blooms`);
+  suppressHashSync = false;
+  syncShareState();
+  return true;
 }
 
 stage.addEventListener('pointermove', (event) => {
@@ -596,6 +784,7 @@ stage.addEventListener('pointerenter', showPreview);
 stage.addEventListener('pointerleave', hidePreview);
 
 stage.addEventListener('click', (event) => {
+  prepareEditableField();
   const rect = stage.getBoundingClientRect();
   const x = event.clientX - rect.left;
   const y = event.clientY - rect.top;
@@ -604,6 +793,7 @@ stage.addEventListener('click', (event) => {
 });
 
 randomizeBtn.addEventListener('click', () => {
+  prepareEditableField();
   const rect = stage.getBoundingClientRect();
   const centerX = rand(rect.width * 0.2, rect.width * 0.8);
   const centerY = rand(rect.height * 0.35, rect.height * 0.82);
@@ -623,11 +813,20 @@ randomizeBtn.addEventListener('click', () => {
   updatePreview(centerX, centerY);
 });
 
+dailySignalBtn.addEventListener('click', () => {
+  loadDailyBroadcast(getUtcDateKey(), { replay: false });
+});
+
 clearBtn.addEventListener('click', () => {
+  suppressHashSync = false;
+  setOpenFieldMode();
   resetField({ logMessage: pick(transmissions.clear), status: 'awaiting first contact' });
 });
 
-undoBtn.addEventListener('click', undoLastBloom);
+undoBtn.addEventListener('click', () => {
+  prepareEditableField();
+  undoLastBloom();
+});
 copyLinkBtn.addEventListener('click', copyShareLink);
 exportPngBtn.addEventListener('click', exportGardenPng);
 replayBtn.addEventListener('click', () => replayGarden());
@@ -636,21 +835,29 @@ document.addEventListener('keydown', (event) => {
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
   if (event.key.toLowerCase() === 'u' && !event.metaKey && !event.ctrlKey && !event.altKey) {
     event.preventDefault();
+    prepareEditableField();
     undoLastBloom();
   }
   if (event.key.toLowerCase() === 'r' && !event.metaKey && !event.ctrlKey && !event.altKey && bloomHistory.length) {
     event.preventDefault();
     replayGarden();
   }
+  if (event.key.toLowerCase() === 'd' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    event.preventDefault();
+    loadDailyBroadcast(getUtcDateKey(), { replay: false });
+  }
 });
 
 window.exportGardenPng = exportGardenPng;
 
 window.addEventListener('hashchange', () => {
-  if (!suppressHashSync) loadGardenFromHash();
+  if (!suppressHashSync) {
+    loadGardenFromHash();
+  }
 });
 
 window.addEventListener('load', () => {
+  setFieldSource('open');
   setMood();
   syncControls();
   logField('Signal Garden online. The soil is listening.', 'awaiting first contact');
