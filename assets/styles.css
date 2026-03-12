@@ -173,17 +173,9 @@ button:disabled {
 }
 
 @keyframes signal-link {
-  0% {
-    opacity: 0;
-    stroke-dashoffset: 0;
-  }
-  18% {
-    opacity: 0.72;
-  }
-  100% {
-    opacity: 0;
-    stroke-dashoffset: -36;
-  }
+  0% { opacity: 0; stroke-dashoffset: 0; }
+  18% { opacity: 0.72; }
+  100% { opacity: 0; stroke-dashoffset: -36; }
 }
 
 .bloom {

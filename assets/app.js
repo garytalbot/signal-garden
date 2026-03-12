@@ -5,17 +5,19 @@ const countEl = document.getElementById('count');
 const moodEl = document.getElementById('mood');
 const lastNameEl = document.getElementById('lastName');
 const randomizeBtn = document.getElementById('randomize');
+const undoBtn = document.getElementById('undo');
 const clearBtn = document.getElementById('clear');
+const hintEl = document.getElementById('hint');
+const previewEl = document.getElementById('preview');
 
 const adjectives = ['velvet', 'neon', 'hollow', 'lunar', 'midnight', 'feral', 'opal', 'echo', 'solar', 'ghost'];
 const nouns = ['orchid', 'signal', 'lantern', 'murmur', 'crown', 'spire', 'feather', 'petal', 'relic', 'flare'];
 const moods = ['violet hush', 'teal static', 'rose voltage', 'amber drift', 'ion mist', 'midnight bloom'];
 const accents = ['#9d7bff', '#55e6ff', '#ff6ec7', '#7cff8f', '#ffd166', '#7ee7ff'];
-const maxBlooms = 60;
 
 let bloomCount = 0;
-let bloomId = 0;
-const plantedBlooms = [];
+let previousBloomPoint = null;
+let previewVisible = false;
 
 function rand(min, max) {
   return Math.random() * (max - min) + min;
@@ -33,58 +35,52 @@ function setMood() {
   moodEl.textContent = pick(moods);
 }
 
-function syncOverlay() {
-  const { width, height } = stage.getBoundingClientRect();
-  signalOverlay.setAttribute('viewBox', `0 0 ${width} ${height}`);
+function syncControls() {
+  const disabled = bloomCount === 0;
+  undoBtn.disabled = disabled;
+  clearBtn.disabled = disabled;
+
+  if (disabled) stage.setAttribute('data-empty', 'true');
+  else stage.removeAttribute('data-empty');
+
+  hintEl.textContent = disabled
+    ? 'Move your cursor to aim a bloom. Click to plant. Press U to undo.'
+    : 'Click to plant. Press U to undo the last bloom.';
 }
 
-function drawSignalLink(fromBloom, toBloom, accent) {
+function updatePreview(x, y) {
+  previewEl.style.left = `${x}px`;
+  previewEl.style.top = `${y}px`;
+}
+
+function showPreview() {
+  previewVisible = true;
+  stage.classList.add('show-preview');
+}
+
+function hidePreview() {
+  previewVisible = false;
+  stage.classList.remove('show-preview');
+}
+
+function drawSignalLink(from, to, accent) {
+  if (!from || !to) return;
+
   const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-  line.setAttribute('x1', fromBloom.x.toFixed(1));
-  line.setAttribute('y1', fromBloom.y.toFixed(1));
-  line.setAttribute('x2', toBloom.x.toFixed(1));
-  line.setAttribute('y2', toBloom.y.toFixed(1));
+  line.setAttribute('x1', from.x.toFixed(1));
+  line.setAttribute('y1', from.y.toFixed(1));
+  line.setAttribute('x2', to.x.toFixed(1));
+  line.setAttribute('y2', to.y.toFixed(1));
+  line.classList.add('signal-line');
   line.style.setProperty('--accent', accent);
-  line.setAttribute('class', 'signal-line');
   signalOverlay.appendChild(line);
-
-  window.setTimeout(() => {
-    line.remove();
-  }, 2300);
-}
-
-function connectBloom(newBloom) {
-  const nearby = plantedBlooms
-    .filter((bloom) => bloom.id !== newBloom.id)
-    .map((bloom) => ({
-      bloom,
-      distance: Math.hypot(bloom.x - newBloom.x, bloom.y - newBloom.y),
-    }))
-    .filter(({ distance }) => distance < 220)
-    .sort((a, b) => a.distance - b.distance)
-    .slice(0, 2);
-
-  nearby.forEach(({ bloom }) => drawSignalLink(newBloom, bloom, newBloom.accent));
-}
-
-function removeOldestBloom() {
-  const oldestBloom = plantedBlooms.shift();
-  oldestBloom?.node.remove();
-  bloomCount = plantedBlooms.length;
-  countEl.textContent = String(bloomCount);
+  window.setTimeout(() => line.remove(), 2400);
 }
 
 function plant(x, y) {
   const node = template.content.firstElementChild.cloneNode(true);
   const name = makeName();
   const accent = pick(accents);
-  const bloom = {
-    id: ++bloomId,
-    x,
-    y,
-    accent,
-    node,
-  };
 
   node.style.left = `${x}px`;
   node.style.top = `${y}px`;
@@ -95,22 +91,66 @@ function plant(x, y) {
   node.style.setProperty('--tilt', `${rand(-40, 40).toFixed(1)}deg`);
   node.querySelector('.label').textContent = name;
 
+  drawSignalLink(previousBloomPoint, { x, y }, accent);
+  previousBloomPoint = { x, y };
+
   stage.appendChild(node);
-  plantedBlooms.push(bloom);
-  bloomCount = plantedBlooms.length;
+  bloomCount += 1;
   countEl.textContent = String(bloomCount);
   lastNameEl.textContent = name;
   setMood();
-  connectBloom(bloom);
 
-  if (plantedBlooms.length > maxBlooms) {
-    removeOldestBloom();
+  if (bloomCount > 60) {
+    stage.querySelector('.bloom')?.remove();
+    bloomCount -= 1;
+    countEl.textContent = String(bloomCount);
   }
+
+  syncControls();
 }
+
+function undoLastBloom() {
+  const blooms = stage.querySelectorAll('.bloom');
+  const latestBloom = blooms[blooms.length - 1];
+  if (!latestBloom) return;
+
+  latestBloom.remove();
+  bloomCount = Math.max(0, bloomCount - 1);
+  countEl.textContent = String(bloomCount);
+
+  const remainingBlooms = stage.querySelectorAll('.bloom');
+  const nextLastBloom = remainingBlooms[remainingBlooms.length - 1];
+  lastNameEl.textContent = nextLastBloom?.querySelector('.label')?.textContent ?? 'none yet';
+
+  if (nextLastBloom) {
+    previousBloomPoint = {
+      x: parseFloat(nextLastBloom.style.left),
+      y: parseFloat(nextLastBloom.style.top),
+    };
+  } else {
+    previousBloomPoint = null;
+    signalOverlay.innerHTML = '';
+  }
+
+  setMood();
+  syncControls();
+}
+
+stage.addEventListener('pointermove', (event) => {
+  const rect = stage.getBoundingClientRect();
+  updatePreview(event.clientX - rect.left, event.clientY - rect.top);
+  if (!previewVisible) showPreview();
+});
+
+stage.addEventListener('pointerenter', showPreview);
+stage.addEventListener('pointerleave', hidePreview);
 
 stage.addEventListener('click', (event) => {
   const rect = stage.getBoundingClientRect();
-  plant(event.clientX - rect.left, event.clientY - rect.top);
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+  plant(x, y);
+  updatePreview(x, y);
 });
 
 randomizeBtn.addEventListener('click', () => {
@@ -122,29 +162,32 @@ randomizeBtn.addEventListener('click', () => {
   for (let i = 0; i < total; i += 1) {
     plant(centerX + rand(-90, 90), centerY + rand(-50, 50));
   }
+
+  updatePreview(centerX, centerY);
 });
 
 clearBtn.addEventListener('click', () => {
-  plantedBlooms.splice(0).forEach(({ node }) => node.remove());
-  signalOverlay.replaceChildren();
+  stage.querySelectorAll('.bloom').forEach((bloom) => bloom.remove());
+  signalOverlay.innerHTML = '';
+  previousBloomPoint = null;
   bloomCount = 0;
   countEl.textContent = '0';
   lastNameEl.textContent = 'none yet';
   setMood();
+  syncControls();
 });
 
-function seedGarden() {
-  const rect = stage.getBoundingClientRect();
-  const initial = 8;
-  for (let i = 0; i < initial; i += 1) {
-    plant(rand(80, rect.width - 80), rand(rect.height * 0.45, rect.height - 20));
+undoBtn.addEventListener('click', undoLastBloom);
+
+document.addEventListener('keydown', (event) => {
+  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+  if (event.key.toLowerCase() === 'u' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    event.preventDefault();
+    undoLastBloom();
   }
-}
+});
 
 window.addEventListener('load', () => {
-  syncOverlay();
   setMood();
-  seedGarden();
+  syncControls();
 });
-
-window.addEventListener('resize', syncOverlay);

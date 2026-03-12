@@ -11,6 +11,8 @@ Because not every repo should be a dashboard, a wrapper, or a productivity vitam
 - click-to-plant glowing blooms
 - procedural names, ring shapes, stem heights, and color accents
 - quick cluster generator
+- live planting cursor for more precise placement
+- undo last bloom with the button or `U`
 - one-click field reset
 - static-site friendly: just HTML, CSS, and vanilla JS
 

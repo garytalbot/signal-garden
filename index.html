@@ -23,7 +23,8 @@
       </div>
       <div class="controls">
         <button id="randomize">plant cluster</button>
-        <button id="clear">clear field</button>
+        <button id="undo" disabled>undo last</button>
+        <button id="clear" disabled>clear field</button>
       </div>
     </header>
 
@@ -32,8 +33,10 @@
         <div><span>blooms</span><strong id="count">0</strong></div>
         <div><span>sky mood</span><strong id="mood">violet hush</strong></div>
         <div><span>last specimen</span><strong id="lastName">none yet</strong></div>
+        <div class="hint-card"><span>planting hint</span><strong id="hint">Move your cursor to aim a bloom. Click to plant. Press U to undo.</strong></div>
       </div>
-      <div id="stage" class="stage" aria-label="Signal Garden canvas">
+      <div id="stage" class="stage" data-empty="true" aria-label="Signal Garden canvas">
+        <div id="preview" class="preview" aria-hidden="true"></div>
         <svg id="signal-overlay" class="signal-overlay" aria-hidden="true"></svg>
       </div>
     </section>
