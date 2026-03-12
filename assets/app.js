@@ -3,10 +3,12 @@ const signalOverlay = document.getElementById('signal-overlay');
 const template = document.getElementById('bloom-template');
 const countEl = document.getElementById('count');
 const moodEl = document.getElementById('mood');
+const weatherModeEl = document.getElementById('weatherMode');
 const lastNameEl = document.getElementById('lastName');
 const sourceLabelEl = document.getElementById('sourceLabel');
 const randomizeBtn = document.getElementById('randomize');
 const dailySignalBtn = document.getElementById('dailySignal');
+const cycleWeatherBtn = document.getElementById('cycleWeather');
 const undoBtn = document.getElementById('undo');
 const clearBtn = document.getElementById('clear');
 const hintEl = document.getElementById('hint');
@@ -18,11 +20,123 @@ const archiveStatusEl = document.getElementById('archiveStatus');
 const copyLinkBtn = document.getElementById('copyLink');
 const replayBtn = document.getElementById('replay');
 const exportPngBtn = document.getElementById('exportPng');
+const themeColorMeta = document.querySelector('meta[name="theme-color"]');
 
 const adjectives = ['velvet', 'neon', 'hollow', 'lunar', 'midnight', 'feral', 'opal', 'echo', 'solar', 'ghost'];
 const nouns = ['orchid', 'signal', 'lantern', 'murmur', 'crown', 'spire', 'feather', 'petal', 'relic', 'flare'];
-const moods = ['violet hush', 'teal static', 'rose voltage', 'amber drift', 'ion mist', 'midnight bloom'];
-const accents = ['#9d7bff', '#55e6ff', '#ff6ec7', '#7cff8f', '#ffd166', '#7ee7ff'];
+const WEATHER_PRESETS = [
+  {
+    id: 'violet-hush',
+    label: 'violet hush',
+    idleMood: 'violet hush',
+    themeColor: '#07111a',
+    moods: ['violet hush', 'teal static', 'rose voltage', 'amber drift', 'ion mist', 'midnight bloom'],
+    accents: ['#9d7bff', '#55e6ff', '#ff6ec7', '#7cff8f', '#ffd166', '#7ee7ff'],
+    preview: {
+      base: '#050d16',
+      skyA: 'rgba(157, 123, 255, 0.16)',
+      skyB: 'rgba(85, 230, 255, 0.12)',
+      floor: 'rgba(0, 255, 170, 0.12)',
+      text: '#bcefff',
+    },
+    export: {
+      bgStart: '#091420',
+      bgEnd: '#020910',
+      haloA: 'rgba(157, 123, 255, 0.18)',
+      haloB: 'rgba(85, 230, 255, 0.14)',
+      floor: 'rgba(0, 255, 170, 0.18)',
+      badgeFill: 'rgba(3, 10, 18, 0.74)',
+      badgeStroke: 'rgba(141, 220, 255, 0.28)',
+      text: '#bcefff',
+      muted: 'rgba(235, 245, 255, 0.82)',
+      brand: '#8ddcff',
+    },
+  },
+  {
+    id: 'aurora-tide',
+    label: 'aurora tide',
+    idleMood: 'aurora tide',
+    themeColor: '#031114',
+    moods: ['aurora tide', 'kelp static', 'glacier murmur', 'ion surf', 'blue moss', 'polar shimmer'],
+    accents: ['#6fffe9', '#b7ff5e', '#7dd4ff', '#7cffc4', '#d8fff2', '#53f2ff'],
+    preview: {
+      base: '#031114',
+      skyA: 'rgba(73, 255, 198, 0.16)',
+      skyB: 'rgba(120, 230, 255, 0.14)',
+      floor: 'rgba(193, 255, 99, 0.12)',
+      text: '#93fff1',
+    },
+    export: {
+      bgStart: '#062228',
+      bgEnd: '#01090d',
+      haloA: 'rgba(73, 255, 198, 0.18)',
+      haloB: 'rgba(120, 230, 255, 0.16)',
+      floor: 'rgba(193, 255, 99, 0.18)',
+      badgeFill: 'rgba(2, 16, 18, 0.76)',
+      badgeStroke: 'rgba(112, 255, 220, 0.28)',
+      text: '#93fff1',
+      muted: 'rgba(225, 255, 249, 0.84)',
+      brand: '#7ffff1',
+    },
+  },
+  {
+    id: 'ember-rain',
+    label: 'ember rain',
+    idleMood: 'ember rain',
+    themeColor: '#140903',
+    moods: ['ember rain', 'sodium dusk', 'lantern weather', 'brick shimmer', 'copper drift', 'heat halo'],
+    accents: ['#ff8a5b', '#ffd166', '#ff6b8a', '#ffb347', '#ffc857', '#ff9f6e'],
+    preview: {
+      base: '#140904',
+      skyA: 'rgba(255, 111, 97, 0.18)',
+      skyB: 'rgba(255, 205, 110, 0.14)',
+      floor: 'rgba(255, 150, 64, 0.12)',
+      text: '#ffbe8b',
+    },
+    export: {
+      bgStart: '#261006',
+      bgEnd: '#100401',
+      haloA: 'rgba(255, 111, 97, 0.2)',
+      haloB: 'rgba(255, 205, 110, 0.16)',
+      floor: 'rgba(255, 150, 64, 0.18)',
+      badgeFill: 'rgba(28, 10, 6, 0.78)',
+      badgeStroke: 'rgba(255, 176, 113, 0.3)',
+      text: '#ffbe8b',
+      muted: 'rgba(255, 237, 217, 0.84)',
+      brand: '#ffbe8b',
+    },
+  },
+  {
+    id: 'storm-glass',
+    label: 'storm glass',
+    idleMood: 'storm glass',
+    themeColor: '#071018',
+    moods: ['storm glass', 'slate voltage', 'mint thunder', 'rain circuit', 'quiet squall', 'cold ballast'],
+    accents: ['#90b7ff', '#6bf2d3', '#b6c8ff', '#86ffd5', '#d4f2ff', '#7bd7ff'],
+    preview: {
+      base: '#071016',
+      skyA: 'rgba(110, 130, 164, 0.18)',
+      skyB: 'rgba(80, 255, 222, 0.12)',
+      floor: 'rgba(102, 201, 179, 0.12)',
+      text: '#a6d7ff',
+    },
+    export: {
+      bgStart: '#0b1822',
+      bgEnd: '#02060b',
+      haloA: 'rgba(110, 130, 164, 0.2)',
+      haloB: 'rgba(80, 255, 222, 0.14)',
+      floor: 'rgba(102, 201, 179, 0.18)',
+      badgeFill: 'rgba(6, 14, 22, 0.78)',
+      badgeStroke: 'rgba(156, 198, 230, 0.28)',
+      text: '#a6d7ff',
+      muted: 'rgba(229, 244, 255, 0.84)',
+      brand: '#a6d7ff',
+    },
+  },
+];
+const WEATHER_PRESET_BY_ID = Object.fromEntries(WEATHER_PRESETS.map((preset) => [preset.id, preset]));
+const DEFAULT_WEATHER_ID = WEATHER_PRESETS[0].id;
+const ACCENT_SLOT_COUNT = WEATHER_PRESETS[0].accents.length;
 const transmissions = {
   first: [
     'The field wakes up. {name} hums like a vending machine seeing god.',
@@ -85,6 +199,11 @@ const transmissions = {
     'Garden replaying now. Like fireworks with emotional baggage.',
     'Replay engaged. The blooms are doing the encore nobody asked for but everybody needed.',
   ],
+  weather: [
+    'Weather switched to {weather}. The horizon now looks professionally unserious.',
+    '{weather} rolls in. The garden immediately starts dressing like a gas station prophecy.',
+    'Sky retuned to {weather}. Somebody definitely tampered with the moon.',
+  ],
 };
 
 const MAX_BLOOMS = 60;
@@ -106,6 +225,7 @@ let suppressHashSync = false;
 let hashMode = 'garden';
 let fieldSourceMode = 'open';
 let currentBroadcastKey = null;
+let currentWeatherPreset = WEATHER_PRESETS[0];
 
 function rand(min, max, randomFn = Math.random) {
   return randomFn() * (max - min) + min;
@@ -117,6 +237,74 @@ function pick(items, randomFn = Math.random) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function getWeatherPresetById(id) {
+  return WEATHER_PRESET_BY_ID[id] ?? WEATHER_PRESET_BY_ID[DEFAULT_WEATHER_ID];
+}
+
+function getBroadcastWeatherPreset(key = getUtcDateKey()) {
+  const rng = makeSeededRandom(`signal-garden:weather:${key}`);
+  return WEATHER_PRESETS[Math.floor(rng() * WEATHER_PRESETS.length)] ?? WEATHER_PRESETS[0];
+}
+
+function getAccentColor(index, preset = currentWeatherPreset) {
+  return preset.accents[index] ?? preset.accents[0] ?? '#8ddcff';
+}
+
+function getAccentToken(index) {
+  const safeIndex = clamp(index, 0, ACCENT_SLOT_COUNT - 1);
+  return `var(--weather-accent-${safeIndex})`;
+}
+
+function getIdleMood(preset = currentWeatherPreset) {
+  return preset.idleMood ?? preset.moods[0] ?? 'violet hush';
+}
+
+function syncWeatherUi() {
+  if (weatherModeEl) weatherModeEl.textContent = currentWeatherPreset.label;
+  if (!cycleWeatherBtn) return;
+
+  cycleWeatherBtn.textContent = `weather: ${currentWeatherPreset.label}`;
+  cycleWeatherBtn.title = fieldSourceMode === 'broadcast'
+    ? 'Daily signal weather is locked to that UTC broadcast.'
+    : 'Cycle the current garden through alternate weather palettes.';
+  cycleWeatherBtn.disabled = fieldSourceMode === 'broadcast';
+}
+
+function setWeatherPreset(weatherId, options = {}) {
+  const { syncUrl = true, logMessage = null, status = 'weather shifted' } = options;
+  currentWeatherPreset = getWeatherPresetById(weatherId);
+  document.body.dataset.weather = currentWeatherPreset.id;
+  themeColorMeta?.setAttribute('content', currentWeatherPreset.themeColor);
+
+  if (bloomHistory.length) {
+    const lastSpec = bloomHistory[bloomHistory.length - 1];
+    setMood(chooseMoodFromSpec(lastSpec, currentWeatherPreset));
+  } else {
+    setMood(getIdleMood(currentWeatherPreset));
+  }
+
+  syncWeatherUi();
+  syncArchiveStatus();
+
+  if (logMessage) {
+    logField(logMessage, status);
+  }
+
+  if (syncUrl) syncShareState();
+}
+
+function cycleWeatherMode() {
+  if (fieldSourceMode === 'broadcast') return;
+
+  const currentIndex = WEATHER_PRESETS.findIndex((preset) => preset.id === currentWeatherPreset.id);
+  const nextPreset = WEATHER_PRESETS[(currentIndex + 1) % WEATHER_PRESETS.length] ?? WEATHER_PRESETS[0];
+
+  setWeatherPreset(nextPreset.id, {
+    logMessage: pick(transmissions.weather).replace('{weather}', nextPreset.label),
+    status: `weather tuned: ${nextPreset.label}`,
+  });
 }
 
 function shiftUtcDate(date, offsetDays) {
@@ -148,18 +336,12 @@ function makeNameFromIndexes(adjectiveIndex, nounIndex) {
   return `${adjectives[adjectiveIndex]} ${nouns[nounIndex]}`;
 }
 
-function makeName() {
-  return makeNameFromIndexes(
-    Math.floor(rand(0, adjectives.length)),
-    Math.floor(rand(0, nouns.length))
-  );
+function chooseMoodFromSpec(spec, preset = currentWeatherPreset) {
+  const moodBank = preset.moods;
+  return moodBank[(spec.adjectiveIndex * 3 + spec.nounIndex + spec.accentIndex) % moodBank.length];
 }
 
-function chooseMoodFromSpec(spec) {
-  return moods[(spec.adjectiveIndex * 3 + spec.nounIndex + spec.accentIndex) % moods.length];
-}
-
-function setMood(nextMood = pick(moods)) {
+function setMood(nextMood = getIdleMood()) {
   moodEl.textContent = nextMood;
 }
 
@@ -232,6 +414,7 @@ function setFieldSource(mode = 'open', broadcastKey = null) {
   fieldSourceMode = mode;
   currentBroadcastKey = mode === 'broadcast' ? broadcastKey : null;
   updateFieldSourceLabel();
+  syncWeatherUi();
   syncArchiveSelection();
   syncArchiveStatus();
 }
@@ -249,7 +432,9 @@ function syncControls() {
 
   hintEl.textContent = disabled
     ? 'Move your cursor to aim a bloom. Click to plant. Press U to undo.'
-    : 'Click to plant. Press U to undo the last bloom. Copy link to share this exact garden.';
+    : 'Click to plant. Press U to undo the last bloom. Press W to switch weather when the field is yours.';
+
+  syncWeatherUi();
 }
 
 function updatePreview(x, y) {
@@ -267,7 +452,7 @@ function hidePreview() {
   stage.classList.remove('show-preview');
 }
 
-function drawSignalLink(from, to, accent) {
+function drawSignalLink(from, to, accentIndex) {
   if (!from || !to) return;
 
   const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -276,7 +461,7 @@ function drawSignalLink(from, to, accent) {
   line.setAttribute('x2', to.x.toFixed(1));
   line.setAttribute('y2', to.y.toFixed(1));
   line.classList.add('signal-line');
-  line.style.setProperty('--accent', accent);
+  line.style.setProperty('--accent', getAccentToken(accentIndex));
   signalOverlay.appendChild(line);
   window.setTimeout(() => line.remove(), 2400);
 }
@@ -288,7 +473,7 @@ function round1(value) {
 function makeBloomSpec(x, y, randomFn = Math.random) {
   const adjectiveIndex = Math.floor(rand(0, adjectives.length, randomFn));
   const nounIndex = Math.floor(rand(0, nouns.length, randomFn));
-  const accentIndex = Math.floor(rand(0, accents.length, randomFn));
+  const accentIndex = Math.floor(rand(0, ACCENT_SLOT_COUNT, randomFn));
 
   return {
     x: round1(x),
@@ -307,12 +492,11 @@ function renderBloom(spec, options = {}) {
   const { logPlant = true, syncUrl = true, animateLink = true } = options;
   const node = template.content.firstElementChild.cloneNode(true);
   const name = makeNameFromIndexes(spec.adjectiveIndex, spec.nounIndex);
-  const accent = accents[spec.accentIndex] ?? accents[0];
   const hadLink = Boolean(previousBloomPoint);
 
   node.style.left = `${spec.x}px`;
   node.style.top = `${spec.y}px`;
-  node.style.setProperty('--accent', accent);
+  node.style.setProperty('--accent', getAccentToken(spec.accentIndex));
   node.style.setProperty('--stem-height', `${spec.stemHeight}px`);
   node.style.setProperty('--ring-a', `${spec.ringA}px`);
   node.style.setProperty('--ring-b', `${spec.ringB}px`);
@@ -320,7 +504,7 @@ function renderBloom(spec, options = {}) {
   node.querySelector('.label').textContent = name;
 
   if (animateLink) {
-    drawSignalLink(previousBloomPoint, { x: spec.x, y: spec.y }, accent);
+    drawSignalLink(previousBloomPoint, { x: spec.x, y: spec.y }, spec.accentIndex);
   }
   previousBloomPoint = { x: spec.x, y: spec.y };
 
@@ -329,7 +513,7 @@ function renderBloom(spec, options = {}) {
   bloomCount += 1;
   countEl.textContent = String(bloomCount);
   lastNameEl.textContent = name;
-  setMood(chooseMoodFromSpec(spec));
+  setMood(chooseMoodFromSpec(spec, currentWeatherPreset));
 
   if (logPlant) {
     logField(choosePlantTransmission(name, hadLink, spec.x, spec.y), `tracking ${bloomCount} bloom${bloomCount === 1 ? '' : 's'}`);
@@ -377,7 +561,7 @@ function decodeBloom(chunk) {
   if ([x, y, adjectiveIndex, nounIndex, accentIndex, stemHeight, ringA, ringB, tilt].some(Number.isNaN)) return null;
   if (adjectiveIndex < 0 || adjectiveIndex >= adjectives.length) return null;
   if (nounIndex < 0 || nounIndex >= nouns.length) return null;
-  if (accentIndex < 0 || accentIndex >= accents.length) return null;
+  if (accentIndex < 0 || accentIndex >= ACCENT_SLOT_COUNT) return null;
 
   return {
     x: x / 10,
@@ -400,25 +584,29 @@ function getBroadcastUrl(key) {
   return `${getBaseUrl()}#broadcast=${key}`;
 }
 
+function buildHashString() {
+  if (hashMode === 'broadcast' && currentBroadcastKey) {
+    return `broadcast=${currentBroadcastKey}`;
+  }
+
+  if (!bloomHistory.length) return '';
+
+  const params = new URLSearchParams();
+  params.set('garden', bloomHistory.map(encodeBloom).join('~'));
+  params.set('weather', currentWeatherPreset.id);
+  return params.toString();
+}
+
 function makeShareUrl() {
   const base = getBaseUrl();
-  if (hashMode === 'broadcast' && currentBroadcastKey) {
-    return getBroadcastUrl(currentBroadcastKey);
-  }
-  if (!bloomHistory.length) return base;
-  return `${base}#garden=${bloomHistory.map(encodeBloom).join('~')}`;
+  const hash = buildHashString();
+  return hash ? `${base}#${hash}` : base;
 }
 
 function syncShareState() {
   if (suppressHashSync) return;
 
-  let nextHash = '';
-  if (hashMode === 'broadcast' && currentBroadcastKey) {
-    nextHash = `broadcast=${currentBroadcastKey}`;
-  } else if (bloomHistory.length) {
-    nextHash = `garden=${bloomHistory.map(encodeBloom).join('~')}`;
-  }
-
+  const nextHash = buildHashString();
   const nextUrl = nextHash ? `${window.location.pathname}#${nextHash}` : window.location.pathname;
   history.replaceState(null, '', nextUrl);
 }
@@ -434,7 +622,7 @@ function resetField({ logMessage = null, status = 'awaiting first contact', keep
   lastNameEl.textContent = 'none yet';
   if (!keepLogs) fieldLogEl.innerHTML = '';
   if (logMessage) logField(logMessage, status);
-  if (mood) setMood();
+  if (mood) setMood(getIdleMood(currentWeatherPreset));
   syncControls();
   syncArchiveStatus();
   if (syncUrl) syncShareState();
@@ -471,11 +659,11 @@ function undoLastBloom() {
   if (bloomHistory.length) {
     const lastSpec = bloomHistory[bloomHistory.length - 1];
     previousBloomPoint = { x: lastSpec.x, y: lastSpec.y };
-    setMood(chooseMoodFromSpec(lastSpec));
+    setMood(chooseMoodFromSpec(lastSpec, currentWeatherPreset));
   } else {
     previousBloomPoint = null;
     signalOverlay.innerHTML = '';
-    setMood();
+    setMood(getIdleMood(currentWeatherPreset));
   }
 
   logField(pick(transmissions.undo).replace('{name}', removedName), bloomCount === 0 ? 'field standing by' : `tracking ${bloomCount} bloom${bloomCount === 1 ? '' : 's'}`);
@@ -497,16 +685,20 @@ function buildExportSvg() {
   const rect = stage.getBoundingClientRect();
   const width = Math.max(1, Math.round(rect.width));
   const height = Math.max(1, Math.round(rect.height));
-  const mood = escapeXml(moodEl.textContent || 'violet hush');
+  const mood = escapeXml(moodEl.textContent || getIdleMood(currentWeatherPreset));
+  const weatherLabel = escapeXml(currentWeatherPreset.label.toUpperCase());
+  const sourceLabel = escapeXml(sourceLabelEl.textContent || 'open field');
+  const footerCopy = escapeXml(`${bloomHistory.length} blooms • ${fieldSourceMode === 'broadcast' && currentBroadcastKey ? currentBroadcastKey : 'portable garden'}`);
+  const exportTheme = currentWeatherPreset.export;
 
   const links = bloomHistory.slice(1).map((spec, index) => {
     const previous = bloomHistory[index];
-    const accent = accents[spec.accentIndex] ?? accents[0];
+    const accent = getAccentColor(spec.accentIndex, currentWeatherPreset);
     return `<line x1="${previous.x}" y1="${previous.y}" x2="${spec.x}" y2="${spec.y}" stroke="${accent}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="6 10" opacity="0.5"/>`;
   }).join('');
 
   const blooms = bloomHistory.map((spec) => {
-    const accent = accents[spec.accentIndex] ?? accents[0];
+    const accent = getAccentColor(spec.accentIndex, currentWeatherPreset);
     const name = escapeXml(makeNameFromIndexes(spec.adjectiveIndex, spec.nounIndex));
     const centerY = spec.y - spec.stemHeight;
     const ringAWidth = spec.ringA;
@@ -526,14 +718,14 @@ function buildExportSvg() {
         <circle cx="${spec.x}" cy="${centerY}" r="11" fill="url(#coreGlow-${spec.accentIndex})"/>
         <circle cx="${sparkAX}" cy="${sparkAY}" r="5" fill="${accent}" opacity="0.9"/>
         <circle cx="${sparkBX}" cy="${sparkBY}" r="5" fill="${accent}" opacity="0.82"/>
-        <text x="${spec.x}" y="${spec.y + 8}" text-anchor="middle" fill="#ebf5ff" font-size="12" font-family="Inter, system-ui, sans-serif">${name}</text>
+        <text x="${spec.x}" y="${spec.y + 8}" text-anchor="middle" fill="${exportTheme.muted}" font-size="12" font-family="Inter, system-ui, sans-serif">${name}</text>
       </g>
     `;
   }).join('');
 
   const moodLabel = bloomHistory.length
-    ? `<text x="24" y="36" fill="#bcefff" font-size="14" font-family="Inter, system-ui, sans-serif" letter-spacing="2">${mood.toUpperCase()}</text>`
-    : '<text x="24" y="36" fill="#ebf5ff" fill-opacity="0.6" font-size="14" font-family="Inter, system-ui, sans-serif">Your garden is empty. Plant the first signal.</text>';
+    ? `<text x="24" y="36" fill="${exportTheme.text}" font-size="14" font-family="Inter, system-ui, sans-serif" letter-spacing="2">${mood.toUpperCase()}</text>`
+    : `<text x="24" y="36" fill="${exportTheme.muted}" font-size="14" font-family="Inter, system-ui, sans-serif">Your garden is empty. Plant the first signal.</text>`;
 
   return {
     width,
@@ -542,17 +734,25 @@ function buildExportSvg() {
       <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
         <defs>
           <linearGradient id="bgGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#091420"/>
-            <stop offset="100%" stop-color="#020910"/>
+            <stop offset="0%" stop-color="${exportTheme.bgStart}"/>
+            <stop offset="100%" stop-color="${exportTheme.bgEnd}"/>
           </linearGradient>
           <radialGradient id="groundGlow" cx="50%" cy="110%" r="40%">
-            <stop offset="0%" stop-color="#00ffaa" stop-opacity="0.22"/>
-            <stop offset="100%" stop-color="#00ffaa" stop-opacity="0"/>
+            <stop offset="0%" stop-color="${exportTheme.floor}"/>
+            <stop offset="100%" stop-color="${exportTheme.floor}" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="skyHaloA" cx="18%" cy="10%" r="28%">
+            <stop offset="0%" stop-color="${exportTheme.haloA}"/>
+            <stop offset="100%" stop-color="${exportTheme.haloA}" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="skyHaloB" cx="82%" cy="12%" r="24%">
+            <stop offset="0%" stop-color="${exportTheme.haloB}"/>
+            <stop offset="100%" stop-color="${exportTheme.haloB}" stop-opacity="0"/>
           </radialGradient>
           <pattern id="fieldDots" width="24" height="24" patternUnits="userSpaceOnUse">
             <circle cx="1.2" cy="1.2" r="1" fill="#ffffff" fill-opacity="0.22"/>
           </pattern>
-          ${accents.map((accent, index) => `
+          ${currentWeatherPreset.accents.map((accent, index) => `
             <radialGradient id="coreGlow-${index}" cx="50%" cy="50%" r="60%">
               <stop offset="0%" stop-color="#ffffff"/>
               <stop offset="30%" stop-color="#ffffff"/>
@@ -562,11 +762,18 @@ function buildExportSvg() {
           `).join('')}
         </defs>
         <rect width="${width}" height="${height}" fill="url(#bgGradient)" rx="18" ry="18"/>
+        <rect width="${width}" height="${height}" fill="url(#skyHaloA)" rx="18" ry="18"/>
+        <rect width="${width}" height="${height}" fill="url(#skyHaloB)" rx="18" ry="18"/>
         <rect width="${width}" height="${height}" fill="url(#groundGlow)" rx="18" ry="18"/>
         <rect width="${width}" height="${height}" fill="url(#fieldDots)" opacity="0.08" rx="18" ry="18"/>
         ${moodLabel}
+        <text x="${width - 24}" y="36" text-anchor="end" fill="${exportTheme.brand}" font-size="12" font-family="Inter, system-ui, sans-serif" letter-spacing="2">SIGNAL GARDEN</text>
         ${links}
         ${blooms}
+        <g transform="translate(24 ${height - 58})">
+          <rect width="${Math.max(120, width - 48)}" height="34" rx="17" ry="17" fill="${exportTheme.badgeFill}" stroke="${exportTheme.badgeStroke}"/>
+          <text x="16" y="22" fill="${exportTheme.muted}" font-size="12" font-family="Inter, system-ui, sans-serif">weather • ${weatherLabel}   ·   source • ${sourceLabel}   ·   ${footerCopy}</text>
+        </g>
       </svg>
     `,
   };
@@ -607,14 +814,14 @@ async function exportGardenPng() {
     const link = document.createElement('a');
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     link.href = pngUrl;
-    link.download = `signal-garden-${timestamp}.png`;
+    link.download = `signal-garden-${currentWeatherPreset.id}-${timestamp}.png`;
     document.body.appendChild(link);
     link.click();
     link.remove();
 
     exportPngBtn.dataset.state = 'done';
     exportPngBtn.textContent = 'PNG exported';
-    logField('Garden export complete. The field has been pressed into a glowing postcard.', 'png ready');
+    logField('Garden export complete. The field has been pressed into a labeled weather postcard.', 'png ready');
     window.clearTimeout(exportToastTimer);
     exportToastTimer = window.setTimeout(() => {
       exportPngBtn.dataset.state = 'idle';
@@ -661,7 +868,7 @@ async function copyShareLink() {
     window.clearTimeout(shareToastTimer);
     copyLinkBtn.dataset.state = 'copied';
     copyLinkBtn.textContent = 'link copied';
-    logField(pick(transmissions.share), hashMode === 'broadcast' ? 'daily link copied' : 'share link copied');
+    logField(pick(transmissions.share), hashMode === 'broadcast' ? 'daily link copied' : `share link copied • ${currentWeatherPreset.label}`);
     shareToastTimer = window.setTimeout(() => {
       copyLinkBtn.dataset.state = 'idle';
       copyLinkBtn.textContent = 'copy share link';
@@ -728,24 +935,27 @@ function buildDailyGarden(key, options = {}) {
   return sequence;
 }
 
-function getSequenceMood(sequence) {
+function getSequenceMood(sequence, preset = currentWeatherPreset) {
   const referenceSpec = sequence[sequence.length - 1] ?? sequence[0];
-  return referenceSpec ? chooseMoodFromSpec(referenceSpec) : moods[0];
+  return referenceSpec ? chooseMoodFromSpec(referenceSpec, preset) : getIdleMood(preset);
 }
 
 function describeDailyBroadcast(key) {
+  const weatherPreset = getBroadcastWeatherPreset(key);
   const blooms = buildDailyGarden(key, {
     width: ARCHIVE_PREVIEW_WIDTH,
     height: ARCHIVE_PREVIEW_HEIGHT,
   });
   const featuredSpec = blooms[Math.floor(blooms.length / 2)] ?? blooms[0];
-  const mood = getSequenceMood(blooms);
+  const mood = getSequenceMood(blooms, weatherPreset);
 
   return {
     key,
     blooms,
     count: blooms.length,
     mood,
+    weatherPreset,
+    weatherLabel: weatherPreset.label,
     dateLabel: formatBroadcastDate(key),
     title: featuredSpec
       ? `${makeNameFromIndexes(featuredSpec.adjectiveIndex, featuredSpec.nounIndex)} archive`
@@ -753,16 +963,17 @@ function describeDailyBroadcast(key) {
   };
 }
 
-function buildArchivePreviewSvg(sequence) {
-  const mood = escapeXml(getSequenceMood(sequence));
+function buildArchivePreviewSvg(sequence, preset) {
+  const mood = escapeXml(getSequenceMood(sequence, preset));
+  const previewTheme = preset.preview;
   const links = sequence.slice(1).map((spec, index) => {
     const previous = sequence[index];
-    const accent = accents[spec.accentIndex] ?? accents[0];
+    const accent = getAccentColor(spec.accentIndex, preset);
     return `<line x1="${previous.x}" y1="${previous.y}" x2="${spec.x}" y2="${spec.y}" stroke="${accent}" stroke-width="1.3" stroke-linecap="round" stroke-dasharray="5 8" opacity="0.45"/>`;
   }).join('');
 
   const blooms = sequence.map((spec) => {
-    const accent = accents[spec.accentIndex] ?? accents[0];
+    const accent = getAccentColor(spec.accentIndex, preset);
     const centerY = spec.y - spec.stemHeight;
     return `
       <g>
@@ -776,13 +987,13 @@ function buildArchivePreviewSvg(sequence) {
 
   return `
     <svg viewBox="0 0 ${ARCHIVE_PREVIEW_WIDTH} ${ARCHIVE_PREVIEW_HEIGHT}" role="img" aria-label="Archive preview for ${mood}">
-      <rect width="${ARCHIVE_PREVIEW_WIDTH}" height="${ARCHIVE_PREVIEW_HEIGHT}" rx="18" ry="18" fill="#050d16"/>
-      <circle cx="70" cy="40" r="90" fill="rgba(157, 123, 255, 0.16)"/>
-      <circle cx="270" cy="34" r="84" fill="rgba(85, 230, 255, 0.12)"/>
-      <ellipse cx="160" cy="250" rx="180" ry="84" fill="rgba(0, 255, 170, 0.12)"/>
+      <rect width="${ARCHIVE_PREVIEW_WIDTH}" height="${ARCHIVE_PREVIEW_HEIGHT}" rx="18" ry="18" fill="${previewTheme.base}"/>
+      <circle cx="70" cy="40" r="90" fill="${previewTheme.skyA}"/>
+      <circle cx="270" cy="34" r="84" fill="${previewTheme.skyB}"/>
+      <ellipse cx="160" cy="250" rx="180" ry="84" fill="${previewTheme.floor}"/>
       ${links}
       ${blooms}
-      <text x="18" y="28" fill="#bcefff" font-size="11" font-family="Inter, system-ui, sans-serif" letter-spacing="1.8">${mood.toUpperCase()}</text>
+      <text x="18" y="28" fill="${previewTheme.text}" font-size="11" font-family="Inter, system-ui, sans-serif" letter-spacing="1.8">${mood.toUpperCase()}</text>
     </svg>
   `;
 }
@@ -800,16 +1011,16 @@ function syncArchiveStatus() {
   if (!archiveStatusEl) return;
 
   if (fieldSourceMode === 'broadcast' && currentBroadcastKey) {
-    archiveStatusEl.textContent = `Viewing ${formatBroadcastDate(currentBroadcastKey)} • ${bloomCount} blooms • ${moodEl.textContent}`;
+    archiveStatusEl.textContent = `Viewing ${formatBroadcastDate(currentBroadcastKey)} • ${currentWeatherPreset.label} • ${bloomCount} blooms • ${moodEl.textContent}`;
     return;
   }
 
   if (fieldSourceMode === 'shared') {
-    archiveStatusEl.textContent = 'Shared permalink loaded. Plant once and it turns back into your own field.';
+    archiveStatusEl.textContent = `Shared permalink loaded • ${currentWeatherPreset.label} • plant once and it turns back into your own field.`;
     return;
   }
 
-  archiveStatusEl.textContent = `Showing the last ${ARCHIVE_DAYS} UTC broadcasts. Today's archive slice is waiting.`;
+  archiveStatusEl.textContent = `Showing the last ${ARCHIVE_DAYS} UTC broadcasts. Weather mode: ${currentWeatherPreset.label}.`;
 }
 
 function renderArchive() {
@@ -824,13 +1035,14 @@ function renderArchive() {
     card.dataset.broadcastKey = key;
     card.dataset.active = 'false';
     card.innerHTML = `
-      <div class="archive-preview" aria-hidden="true">${buildArchivePreviewSvg(entry.blooms)}</div>
+      <div class="archive-preview" aria-hidden="true">${buildArchivePreviewSvg(entry.blooms, entry.weatherPreset)}</div>
       <div class="archive-meta">
         <div class="archive-date">
           <strong>${escapeXml(entry.dateLabel)}</strong>
           <span>${key}</span>
         </div>
         <p class="archive-title">${escapeXml(entry.title)}</p>
+        <p class="archive-weather">${escapeXml(entry.weatherLabel)}</p>
         <p class="archive-summary">${entry.count} blooms • ${escapeXml(entry.mood)} • ${recency}</p>
       </div>
       <div class="archive-actions">
@@ -894,9 +1106,12 @@ function loadDailyBroadcast(key = getUtcDateKey(), { replay = false } = {}) {
   const blooms = buildDailyGarden(key);
   if (!blooms.length) return false;
 
+  const weatherPreset = getBroadcastWeatherPreset(key);
+
   suppressHashSync = true;
   hashMode = 'broadcast';
   setFieldSource('broadcast', key);
+  setWeatherPreset(weatherPreset.id, { syncUrl: false });
 
   if (replay) {
     replayGarden(blooms, {
@@ -916,32 +1131,57 @@ function loadDailyBroadcast(key = getUtcDateKey(), { replay = false } = {}) {
       animateLink: index !== 0,
     });
   });
-  logField(pick(transmissions.daily).replace('{date}', key), `daily signal tuned: ${blooms.length} blooms`);
+  logField(
+    `${pick(transmissions.daily).replace('{date}', key)} Weather report: ${weatherPreset.label}.`,
+    `daily signal tuned: ${blooms.length} blooms`
+  );
   suppressHashSync = false;
   syncShareState();
   return true;
 }
 
-function loadGardenFromHash({ replay = false } = {}) {
-  const hash = window.location.hash.replace(/^#/, '');
-  if (!hash) return false;
+function parseHashState() {
+  const hash = window.location.hash.replace(/^#/, '').trim();
+  if (!hash) return null;
 
-  if (hash.startsWith('broadcast=')) {
-    const key = hash.slice('broadcast='.length).trim();
-    return loadDailyBroadcast(key, { replay });
+  const params = new URLSearchParams(hash);
+
+  if (params.has('broadcast')) {
+    return {
+      type: 'broadcast',
+      broadcastKey: params.get('broadcast')?.trim() ?? '',
+    };
   }
 
-  if (!hash.startsWith('garden=')) return false;
+  if (params.has('garden')) {
+    return {
+      type: 'garden',
+      encodedGarden: params.get('garden')?.trim() ?? '',
+      weatherId: params.get('weather')?.trim() ?? '',
+    };
+  }
 
-  const encoded = hash.slice('garden='.length).trim();
-  if (!encoded) return false;
+  return null;
+}
 
-  const blooms = encoded.split('~').map(decodeBloom).filter(Boolean).slice(0, MAX_BLOOMS);
+function loadGardenFromHash({ replay = false } = {}) {
+  const parsed = parseHashState();
+  if (!parsed) return false;
+
+  if (parsed.type === 'broadcast') {
+    return loadDailyBroadcast(parsed.broadcastKey, { replay });
+  }
+
+  if (parsed.type !== 'garden') return false;
+  if (!parsed.encodedGarden) return false;
+
+  const blooms = parsed.encodedGarden.split('~').map(decodeBloom).filter(Boolean).slice(0, MAX_BLOOMS);
   if (!blooms.length) return false;
 
   suppressHashSync = true;
   hashMode = 'garden';
   setFieldSource('shared');
+  setWeatherPreset(parsed.weatherId || DEFAULT_WEATHER_ID, { syncUrl: false });
 
   if (replay) {
     replayGarden(blooms, {
@@ -960,7 +1200,7 @@ function loadGardenFromHash({ replay = false } = {}) {
       animateLink: index !== 0,
     });
   });
-  logField(pick(transmissions.loaded), `shared garden loaded: ${blooms.length} blooms`);
+  logField(pick(transmissions.loaded), `shared garden loaded: ${blooms.length} blooms • ${currentWeatherPreset.label}`);
   suppressHashSync = false;
   syncShareState();
   return true;
@@ -1009,6 +1249,8 @@ dailySignalBtn.addEventListener('click', () => {
   loadDailyBroadcast(getUtcDateKey(), { replay: false });
 });
 
+cycleWeatherBtn?.addEventListener('click', cycleWeatherMode);
+
 archiveGridEl?.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-action][data-key]');
   if (!(button instanceof HTMLButtonElement)) return;
@@ -1055,6 +1297,10 @@ document.addEventListener('keydown', (event) => {
     event.preventDefault();
     loadDailyBroadcast(getUtcDateKey(), { replay: false });
   }
+  if (event.key.toLowerCase() === 'w' && !event.metaKey && !event.ctrlKey && !event.altKey && fieldSourceMode !== 'broadcast') {
+    event.preventDefault();
+    cycleWeatherMode();
+  }
 });
 
 window.exportGardenPng = exportGardenPng;
@@ -1067,7 +1313,7 @@ window.addEventListener('hashchange', () => {
 
 window.addEventListener('load', () => {
   setFieldSource('open');
-  setMood();
+  setWeatherPreset(DEFAULT_WEATHER_ID, { syncUrl: false });
   syncControls();
   renderArchive();
   logField('Signal Garden online. The soil is listening.', 'awaiting first contact');
