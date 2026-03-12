@@ -18,6 +18,7 @@ const logStatusEl = document.getElementById('logStatus');
 const archiveGridEl = document.getElementById('archiveGrid');
 const archiveStatusEl = document.getElementById('archiveStatus');
 const copyLinkBtn = document.getElementById('copyLink');
+const sharePostcardBtn = document.getElementById('sharePostcard');
 const replayBtn = document.getElementById('replay');
 const exportPngBtn = document.getElementById('exportPng');
 const themeColorMeta = document.querySelector('meta[name="theme-color"]');
@@ -425,6 +426,7 @@ function syncControls() {
   clearBtn.disabled = disabled;
   replayBtn.disabled = disabled;
   copyLinkBtn.disabled = disabled;
+  sharePostcardBtn.disabled = disabled;
   exportPngBtn.disabled = disabled;
 
   if (disabled) stage.setAttribute('data-empty', 'true');
@@ -779,19 +781,17 @@ function buildExportSvg() {
   };
 }
 
-async function exportGardenPng() {
-  if (!bloomHistory.length) return;
+function makePostcardFilename() {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return `signal-garden-${currentWeatherPreset.id}-${timestamp}.png`;
+}
 
-  exportPngBtn.disabled = true;
-  exportPngBtn.dataset.state = 'working';
-  exportPngBtn.textContent = 'rendering...';
-
-  let blobUrl = null;
+async function renderGardenPngBlob() {
+  const { width, height, svg } = buildExportSvg();
+  const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+  const blobUrl = URL.createObjectURL(blob);
 
   try {
-    const { width, height, svg } = buildExportSvg();
-    const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-    blobUrl = URL.createObjectURL(blob);
     const image = new Image();
 
     await new Promise((resolve, reject) => {
@@ -810,14 +810,41 @@ async function exportGardenPng() {
     context.scale(scale, scale);
     context.drawImage(image, 0, 0, width, height);
 
-    const pngUrl = canvas.toDataURL('image/png');
-    const link = document.createElement('a');
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    link.href = pngUrl;
-    link.download = `signal-garden-${currentWeatherPreset.id}-${timestamp}.png`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    return await new Promise((resolve, reject) => {
+      canvas.toBlob((pngBlob) => {
+        if (!pngBlob) {
+          reject(new Error('png-blob-unavailable'));
+          return;
+        }
+        resolve(pngBlob);
+      }, 'image/png');
+    });
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
+}
+
+function downloadBlob(blob, filename) {
+  const blobUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+}
+
+async function exportGardenPng() {
+  if (!bloomHistory.length) return;
+
+  exportPngBtn.disabled = true;
+  exportPngBtn.dataset.state = 'working';
+  exportPngBtn.textContent = 'rendering...';
+
+  try {
+    const pngBlob = await renderGardenPngBlob();
+    downloadBlob(pngBlob, makePostcardFilename());
 
     exportPngBtn.dataset.state = 'done';
     exportPngBtn.textContent = 'PNG exported';
@@ -834,8 +861,63 @@ async function exportGardenPng() {
     exportPngBtn.textContent = 'export PNG';
     syncControls();
     logField('PNG export hit a weird patch of weather on this browser. Reload and try again.', 'export needs retry');
-  } finally {
-    if (blobUrl) URL.revokeObjectURL(blobUrl);
+  }
+}
+
+async function shareGardenPostcard() {
+  if (!bloomHistory.length) return;
+
+  sharePostcardBtn.disabled = true;
+  sharePostcardBtn.dataset.state = 'working';
+  sharePostcardBtn.textContent = 'packing postcard...';
+
+  try {
+    const pngBlob = await renderGardenPngBlob();
+    const filename = makePostcardFilename();
+    const shareUrl = makeShareUrl();
+    const shareText = `Signal Garden • ${currentWeatherPreset.label} • ${bloomHistory.length} blooms`;
+    const postcardFile = new File([pngBlob], filename, { type: 'image/png' });
+    const sharePayload = {
+      title: 'Signal Garden postcard',
+      text: `${shareText}
+${shareUrl}`,
+      url: shareUrl,
+      files: [postcardFile],
+    };
+
+    if (navigator.share && (!navigator.canShare || navigator.canShare(sharePayload))) {
+      await navigator.share(sharePayload);
+      sharePostcardBtn.dataset.state = 'done';
+      sharePostcardBtn.textContent = 'postcard shared';
+      logField('Postcard shared with the full garden attached. Extremely portable weather.', `postcard shared • ${currentWeatherPreset.label}`);
+    } else {
+      downloadBlob(pngBlob, filename);
+      await copyTextToClipboard(shareUrl, 'Copy this Signal Garden postcard link:');
+      sharePostcardBtn.dataset.state = 'done';
+      sharePostcardBtn.textContent = 'saved + link copied';
+      logField('Native share skipped the party, so the postcard was downloaded and the matching link copied instead.', 'postcard saved locally');
+    }
+
+    window.clearTimeout(sharePostcardBtn.copyStateTimer);
+    sharePostcardBtn.copyStateTimer = window.setTimeout(() => {
+      sharePostcardBtn.dataset.state = 'idle';
+      sharePostcardBtn.textContent = 'share postcard';
+      syncControls();
+    }, 2400);
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      sharePostcardBtn.dataset.state = 'idle';
+      sharePostcardBtn.textContent = 'share postcard';
+      syncControls();
+      logField('Postcard share canceled. The weather remains local for now.', 'share canceled');
+      return;
+    }
+
+    console.error(error);
+    sharePostcardBtn.dataset.state = 'idle';
+    sharePostcardBtn.textContent = 'share postcard';
+    syncControls();
+    logField('Postcard share hit a weird browser pothole. Export PNG still works.', 'share needs retry');
   }
 }
 
@@ -1279,6 +1361,7 @@ undoBtn.addEventListener('click', () => {
   undoLastBloom();
 });
 copyLinkBtn.addEventListener('click', copyShareLink);
+sharePostcardBtn.addEventListener('click', shareGardenPostcard);
 exportPngBtn.addEventListener('click', exportGardenPng);
 replayBtn.addEventListener('click', () => replayGarden());
 
