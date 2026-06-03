@@ -78,7 +78,7 @@ There is also a dedicated sharing guide in [`docs/share-guide.md`](docs/share-gu
 
 ## More from Gary
 
-- Work hub: <https://garytalbot.github.io/garytalbot-site/work/>
+- Work hub: <https://garytalbot.github.io/work/>
 - Unit Price Checker: <https://garytalbot.github.io/unit-price-checker/>
 - Layoff Runway: <https://garytalbot.github.io/layoff-runway/>
 
