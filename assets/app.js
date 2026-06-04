@@ -1,6 +1,7 @@
 const stage = document.getElementById('stage');
 const constellationOverlay = document.getElementById('constellation-overlay');
 const meteorOverlay = document.getElementById('meteor-overlay');
+const harmonyOverlay = document.getElementById('harmony-overlay');
 const signalOverlay = document.getElementById('signal-overlay');
 const template = document.getElementById('bloom-template');
 const countEl = document.getElementById('count');
@@ -8,6 +9,7 @@ const moodEl = document.getElementById('mood');
 const weatherModeEl = document.getElementById('weatherMode');
 const weaveModeEl = document.getElementById('weaveMode');
 const meteorModeEl = document.getElementById('meteorMode');
+const harmonyModeEl = document.getElementById('harmonyMode');
 const lastNameEl = document.getElementById('lastName');
 const sourceLabelEl = document.getElementById('sourceLabel');
 const residentNameEl = document.getElementById('residentName');
@@ -18,6 +20,7 @@ const dailySignalBtn = document.getElementById('dailySignal');
 const cycleWeatherBtn = document.getElementById('cycleWeather');
 const toggleWeaveBtn = document.getElementById('toggleWeave');
 const toggleMeteorBtn = document.getElementById('toggleMeteor');
+const toggleHarmonyBtn = document.getElementById('toggleHarmony');
 const undoBtn = document.getElementById('undo');
 const clearBtn = document.getElementById('clear');
 const hintEl = document.getElementById('hint');
@@ -160,6 +163,7 @@ const WEATHER_PRESETS = [
 const WEATHER_PRESET_BY_ID = Object.fromEntries(WEATHER_PRESETS.map((preset) => [preset.id, preset]));
 const DEFAULT_WEATHER_ID = WEATHER_PRESETS[0].id;
 const ACCENT_SLOT_COUNT = WEATHER_PRESETS[0].accents.length;
+const SIGNAL_OVERLAY_STYLE_ID = 'signal-chorus-inline-styles';
 const transmissions = {
   first: [
     'The field wakes up. {name} hums like a vending machine seeing god.',
@@ -286,6 +290,11 @@ let currentWeatherPreset = WEATHER_PRESETS[0];
 let currentCritterSpec = null;
 let constellationWeaveEnabled = false;
 let meteorShowerEnabled = false;
+let signalChorusEnabled = false;
+let signalOverlayFlashGroup = null;
+let signalOverlayChorusGroup = null;
+let signalCursorPoint = null;
+let signalChorusFrame = null;
 
 function rand(min, max, randomFn = Math.random) {
   return randomFn() * (max - min) + min;
@@ -315,6 +324,297 @@ function getAccentColor(index, preset = currentWeatherPreset) {
 function getAccentToken(index) {
   const safeIndex = clamp(index, 0, ACCENT_SLOT_COUNT - 1);
   return `var(--weather-accent-${safeIndex})`;
+}
+
+function ensureSignalChorusStyles() {
+  if (document.getElementById(SIGNAL_OVERLAY_STYLE_ID)) return;
+
+  const style = document.createElement('style');
+  style.id = SIGNAL_OVERLAY_STYLE_ID;
+  style.textContent = `
+    .stage[data-chorus="true"] .signal-overlay {
+      opacity: 1;
+    }
+
+    .signal-chorus-group {
+      mix-blend-mode: screen;
+      filter: drop-shadow(0 0 14px color-mix(in srgb, var(--accent-soft) 26%, transparent));
+    }
+
+    .signal-chorus-thread {
+      fill: none;
+      stroke-linecap: round;
+      stroke-dasharray: 8 14;
+      animation: signal-chorus-thread 4.8s ease-in-out infinite;
+    }
+
+    .signal-chorus-node {
+      transform-origin: center;
+      animation: signal-chorus-node 3.9s ease-in-out infinite;
+    }
+
+    .signal-chorus-halo {
+      fill: none;
+      transform-origin: center;
+      animation: signal-chorus-halo 5.8s ease-in-out infinite;
+    }
+
+    .signal-chorus-flare {
+      animation: signal-chorus-flare 4.4s ease-in-out infinite;
+      transform-origin: center;
+    }
+
+    @keyframes signal-chorus-thread {
+      0% { opacity: 0.16; stroke-dashoffset: 0; }
+      22% { opacity: 0.58; }
+      50% { opacity: 0.34; stroke-dashoffset: -28; }
+      78% { opacity: 0.72; }
+      100% { opacity: 0.18; stroke-dashoffset: -56; }
+    }
+
+    @keyframes signal-chorus-node {
+      0%, 100% { opacity: 0.42; transform: scale(0.86); }
+      35% { opacity: 0.78; transform: scale(1.1); }
+      62% { opacity: 1; transform: scale(1.22); }
+    }
+
+    @keyframes signal-chorus-halo {
+      0%, 100% { opacity: 0.14; transform: scale(0.92); }
+      38% { opacity: 0.34; transform: scale(1.02); }
+      68% { opacity: 0.2; transform: scale(1.14); }
+    }
+
+    @keyframes signal-chorus-flare {
+      0%, 100% { opacity: 0.2; transform: scale(0.8); }
+      48% { opacity: 0.7; transform: scale(1.08); }
+      72% { opacity: 0.96; transform: scale(1.2); }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function syncSignalOverlayFrame({ width = stage?.clientWidth ?? CANONICAL_STAGE_WIDTH, height = stage?.clientHeight ?? CANONICAL_STAGE_HEIGHT } = {}) {
+  if (!signalOverlay) return;
+
+  signalOverlay.setAttribute('viewBox', `0 0 ${Math.max(1, Math.round(width))} ${Math.max(1, Math.round(height))}`);
+  signalOverlay.setAttribute('preserveAspectRatio', 'none');
+}
+
+function ensureSignalOverlayLayers() {
+  if (!signalOverlay) return null;
+
+  ensureSignalChorusStyles();
+  syncSignalOverlayFrame();
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const needsReset = !signalOverlayChorusGroup?.isConnected || !signalOverlayFlashGroup?.isConnected;
+  if (needsReset) {
+    signalOverlay.innerHTML = '';
+    signalOverlayChorusGroup = document.createElementNS(svgNS, 'g');
+    signalOverlayChorusGroup.setAttribute('class', 'signal-chorus-group signal-overlay-chorus');
+    signalOverlayFlashGroup = document.createElementNS(svgNS, 'g');
+    signalOverlayFlashGroup.setAttribute('class', 'signal-overlay-flash');
+    signalOverlay.append(signalOverlayChorusGroup, signalOverlayFlashGroup);
+  }
+
+  return {
+    chorusGroup: signalOverlayChorusGroup,
+    flashGroup: signalOverlayFlashGroup,
+  };
+}
+
+function getSignalChorusAnchor(width, height, phase, blooms, cursorPoint = signalCursorPoint) {
+  if (!blooms.length) {
+    const center = {
+      x: width * 0.5 + Math.sin(phase * 0.9) * 20,
+      y: height * 0.56 + Math.cos(phase * 0.7) * 14,
+    };
+
+    if (!cursorPoint) return center;
+
+    return {
+      x: center.x * 0.6 + cursorPoint.x * 0.4,
+      y: center.y * 0.6 + cursorPoint.y * 0.4,
+    };
+  }
+
+  const anchorSamples = blooms.slice(-Math.min(5, blooms.length));
+  const totalWeight = anchorSamples.reduce((sum, _, index) => sum + index + 1, 0);
+  const weighted = anchorSamples.reduce((acc, spec, index) => {
+    const weight = index + 1;
+    acc.x += spec.x * weight;
+    acc.y += spec.y * weight;
+    return acc;
+  }, { x: 0, y: 0 });
+
+  const base = {
+    x: weighted.x / totalWeight,
+    y: weighted.y / totalWeight,
+  };
+  const orbit = {
+    x: base.x + Math.sin(phase * 0.75) * 18 + Math.cos(phase * 0.31) * 8,
+    y: base.y + Math.cos(phase * 0.68) * 14 + Math.sin(phase * 0.29) * 6,
+  };
+
+  if (!cursorPoint) return orbit;
+
+  return {
+    x: orbit.x * 0.64 + cursorPoint.x * 0.36,
+    y: orbit.y * 0.64 + cursorPoint.y * 0.36,
+  };
+}
+
+function buildSignalChorusLayout({ width = stage?.clientWidth ?? CANONICAL_STAGE_WIDTH, height = stage?.clientHeight ?? CANONICAL_STAGE_HEIGHT, phase = 0, cursorPoint = signalCursorPoint } = {}) {
+  const blooms = bloomHistory.slice(-12);
+  const anchor = getSignalChorusAnchor(width, height, phase, blooms, cursorPoint);
+  const threads = [];
+  const nodes = [];
+  const halos = [];
+  const flares = [];
+
+  halos.push(
+    {
+      x: anchor.x,
+      y: anchor.y,
+      radius: Math.max(32, 40 + blooms.length * 4),
+      accentIndex: blooms[0]?.accentIndex ?? 1,
+      opacity: 0.18,
+      delay: 0.1,
+      duration: 5.4,
+    },
+    {
+      x: anchor.x,
+      y: anchor.y,
+      radius: Math.max(54, 72 + blooms.length * 3),
+      accentIndex: blooms[1]?.accentIndex ?? blooms[0]?.accentIndex ?? 3,
+      opacity: 0.1,
+      delay: 0.48,
+      duration: 6.4,
+    },
+  );
+
+  blooms.forEach((spec, index) => {
+    const spread = 14 + index * 2.2;
+    const curveX = (spec.x + anchor.x) / 2 + Math.sin(phase * 1.4 + index * 0.84) * spread;
+    const curveY = (spec.y + anchor.y) / 2 + Math.cos(phase * 1.2 + index * 0.71) * (spread * 0.72);
+    const accentIndex = spec.accentIndex;
+    const distance = Math.hypot(spec.x - anchor.x, spec.y - anchor.y);
+    const threadOpacity = clamp(0.22 + (1 - index / Math.max(1, blooms.length)) * 0.42, 0.16, 0.72);
+
+    threads.push({
+      x1: spec.x,
+      y1: spec.y,
+      cx: curveX,
+      cy: curveY,
+      x2: anchor.x,
+      y2: anchor.y,
+      accentIndex,
+      width: clamp(1.2 + (1 - index / Math.max(1, blooms.length)) * 1.4, 1.1, 3.4),
+      opacity: threadOpacity,
+      delay: index * 0.14,
+      duration: 3.8 + index * 0.08,
+      dashA: Math.max(7, Math.round(distance / 18)),
+      dashB: Math.max(10, Math.round(distance / 11)),
+    });
+
+    nodes.push({
+      x: spec.x,
+      y: spec.y,
+      accentIndex,
+      radius: clamp(2.4 + index * 0.14, 2.4, 4.8),
+      opacity: clamp(0.48 + (1 - index / Math.max(1, blooms.length)) * 0.38, 0.46, 0.96),
+      delay: index * 0.07,
+      duration: 3.2 + index * 0.05,
+    });
+
+    if (index % 3 === 0) {
+      const flareX = spec.x + Math.sin(phase * 1.7 + index) * 16;
+      const flareY = spec.y - spec.stemHeight * 0.48 + Math.cos(phase * 1.2 + index * 0.5) * 10;
+      flares.push({
+        x: clamp(flareX, 0, width),
+        y: clamp(flareY, 0, height),
+        accentIndex,
+        radius: 5 + (index % 4),
+        opacity: 0.28 + (index % 5) * 0.06,
+        delay: index * 0.1,
+        duration: 4.4 + index * 0.12,
+      });
+    }
+  });
+
+  if (cursorPoint) {
+    const pointerDistance = Math.hypot(cursorPoint.x - anchor.x, cursorPoint.y - anchor.y);
+    threads.push({
+      x1: anchor.x,
+      y1: anchor.y,
+      cx: (anchor.x + cursorPoint.x) / 2 + Math.sin(phase * 2.1) * 18,
+      cy: (anchor.y + cursorPoint.y) / 2 + Math.cos(phase * 1.6) * 12,
+      x2: cursorPoint.x,
+      y2: cursorPoint.y,
+      accentIndex: blooms[blooms.length - 1]?.accentIndex ?? 4,
+      width: clamp(1.1 + pointerDistance / 220, 1.1, 3.1),
+      opacity: 0.58,
+      delay: 0,
+      duration: 2.8,
+      dashA: Math.max(10, Math.round(pointerDistance / 14)),
+      dashB: Math.max(12, Math.round(pointerDistance / 10)),
+    });
+
+    flares.push({
+      x: cursorPoint.x,
+      y: cursorPoint.y,
+      accentIndex: blooms[blooms.length - 1]?.accentIndex ?? 2,
+      radius: clamp(5.8 + blooms.length * 0.16, 5.8, 8.8),
+      opacity: 0.42,
+      delay: 0.08,
+      duration: 3.6,
+    });
+  } else if (!blooms.length) {
+    for (let index = 0; index < 3; index += 1) {
+      const angle = phase * 1.2 + index * 2.09439510239;
+      flares.push({
+        x: anchor.x + Math.cos(angle) * (20 + index * 6),
+        y: anchor.y + Math.sin(angle) * (12 + index * 4),
+        accentIndex: index + 2,
+        radius: 4.8 + index,
+        opacity: 0.28 + index * 0.08,
+        delay: index * 0.12,
+        duration: 4.2 + index * 0.18,
+      });
+    }
+  }
+
+  return {
+    anchor,
+    blooms,
+    threads,
+    nodes,
+    halos,
+    flares,
+  };
+}
+
+function startSignalChorusLoop() {
+  if (signalChorusFrame !== null) return;
+
+  const tick = () => {
+    if (!signalChorusEnabled) {
+      signalChorusFrame = null;
+      return;
+    }
+
+    renderSignalOverlay(performance.now());
+    signalChorusFrame = window.requestAnimationFrame(tick);
+  };
+
+  signalChorusFrame = window.requestAnimationFrame(tick);
+}
+
+function stopSignalChorusLoop() {
+  if (signalChorusFrame !== null) {
+    window.cancelAnimationFrame(signalChorusFrame);
+    signalChorusFrame = null;
+  }
 }
 
 function getIdleMood(preset = currentWeatherPreset) {
@@ -368,6 +668,24 @@ function syncMeteorUi() {
   }
 }
 
+function syncHarmonyUi() {
+  if (stage) {
+    stage.dataset.chorus = String(signalChorusEnabled);
+  }
+
+  if (harmonyModeEl) {
+    harmonyModeEl.textContent = signalChorusEnabled ? 'on' : 'off';
+  }
+
+  if (toggleHarmonyBtn) {
+    toggleHarmonyBtn.textContent = signalChorusEnabled ? 'signal chorus: on' : 'signal chorus: off';
+    toggleHarmonyBtn.setAttribute('aria-pressed', String(signalChorusEnabled));
+    toggleHarmonyBtn.title = signalChorusEnabled
+      ? 'Quiet the living signal chorus.'
+      : 'Wake the hidden signal overlay into a living chorus.';
+  }
+}
+
 function setWeatherPreset(weatherId, options = {}) {
   const { syncUrl = true, logMessage = null, status = 'weather shifted' } = options;
   currentWeatherPreset = getWeatherPresetById(weatherId);
@@ -386,6 +704,7 @@ function setWeatherPreset(weatherId, options = {}) {
   syncArchiveStatus();
   renderConstellationOverlay();
   renderMeteorOverlay();
+  renderSignalOverlay();
 
   if (logMessage) {
     logField(logMessage, status);
@@ -613,11 +932,12 @@ function syncControls() {
   else stage.removeAttribute('data-empty');
 
   hintEl.textContent = disabled
-    ? 'Move your cursor to aim a bloom. Click to plant. Press U to undo.'
-    : 'Click to plant. Press U to undo the last bloom. Press C to toggle constellations. Press M to toggle the meteor shower. Press W to switch weather when the field is yours.';
+    ? 'Move your cursor to aim a bloom. Click to plant. Press U to undo. Press H to wake the signal chorus.'
+    : 'Click to plant. Press U to undo the last bloom. Press C to toggle constellations. Press M to toggle the meteor shower. Press H to toggle the signal chorus. Press W to switch weather when the field is yours.';
 
   syncWeaveUi();
   syncMeteorUi();
+  syncHarmonyUi();
   syncWeatherUi();
 }
 
@@ -638,6 +958,10 @@ function hidePreview() {
 
 function drawSignalLink(from, to, accentIndex) {
   if (!from || !to) return;
+  if (!signalChorusEnabled) return;
+
+  const layers = ensureSignalOverlayLayers();
+  if (!layers) return;
 
   const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
   line.setAttribute('x1', from.x.toFixed(1));
@@ -646,7 +970,7 @@ function drawSignalLink(from, to, accentIndex) {
   line.setAttribute('y2', to.y.toFixed(1));
   line.classList.add('signal-line');
   line.style.setProperty('--accent', getAccentToken(accentIndex));
-  signalOverlay.appendChild(line);
+  layers.flashGroup.appendChild(line);
   window.setTimeout(() => line.remove(), 2400);
 }
 
@@ -838,6 +1162,133 @@ function renderMeteorOverlay() {
   meteorOverlay.appendChild(group);
 }
 
+function getHarmonySeed() {
+  const trail = bloomHistory
+    .slice(-8)
+    .map((spec) => `${Math.round(spec.x)}:${Math.round(spec.y)}:${spec.accentIndex}:${spec.stemHeight}`)
+    .join('|') || 'empty';
+
+  return `signal-garden:harmony:${currentWeatherPreset.id}:${fieldSourceMode}:${currentBroadcastKey ?? 'open'}:${constellationWeaveEnabled ? 'weave' : 'plain'}:${meteorShowerEnabled ? 'meteor' : 'quiet'}:${trail}`;
+}
+
+function buildHarmonyRings({ width = stage?.clientWidth ?? CANONICAL_STAGE_WIDTH, height = stage?.clientHeight ?? CANONICAL_STAGE_HEIGHT } = {}) {
+  const rng = makeSeededRandom(getHarmonySeed());
+  const blooms = bloomHistory.slice(-10);
+  const rings = [];
+
+  blooms.forEach((spec, bloomIndex) => {
+    const centerY = spec.y - spec.stemHeight;
+    const ringCount = 1 + Math.floor(rand(0, 2, rng));
+    const baseRadius = Math.max(18, spec.ringA * 0.42);
+    const baseOpacity = 0.18 + Math.min(0.22, bloomIndex * 0.018);
+
+    for (let index = 0; index < ringCount; index += 1) {
+      const radius = clamp(baseRadius + index * rand(14, 28, rng) + rand(-4, 6, rng), 14, Math.max(width, height) * 0.48);
+      const delay = rand(0, 2.8, rng);
+      const duration = rand(4.8, 8.8, rng);
+      const strokeWidth = rand(1.2, 2.8, rng);
+      const dashA = Math.round(rand(6, 14, rng));
+      const dashB = Math.round(rand(12, 24, rng));
+
+      rings.push({
+        id: `${bloomIndex}-${index}-${Math.round(radius)}`,
+        x: spec.x,
+        y: centerY,
+        radius,
+        accentIndex: spec.accentIndex,
+        delay,
+        duration,
+        strokeWidth,
+        dashA,
+        dashB,
+        opacity: baseOpacity + index * 0.08,
+        bloomIndex,
+      });
+    }
+  });
+
+  return rings.sort((a, b) => a.delay - b.delay || a.radius - b.radius);
+}
+
+function renderSignalOverlay(now = performance.now()) {
+  if (!signalOverlay) return;
+
+  const width = Math.max(1, Math.round(stage?.clientWidth ?? CANONICAL_STAGE_WIDTH));
+  const height = Math.max(1, Math.round(stage?.clientHeight ?? CANONICAL_STAGE_HEIGHT));
+  syncSignalOverlayFrame({ width, height });
+
+  const layers = ensureSignalOverlayLayers();
+  if (!layers) return;
+
+  layers.chorusGroup.replaceChildren();
+
+  if (!signalChorusEnabled) {
+    layers.flashGroup.replaceChildren();
+    return;
+  }
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const layout = buildSignalChorusLayout({ width, height, phase: now / 1000 });
+
+  layout.halos.forEach((halo, index) => {
+    const circle = document.createElementNS(svgNS, 'circle');
+    circle.setAttribute('cx', halo.x.toFixed(1));
+    circle.setAttribute('cy', halo.y.toFixed(1));
+    circle.setAttribute('r', halo.radius.toFixed(1));
+    circle.classList.add('signal-chorus-halo');
+    circle.style.setProperty('--accent', getAccentToken(halo.accentIndex));
+    circle.style.setProperty('stroke', getAccentToken(halo.accentIndex));
+    circle.style.setProperty('stroke-width', `${Math.max(1.4, 2.8 - index * 0.6).toFixed(2)}px`);
+    circle.style.setProperty('stroke-dasharray', `${Math.max(12, Math.round(halo.radius / 4))} ${Math.max(18, Math.round(halo.radius / 3))}`);
+    circle.style.setProperty('opacity', halo.opacity.toFixed(2));
+    circle.style.setProperty('animation-delay', `${halo.delay.toFixed(2)}s`);
+    circle.style.setProperty('animation-duration', `${halo.duration.toFixed(2)}s`);
+    layers.chorusGroup.appendChild(circle);
+  });
+
+  layout.threads.forEach((thread) => {
+    const path = document.createElementNS(svgNS, 'path');
+    path.setAttribute('d', `M ${thread.x1.toFixed(1)} ${thread.y1.toFixed(1)} Q ${thread.cx.toFixed(1)} ${thread.cy.toFixed(1)} ${thread.x2.toFixed(1)} ${thread.y2.toFixed(1)}`);
+    path.classList.add('signal-chorus-thread');
+    path.style.setProperty('--accent', getAccentToken(thread.accentIndex));
+    path.style.setProperty('stroke', getAccentToken(thread.accentIndex));
+    path.style.setProperty('stroke-width', `${thread.width.toFixed(2)}px`);
+    path.style.setProperty('stroke-dasharray', `${thread.dashA} ${thread.dashB}`);
+    path.style.setProperty('opacity', thread.opacity.toFixed(2));
+    path.style.setProperty('animation-delay', `${thread.delay.toFixed(2)}s`);
+    path.style.setProperty('animation-duration', `${thread.duration.toFixed(2)}s`);
+    layers.chorusGroup.appendChild(path);
+  });
+
+  layout.nodes.forEach((node) => {
+    const circle = document.createElementNS(svgNS, 'circle');
+    circle.setAttribute('cx', node.x.toFixed(1));
+    circle.setAttribute('cy', node.y.toFixed(1));
+    circle.setAttribute('r', node.radius.toFixed(1));
+    circle.classList.add('signal-chorus-node');
+    circle.style.setProperty('--accent', getAccentToken(node.accentIndex));
+    circle.style.setProperty('fill', getAccentToken(node.accentIndex));
+    circle.style.setProperty('opacity', node.opacity.toFixed(2));
+    circle.style.setProperty('animation-delay', `${node.delay.toFixed(2)}s`);
+    circle.style.setProperty('animation-duration', `${node.duration.toFixed(2)}s`);
+    layers.chorusGroup.appendChild(circle);
+  });
+
+  layout.flares.forEach((flare) => {
+    const circle = document.createElementNS(svgNS, 'circle');
+    circle.setAttribute('cx', flare.x.toFixed(1));
+    circle.setAttribute('cy', flare.y.toFixed(1));
+    circle.setAttribute('r', flare.radius.toFixed(1));
+    circle.classList.add('signal-chorus-flare');
+    circle.style.setProperty('--accent', getAccentToken(flare.accentIndex));
+    circle.style.setProperty('fill', getAccentToken(flare.accentIndex));
+    circle.style.setProperty('opacity', flare.opacity.toFixed(2));
+    circle.style.setProperty('animation-delay', `${flare.delay.toFixed(2)}s`);
+    circle.style.setProperty('animation-duration', `${flare.duration.toFixed(2)}s`);
+    layers.chorusGroup.appendChild(circle);
+  });
+}
+
 function round1(value) {
   return Number(value.toFixed(1));
 }
@@ -907,6 +1358,7 @@ function renderBloom(spec, options = {}) {
   updateCritterUi();
   renderConstellationOverlay();
   renderMeteorOverlay();
+  renderSignalOverlay();
   if (syncUrl) syncShareState();
 }
 
@@ -984,6 +1436,10 @@ function buildHashString() {
     params.set('meteor', '1');
   }
 
+  if (signalChorusEnabled) {
+    params.set('chorus', '1');
+  }
+
   if (!params.toString()) return '';
 
   return params.toString();
@@ -1027,6 +1483,20 @@ function setMeteorShowerEnabled(nextEnabled, { syncUrl = true, logMessage = null
   if (syncUrl) syncShareState();
 }
 
+function setSignalChorusEnabled(nextEnabled, { syncUrl = true, logMessage = null } = {}) {
+  signalChorusEnabled = Boolean(nextEnabled);
+  syncHarmonyUi();
+  if (signalChorusEnabled) startSignalChorusLoop();
+  else stopSignalChorusLoop();
+  renderSignalOverlay();
+
+  if (logMessage) {
+    logField(logMessage, signalChorusEnabled ? 'signal chorus on' : 'signal chorus off');
+  }
+
+  if (syncUrl) syncShareState();
+}
+
 function toggleMeteorShower() {
   const nextEnabled = !meteorShowerEnabled;
   setMeteorShowerEnabled(nextEnabled, {
@@ -1045,10 +1515,21 @@ function toggleConstellationWeave() {
   });
 }
 
+function toggleHarmonyField() {
+  const nextEnabled = !signalChorusEnabled;
+  setSignalChorusEnabled(nextEnabled, {
+    logMessage: nextEnabled
+      ? 'The signal chorus woke up and started ring-singing through the blooms.'
+      : 'The signal chorus settled back into the dirt and went quiet.',
+  });
+}
+
 function resetField({ logMessage = null, status = 'awaiting first contact', keepLogs = false, syncUrl = true, mood = true } = {}) {
   clearReplayTimers();
   stage.querySelectorAll('.bloom').forEach((bloom) => bloom.remove());
-  signalOverlay.innerHTML = '';
+  if (signalOverlayFlashGroup) signalOverlayFlashGroup.replaceChildren();
+  if (signalOverlayChorusGroup) signalOverlayChorusGroup.replaceChildren();
+  signalCursorPoint = null;
   previousBloomPoint = null;
   bloomCount = 0;
   bloomHistory = [];
@@ -1062,6 +1543,7 @@ function resetField({ logMessage = null, status = 'awaiting first contact', keep
   updateCritterUi();
   renderConstellationOverlay();
   renderMeteorOverlay();
+  renderSignalOverlay();
   if (syncUrl) syncShareState();
 }
 
@@ -1099,7 +1581,8 @@ function undoLastBloom() {
     setMood(chooseMoodFromSpec(lastSpec, currentWeatherPreset));
   } else {
     previousBloomPoint = null;
-    signalOverlay.innerHTML = '';
+    if (signalOverlayFlashGroup) signalOverlayFlashGroup.replaceChildren();
+    if (signalOverlayChorusGroup) signalOverlayChorusGroup.replaceChildren();
     setMood(getIdleMood(currentWeatherPreset));
   }
 
@@ -1109,6 +1592,7 @@ function undoLastBloom() {
   updateCritterUi();
   renderConstellationOverlay();
   renderMeteorOverlay();
+  renderSignalOverlay();
   syncShareState();
 }
 
@@ -1130,6 +1614,7 @@ function buildExportSvg() {
   const sourceLabel = escapeXml(sourceLabelEl.textContent || 'open field');
   const exportTheme = currentWeatherPreset.export;
   const skyModeLabel = meteorShowerEnabled ? 'meteor shower on' : 'meteor shower off';
+  const signalModeLabel = signalChorusEnabled ? 'signal chorus on' : 'signal chorus off';
   const lastBloom = bloomHistory[bloomHistory.length - 1] ?? null;
   const lastBloomName = lastBloom
     ? escapeXml(makeNameFromIndexes(lastBloom.adjectiveIndex, lastBloom.nounIndex))
@@ -1156,6 +1641,7 @@ function buildExportSvg() {
     { label: 'SOURCE', value: sourceLabel },
     { label: 'LAST BLOOM', value: lastBloomName },
     { label: 'COUNT', value: String(bloomHistory.length) },
+    { label: 'SIGNAL', value: escapeXml(signalModeLabel.toUpperCase()) },
   ];
 
   const links = bloomHistory.slice(1).map((spec, index) => {
@@ -1189,6 +1675,38 @@ function buildExportSvg() {
         </g>
       `;
     }).join('')
+    : '';
+
+  const signalChorusSegments = signalChorusEnabled
+    ? (() => {
+      const layout = buildSignalChorusLayout({ width, height, phase: bloomHistory.length * 0.37 + 0.5, cursorPoint: null });
+      return [
+        ...layout.halos.map((halo, index) => {
+          const color = getAccentColor(halo.accentIndex, currentWeatherPreset);
+          return `
+            <circle cx="${halo.x.toFixed(1)}" cy="${halo.y.toFixed(1)}" r="${halo.radius.toFixed(1)}" fill="none" stroke="${color}" stroke-width="${Math.max(1.2, 2.6 - index * 0.5).toFixed(2)}" stroke-dasharray="${Math.max(12, Math.round(halo.radius / 4))} ${Math.max(18, Math.round(halo.radius / 3))}" opacity="${halo.opacity.toFixed(2)}"/>
+          `;
+        }),
+        ...layout.threads.map((thread) => {
+          const color = getAccentColor(thread.accentIndex, currentWeatherPreset);
+          return `
+            <path d="M ${thread.x1.toFixed(1)} ${thread.y1.toFixed(1)} Q ${thread.cx.toFixed(1)} ${thread.cy.toFixed(1)} ${thread.x2.toFixed(1)} ${thread.y2.toFixed(1)}" fill="none" stroke="${color}" stroke-width="${thread.width.toFixed(2)}" stroke-linecap="round" stroke-dasharray="${thread.dashA} ${thread.dashB}" opacity="${thread.opacity.toFixed(2)}"/>
+          `;
+        }),
+        ...layout.nodes.map((node) => {
+          const color = getAccentColor(node.accentIndex, currentWeatherPreset);
+          return `
+            <circle cx="${node.x.toFixed(1)}" cy="${node.y.toFixed(1)}" r="${node.radius.toFixed(1)}" fill="${color}" opacity="${node.opacity.toFixed(2)}"/>
+          `;
+        }),
+        ...layout.flares.map((flare) => {
+          const color = getAccentColor(flare.accentIndex, currentWeatherPreset);
+          return `
+            <circle cx="${flare.x.toFixed(1)}" cy="${flare.y.toFixed(1)}" r="${flare.radius.toFixed(1)}" fill="${color}" opacity="${flare.opacity.toFixed(2)}"/>
+          `;
+        }),
+      ].join('');
+    })()
     : '';
 
   const blooms = bloomHistory.map((spec) => {
@@ -1288,6 +1806,7 @@ function buildExportSvg() {
         </g>
         ${meteorSegments}
         ${weaveSegments}
+        ${signalChorusSegments}
         ${links}
         ${blooms}
         <g transform="translate(24 ${height - 138})">
@@ -1303,7 +1822,7 @@ function buildExportSvg() {
 
 function makePostcardFilename() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  return `signal-garden-${currentWeatherPreset.id}${meteorShowerEnabled ? '-meteor' : ''}-${timestamp}.png`;
+  return `signal-garden-${currentWeatherPreset.id}${meteorShowerEnabled ? '-meteor' : ''}${signalChorusEnabled ? '-chorus' : ''}-${timestamp}.png`;
 }
 
 async function renderGardenPngBlob() {
@@ -1368,7 +1887,7 @@ async function exportGardenPng() {
 
     exportPngBtn.dataset.state = 'done';
     exportPngBtn.textContent = 'PNG exported';
-    logField('Garden export complete. The field has been pressed into a labeled weather postcard.', meteorShowerEnabled ? 'meteor postcard ready' : 'png ready');
+    logField('Garden export complete. The field has been pressed into a labeled weather postcard.', signalChorusEnabled ? 'chorus postcard ready' : meteorShowerEnabled ? 'meteor postcard ready' : 'png ready');
     window.clearTimeout(exportToastTimer);
     exportToastTimer = window.setTimeout(() => {
       exportPngBtn.dataset.state = 'idle';
@@ -1395,7 +1914,7 @@ async function shareGardenPostcard() {
     const pngBlob = await renderGardenPngBlob();
     const filename = makePostcardFilename();
     const shareUrl = makeShareUrl();
-    const shareText = `Signal Garden • ${currentWeatherPreset.label} • ${bloomHistory.length} blooms • ${meteorShowerEnabled ? 'meteor shower on' : 'meteor shower off'}`;
+    const shareText = `Signal Garden • ${currentWeatherPreset.label} • ${bloomHistory.length} blooms • ${meteorShowerEnabled ? 'meteor shower on' : 'meteor shower off'} • ${signalChorusEnabled ? 'signal chorus on' : 'signal chorus off'}`;
     const postcardFile = new File([pngBlob], filename, { type: 'image/png' });
     const sharePayload = {
       title: 'Signal Garden postcard',
@@ -1409,7 +1928,7 @@ ${shareUrl}`,
       await navigator.share(sharePayload);
       sharePostcardBtn.dataset.state = 'done';
       sharePostcardBtn.textContent = 'postcard shared';
-      logField('Postcard shared with the full garden attached. Extremely portable weather.', meteorShowerEnabled ? `postcard shared • ${currentWeatherPreset.label} • meteor` : `postcard shared • ${currentWeatherPreset.label}`);
+      logField('Postcard shared with the full garden attached. Extremely portable weather.', signalChorusEnabled ? `postcard shared • ${currentWeatherPreset.label} • chorus` : meteorShowerEnabled ? `postcard shared • ${currentWeatherPreset.label} • meteor` : `postcard shared • ${currentWeatherPreset.label}`);
     } else {
       downloadBlob(pngBlob, filename);
       await copyTextToClipboard(shareUrl, 'Copy this Signal Garden postcard link:');
@@ -1776,6 +2295,7 @@ function applySharedSequence(sequence, {
   broadcastKey = null,
   weaveEnabled = constellationWeaveEnabled,
   meteorEnabled = meteorShowerEnabled,
+  chorusEnabled = signalChorusEnabled,
   logMessage = pick(transmissions.loaded),
   status = null,
 } = {}) {
@@ -1790,6 +2310,7 @@ function applySharedSequence(sequence, {
   if (replay) {
     setConstellationWeave(weaveEnabled, { syncUrl: false });
     setMeteorShowerEnabled(meteorEnabled, { syncUrl: false });
+    setSignalChorusEnabled(chorusEnabled, { syncUrl: false });
     replayGarden(blooms, {
       restoreFromHash: true,
       shareMode: hashShareMode,
@@ -1809,13 +2330,14 @@ function applySharedSequence(sequence, {
   });
   setConstellationWeave(weaveEnabled, { syncUrl: false });
   setMeteorShowerEnabled(meteorEnabled, { syncUrl: false });
+  setSignalChorusEnabled(chorusEnabled, { syncUrl: false });
   logField(logMessage, status ?? `${sourceMode === 'broadcast' ? 'daily signal tuned' : 'shared garden loaded'}: ${blooms.length} blooms • ${currentWeatherPreset.label}`);
   suppressHashSync = false;
   syncShareState();
   return true;
 }
 
-function loadDailyBroadcast(key = getUtcDateKey(), { replay = false, weaveEnabled = constellationWeaveEnabled, meteorEnabled = meteorShowerEnabled } = {}) {
+function loadDailyBroadcast(key = getUtcDateKey(), { replay = false, weaveEnabled = constellationWeaveEnabled, meteorEnabled = meteorShowerEnabled, chorusEnabled = signalChorusEnabled } = {}) {
   if (!isBroadcastKey(key)) return false;
 
   const blooms = buildDailyGarden(key);
@@ -1830,6 +2352,7 @@ function loadDailyBroadcast(key = getUtcDateKey(), { replay = false, weaveEnable
     broadcastKey: key,
     weaveEnabled,
     meteorEnabled,
+    chorusEnabled,
     logMessage: `${pick(transmissions.daily).replace('{date}', key)} Weather report: ${weatherPreset.label}.`,
     status: `daily signal tuned: ${blooms.length} blooms`,
   });
@@ -1842,6 +2365,7 @@ function parseHashState() {
   const params = new URLSearchParams(hash);
   const weaveEnabled = params.get('weave') === '1' || params.get('weave') === 'true';
   const meteorEnabled = params.get('meteor') === '1' || params.get('meteor') === 'true';
+  const chorusEnabled = params.get('chorus') === '1' || params.get('chorus') === 'true' || params.get('harmony') === '1' || params.get('harmony') === 'true';
 
   if (params.has('broadcast')) {
     return {
@@ -1849,6 +2373,7 @@ function parseHashState() {
       broadcastKey: params.get('broadcast')?.trim() ?? '',
       weaveEnabled,
       meteorEnabled,
+      chorusEnabled,
     };
   }
 
@@ -1859,14 +2384,16 @@ function parseHashState() {
       weatherId: params.get('weather')?.trim() ?? '',
       weaveEnabled,
       meteorEnabled,
+      chorusEnabled,
     };
   }
 
-  if (weaveEnabled || meteorEnabled) {
+  if (weaveEnabled || meteorEnabled || chorusEnabled) {
     return {
       type: 'modes',
       weaveEnabled,
       meteorEnabled,
+      chorusEnabled,
     };
   }
 
@@ -1881,13 +2408,14 @@ function loadGardenFromHash({ replay = false } = {}) {
     suppressHashSync = true;
     setConstellationWeave(parsed.weaveEnabled, { syncUrl: false });
     setMeteorShowerEnabled(parsed.meteorEnabled, { syncUrl: false });
+    setSignalChorusEnabled(parsed.chorusEnabled, { syncUrl: false });
     suppressHashSync = false;
     syncShareState();
     return true;
   }
 
   if (parsed.type === 'broadcast') {
-    return loadDailyBroadcast(parsed.broadcastKey, { replay, weaveEnabled: parsed.weaveEnabled, meteorEnabled: parsed.meteorEnabled });
+    return loadDailyBroadcast(parsed.broadcastKey, { replay, weaveEnabled: parsed.weaveEnabled, meteorEnabled: parsed.meteorEnabled, chorusEnabled: parsed.chorusEnabled });
   }
 
   if (parsed.type !== 'garden') return false;
@@ -1903,6 +2431,7 @@ function loadGardenFromHash({ replay = false } = {}) {
     hashShareMode: 'garden',
     weaveEnabled: parsed.weaveEnabled,
     meteorEnabled: parsed.meteorEnabled,
+    chorusEnabled: parsed.chorusEnabled,
     logMessage: pick(transmissions.loaded),
     status: `shared garden loaded: ${blooms.length} blooms • ${getWeatherPresetById(parsed.weatherId || DEFAULT_WEATHER_ID).label}`,
   });
@@ -1910,18 +2439,27 @@ function loadGardenFromHash({ replay = false } = {}) {
 
 stage.addEventListener('pointermove', (event) => {
   const rect = stage.getBoundingClientRect();
-  updatePreview(event.clientX - rect.left, event.clientY - rect.top);
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+  signalCursorPoint = { x, y };
+  updatePreview(x, y);
   if (!previewVisible) showPreview();
+  if (signalChorusEnabled) renderSignalOverlay();
 });
 
 stage.addEventListener('pointerenter', showPreview);
-stage.addEventListener('pointerleave', hidePreview);
+stage.addEventListener('pointerleave', () => {
+  signalCursorPoint = null;
+  hidePreview();
+  if (signalChorusEnabled) renderSignalOverlay();
+});
 
 stage.addEventListener('click', (event) => {
   prepareEditableField();
   const rect = stage.getBoundingClientRect();
   const x = event.clientX - rect.left;
   const y = event.clientY - rect.top;
+  signalCursorPoint = { x, y };
   plant(x, y);
   updatePreview(x, y);
 });
@@ -1954,6 +2492,7 @@ dailySignalBtn.addEventListener('click', () => {
 cycleWeatherBtn?.addEventListener('click', cycleWeatherMode);
 toggleWeaveBtn?.addEventListener('click', toggleConstellationWeave);
 toggleMeteorBtn?.addEventListener('click', toggleMeteorShower);
+toggleHarmonyBtn?.addEventListener('click', toggleHarmonyField);
 
 highlightsGridEl?.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-action][data-id]');
@@ -2030,6 +2569,10 @@ document.addEventListener('keydown', (event) => {
   if (event.key.toLowerCase() === 'm' && !event.metaKey && !event.ctrlKey && !event.altKey) {
     event.preventDefault();
     toggleMeteorShower();
+  }
+  if (event.key.toLowerCase() === 'h' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    event.preventDefault();
+    toggleHarmonyField();
   }
 });
 

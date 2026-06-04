@@ -49,36 +49,55 @@
         <p class="lede">Signal Garden is a tiny constellation-era browser garden: every UTC day gets a shared field, the newest broadcasts live below as a browsable archive, and you can still plant your own glowing nonsense whenever the mood strikes.</p>
       </div>
       <div class="controls">
-        <button id="randomize">plant cluster</button>
-        <button id="dailySignal">today's signal</button>
-        <button id="cycleWeather">weather: violet hush</button>
-        <button id="toggleWeave" aria-pressed="false">constellations: off</button>
-        <button id="toggleMeteor" aria-pressed="false">meteor shower: off</button>
-        <button id="replay" disabled>replay garden</button>
-        <button id="copyLink" disabled>copy share link</button>
-        <button id="sharePostcard" disabled>share postcard</button>
-        <button id="exportPng" disabled>export PNG</button>
-        <button id="undo" disabled>undo last</button>
-        <button id="clear" disabled>clear field</button>
+        <section class="control-group control-group--primary" aria-label="Planting controls">
+          <p class="control-label">field actions</p>
+          <div class="control-row">
+            <button id="randomize">plant cluster</button>
+            <button id="dailySignal">today's signal</button>
+            <button id="cycleWeather">weather: violet hush</button>
+          </div>
+        </section>
+        <section class="control-group control-group--modes" aria-label="Mode controls">
+          <p class="control-label">new mode / sky weave</p>
+          <p class="control-note">The signal chorus is the weird switch. The HUD below mirrors its state, along with the other ambient toggles.</p>
+          <div class="control-row">
+            <button id="toggleWeave" aria-pressed="false">constellations: off</button>
+            <button id="toggleMeteor" aria-pressed="false">meteor shower: off</button>
+            <button id="toggleHarmony" aria-pressed="false">signal chorus: off</button>
+          </div>
+        </section>
+        <section class="control-group control-group--secondary" aria-label="Sharing and editing controls">
+          <p class="control-label">field tools</p>
+          <div class="control-row">
+            <button id="replay" disabled>replay garden</button>
+            <button id="copyLink" disabled>copy share link</button>
+            <button id="sharePostcard" disabled>share postcard</button>
+            <button id="exportPng" disabled>export PNG</button>
+            <button id="undo" disabled>undo last</button>
+            <button id="clear" disabled>clear field</button>
+          </div>
+        </section>
       </div>
     </header>
 
     <section class="stage-wrap">
       <div class="hud">
-        <div><span>blooms</span><strong id="count">0</strong></div>
-        <div><span>sky mood</span><strong id="mood">violet hush</strong></div>
-        <div><span>weather mode</span><strong id="weatherMode">violet hush</strong></div>
-        <div><span>sky weave</span><strong id="weaveMode">off</strong></div>
-        <div><span>meteor shower</span><strong id="meteorMode">off</strong></div>
-        <div><span>last specimen</span><strong id="lastName">none yet</strong></div>
-        <div><span>field source</span><strong id="sourceLabel">open field</strong></div>
-        <div><span>resident</span><strong id="residentName">vacant terrarium</strong><em id="residentMood" class="resident-mood">waiting for a reason to exist</em></div>
-        <div class="hint-card"><span>planting hint</span><strong id="hint">Move your cursor to aim a bloom. Click to plant. Press U to undo.</strong></div>
+        <div class="hud-tile"><span>blooms</span><strong id="count">0</strong></div>
+        <div class="hud-tile"><span>sky mood</span><strong id="mood">violet hush</strong></div>
+        <div class="hud-tile"><span>weather mode</span><strong id="weatherMode">violet hush</strong></div>
+        <div class="hud-tile hud-tile--focus"><span>sky weave</span><strong id="weaveMode">off</strong></div>
+        <div class="hud-tile"><span>meteor shower</span><strong id="meteorMode">off</strong></div>
+        <div class="hud-tile"><span>signal chorus</span><strong id="harmonyMode">off</strong></div>
+        <div class="hud-tile"><span>last specimen</span><strong id="lastName">none yet</strong></div>
+        <div class="hud-tile hud-tile--source"><span>field source</span><strong id="sourceLabel">open field</strong></div>
+        <div class="hud-tile hud-tile--resident"><span>resident</span><strong id="residentName">vacant terrarium</strong><em id="residentMood" class="resident-mood">waiting for a reason to exist</em></div>
+        <div class="hud-tile hint-card"><span>planting hint</span><strong id="hint">Move your cursor to aim a bloom. Click to plant. Press U to undo.</strong></div>
       </div>
       <div id="stage" class="stage" data-empty="true" aria-label="Signal Garden canvas">
         <div id="preview" class="preview" aria-hidden="true"></div>
         <svg id="constellation-overlay" class="constellation-overlay" aria-hidden="true"></svg>
         <svg id="meteor-overlay" class="meteor-overlay" aria-hidden="true"></svg>
+        <svg id="harmony-overlay" class="harmony-overlay" aria-hidden="true"></svg>
         <svg id="signal-overlay" class="signal-overlay" aria-hidden="true"></svg>
         <button id="gardenCritter" class="garden-critter" type="button" aria-live="polite" aria-label="Garden resident is waiting"></button>
       </div>
