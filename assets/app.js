@@ -1,9 +1,11 @@
 const stage = document.getElementById('stage');
+const constellationOverlay = document.getElementById('constellation-overlay');
 const signalOverlay = document.getElementById('signal-overlay');
 const template = document.getElementById('bloom-template');
 const countEl = document.getElementById('count');
 const moodEl = document.getElementById('mood');
 const weatherModeEl = document.getElementById('weatherMode');
+const weaveModeEl = document.getElementById('weaveMode');
 const lastNameEl = document.getElementById('lastName');
 const sourceLabelEl = document.getElementById('sourceLabel');
 const residentNameEl = document.getElementById('residentName');
@@ -12,6 +14,7 @@ const gardenCritterEl = document.getElementById('gardenCritter');
 const randomizeBtn = document.getElementById('randomize');
 const dailySignalBtn = document.getElementById('dailySignal');
 const cycleWeatherBtn = document.getElementById('cycleWeather');
+const toggleWeaveBtn = document.getElementById('toggleWeave');
 const undoBtn = document.getElementById('undo');
 const clearBtn = document.getElementById('clear');
 const hintEl = document.getElementById('hint');
@@ -278,6 +281,7 @@ let fieldSourceMode = 'open';
 let currentBroadcastKey = null;
 let currentWeatherPreset = WEATHER_PRESETS[0];
 let currentCritterSpec = null;
+let constellationWeaveEnabled = false;
 
 function rand(min, max, randomFn = Math.random) {
   return randomFn() * (max - min) + min;
@@ -324,6 +328,24 @@ function syncWeatherUi() {
   cycleWeatherBtn.disabled = fieldSourceMode === 'broadcast';
 }
 
+function syncWeaveUi() {
+  if (stage) {
+    stage.dataset.weave = String(constellationWeaveEnabled);
+  }
+
+  if (weaveModeEl) {
+    weaveModeEl.textContent = constellationWeaveEnabled ? 'on' : 'off';
+  }
+
+  if (toggleWeaveBtn) {
+    toggleWeaveBtn.textContent = constellationWeaveEnabled ? 'constellations: on' : 'constellations: off';
+    toggleWeaveBtn.setAttribute('aria-pressed', String(constellationWeaveEnabled));
+    toggleWeaveBtn.title = constellationWeaveEnabled
+      ? 'Hide the ambient links between blooms.'
+      : 'Reveal the ambient links between blooms.';
+  }
+}
+
 function setWeatherPreset(weatherId, options = {}) {
   const { syncUrl = true, logMessage = null, status = 'weather shifted' } = options;
   currentWeatherPreset = getWeatherPresetById(weatherId);
@@ -340,6 +362,7 @@ function setWeatherPreset(weatherId, options = {}) {
 
   syncWeatherUi();
   syncArchiveStatus();
+  renderConstellationOverlay();
 
   if (logMessage) {
     logField(logMessage, status);
@@ -568,8 +591,9 @@ function syncControls() {
 
   hintEl.textContent = disabled
     ? 'Move your cursor to aim a bloom. Click to plant. Press U to undo.'
-    : 'Click to plant. Press U to undo the last bloom. Press W to switch weather when the field is yours.';
+    : 'Click to plant. Press U to undo the last bloom. Press C to toggle constellations. Press W to switch weather when the field is yours.';
 
+  syncWeaveUi();
   syncWeatherUi();
 }
 
@@ -600,6 +624,83 @@ function drawSignalLink(from, to, accentIndex) {
   line.style.setProperty('--accent', getAccentToken(accentIndex));
   signalOverlay.appendChild(line);
   window.setTimeout(() => line.remove(), 2400);
+}
+
+function buildConstellationSegments(sequence, { width = stage?.clientWidth ?? CANONICAL_STAGE_WIDTH, height = stage?.clientHeight ?? CANONICAL_STAGE_HEIGHT } = {}) {
+  if (!sequence.length) return [];
+
+  const maxDistance = Math.max(132, Math.min(width, height) * 0.24);
+  const segments = [];
+  const seen = new Set();
+
+  sequence.forEach((spec, index) => {
+    const neighbors = sequence
+      .map((other, otherIndex) => {
+        if (otherIndex === index) return null;
+        const distance = Math.hypot(other.x - spec.x, other.y - spec.y);
+        return { other, otherIndex, distance };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 2);
+
+    neighbors.forEach(({ other, otherIndex, distance }) => {
+      if (distance > maxDistance) return;
+
+      const key = index < otherIndex ? `${index}:${otherIndex}` : `${otherIndex}:${index}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      segments.push({
+        from: spec,
+        to: other,
+        distance,
+        accentIndex: spec.accentIndex,
+      });
+    });
+  });
+
+  return segments.sort((a, b) => a.distance - b.distance);
+}
+
+function renderConstellationOverlay() {
+  if (!constellationOverlay) return;
+
+  const width = Math.max(1, Math.round(stage?.clientWidth ?? CANONICAL_STAGE_WIDTH));
+  const height = Math.max(1, Math.round(stage?.clientHeight ?? CANONICAL_STAGE_HEIGHT));
+  constellationOverlay.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  constellationOverlay.setAttribute('preserveAspectRatio', 'none');
+  constellationOverlay.innerHTML = '';
+
+  if (!constellationWeaveEnabled || bloomHistory.length < 2) return;
+
+  const segments = buildConstellationSegments(bloomHistory, { width, height });
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const group = document.createElementNS(svgNS, 'g');
+  group.setAttribute('class', 'constellation-group');
+
+  segments.forEach((segment, index) => {
+    const line = document.createElementNS(svgNS, 'line');
+    line.setAttribute('x1', segment.from.x.toFixed(1));
+    line.setAttribute('y1', segment.from.y.toFixed(1));
+    line.setAttribute('x2', segment.to.x.toFixed(1));
+    line.setAttribute('y2', segment.to.y.toFixed(1));
+    line.classList.add('constellation-line');
+    line.style.setProperty('--accent', getAccentToken(segment.accentIndex));
+    line.style.setProperty('--distance', `${Math.round(segment.distance)}px`);
+    line.style.animationDelay = `${index * 36}ms`;
+    group.appendChild(line);
+
+    const beacon = document.createElementNS(svgNS, 'circle');
+    beacon.setAttribute('cx', ((segment.from.x + segment.to.x) / 2).toFixed(1));
+    beacon.setAttribute('cy', ((segment.from.y + segment.to.y) / 2).toFixed(1));
+    beacon.setAttribute('r', `${Math.max(1.6, Math.min(4.5, 7 - segment.distance / 60)).toFixed(1)}`);
+    beacon.classList.add('constellation-beacon');
+    beacon.style.setProperty('--accent', getAccentToken(segment.accentIndex));
+    beacon.style.animationDelay = `${index * 58}ms`;
+    group.appendChild(beacon);
+  });
+
+  constellationOverlay.appendChild(group);
 }
 
 function round1(value) {
@@ -669,6 +770,7 @@ function renderBloom(spec, options = {}) {
   syncControls();
   syncArchiveStatus();
   updateCritterUi();
+  renderConstellationOverlay();
   if (syncUrl) syncShareState();
 }
 
@@ -729,15 +831,21 @@ function getGardenUrl(encodedGarden, weatherId = currentWeatherPreset.id) {
 }
 
 function buildHashString() {
+  const params = new URLSearchParams();
+
   if (hashMode === 'broadcast' && currentBroadcastKey) {
-    return `broadcast=${currentBroadcastKey}`;
+    params.set('broadcast', currentBroadcastKey);
+  } else if (bloomHistory.length) {
+    params.set('garden', bloomHistory.map(encodeBloom).join('~'));
+    params.set('weather', currentWeatherPreset.id);
   }
 
-  if (!bloomHistory.length) return '';
+  if (!params.toString()) return '';
 
-  const params = new URLSearchParams();
-  params.set('garden', bloomHistory.map(encodeBloom).join('~'));
-  params.set('weather', currentWeatherPreset.id);
+  if (constellationWeaveEnabled) {
+    params.set('weave', '1');
+  }
+
   return params.toString();
 }
 
@@ -755,6 +863,27 @@ function syncShareState() {
   history.replaceState(null, '', nextUrl);
 }
 
+function setConstellationWeave(nextEnabled, { syncUrl = true, logMessage = null } = {}) {
+  constellationWeaveEnabled = Boolean(nextEnabled);
+  syncWeaveUi();
+  renderConstellationOverlay();
+
+  if (logMessage) {
+    logField(logMessage, constellationWeaveEnabled ? 'constellations on' : 'constellations off');
+  }
+
+  if (syncUrl) syncShareState();
+}
+
+function toggleConstellationWeave() {
+  const nextEnabled = !constellationWeaveEnabled;
+  setConstellationWeave(nextEnabled, {
+    logMessage: nextEnabled
+      ? 'The field started sketching constellations between blooms.'
+      : 'The ambient links are still glowing under the blooms.',
+  });
+}
+
 function resetField({ logMessage = null, status = 'awaiting first contact', keepLogs = false, syncUrl = true, mood = true } = {}) {
   clearReplayTimers();
   stage.querySelectorAll('.bloom').forEach((bloom) => bloom.remove());
@@ -770,6 +899,7 @@ function resetField({ logMessage = null, status = 'awaiting first contact', keep
   syncControls();
   syncArchiveStatus();
   updateCritterUi();
+  renderConstellationOverlay();
   if (syncUrl) syncShareState();
 }
 
@@ -815,6 +945,7 @@ function undoLastBloom() {
   syncControls();
   syncArchiveStatus();
   updateCritterUi();
+  renderConstellationOverlay();
   syncShareState();
 }
 
@@ -866,6 +997,19 @@ function buildExportSvg() {
     const accent = getAccentColor(spec.accentIndex, currentWeatherPreset);
     return `<line x1="${previous.x}" y1="${previous.y}" x2="${spec.x}" y2="${spec.y}" stroke="${accent}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="6 10" opacity="0.5"/>`;
   }).join('');
+
+  const weaveSegments = constellationWeaveEnabled && bloomHistory.length > 1
+    ? buildConstellationSegments(bloomHistory, { width, height }).map((segment) => {
+      const color = getAccentColor(segment.accentIndex, currentWeatherPreset);
+      const radius = Math.max(1.4, Math.min(4.25, 6.6 - segment.distance / 65)).toFixed(1);
+      return `
+        <g opacity="${Math.max(0.24, 0.58 - segment.distance / 520).toFixed(2)}">
+          <line x1="${segment.from.x}" y1="${segment.from.y}" x2="${segment.to.x}" y2="${segment.to.y}" stroke="${color}" stroke-width="${Math.max(1, 2.2 - segment.distance / 220).toFixed(2)}" stroke-linecap="round" stroke-dasharray="7 12" opacity="0.6"/>
+          <circle cx="${((segment.from.x + segment.to.x) / 2).toFixed(1)}" cy="${((segment.from.y + segment.to.y) / 2).toFixed(1)}" r="${radius}" fill="${color}" opacity="0.72"/>
+        </g>
+      `;
+    }).join('')
+    : '';
 
   const blooms = bloomHistory.map((spec) => {
     const accent = getAccentColor(spec.accentIndex, currentWeatherPreset);
@@ -958,6 +1102,7 @@ function buildExportSvg() {
           <text x="36" y="104" fill="${exportTheme.muted}" font-size="14" font-family="Inter, system-ui, sans-serif">${gardenSubtitle}</text>
           <text x="${Math.max(220, width - 84)}" y="48" text-anchor="end" fill="${exportTheme.brand}" font-size="12" font-family="Inter, system-ui, sans-serif" letter-spacing="2">SIGNAL GARDEN</text>
         </g>
+        ${weaveSegments}
         ${links}
         ${blooms}
         <g transform="translate(24 ${height - 138})">
@@ -1444,6 +1589,7 @@ function applySharedSequence(sequence, {
   sourceMode = 'shared',
   hashShareMode = 'garden',
   broadcastKey = null,
+  weaveEnabled = constellationWeaveEnabled,
   logMessage = pick(transmissions.loaded),
   status = null,
 } = {}) {
@@ -1473,13 +1619,14 @@ function applySharedSequence(sequence, {
       animateLink: index !== 0,
     });
   });
+  setConstellationWeave(weaveEnabled, { syncUrl: false });
   logField(logMessage, status ?? `${sourceMode === 'broadcast' ? 'daily signal tuned' : 'shared garden loaded'}: ${blooms.length} blooms • ${currentWeatherPreset.label}`);
   suppressHashSync = false;
   syncShareState();
   return true;
 }
 
-function loadDailyBroadcast(key = getUtcDateKey(), { replay = false } = {}) {
+function loadDailyBroadcast(key = getUtcDateKey(), { replay = false, weaveEnabled = constellationWeaveEnabled } = {}) {
   if (!isBroadcastKey(key)) return false;
 
   const blooms = buildDailyGarden(key);
@@ -1492,6 +1639,7 @@ function loadDailyBroadcast(key = getUtcDateKey(), { replay = false } = {}) {
     sourceMode: 'broadcast',
     hashShareMode: 'broadcast',
     broadcastKey: key,
+    weaveEnabled,
     logMessage: `${pick(transmissions.daily).replace('{date}', key)} Weather report: ${weatherPreset.label}.`,
     status: `daily signal tuned: ${blooms.length} blooms`,
   });
@@ -1502,11 +1650,13 @@ function parseHashState() {
   if (!hash) return null;
 
   const params = new URLSearchParams(hash);
+  const weaveEnabled = params.get('weave') === '1' || params.get('weave') === 'true';
 
   if (params.has('broadcast')) {
     return {
       type: 'broadcast',
       broadcastKey: params.get('broadcast')?.trim() ?? '',
+      weaveEnabled,
     };
   }
 
@@ -1515,6 +1665,7 @@ function parseHashState() {
       type: 'garden',
       encodedGarden: params.get('garden')?.trim() ?? '',
       weatherId: params.get('weather')?.trim() ?? '',
+      weaveEnabled,
     };
   }
 
@@ -1526,7 +1677,7 @@ function loadGardenFromHash({ replay = false } = {}) {
   if (!parsed) return false;
 
   if (parsed.type === 'broadcast') {
-    return loadDailyBroadcast(parsed.broadcastKey, { replay });
+    return loadDailyBroadcast(parsed.broadcastKey, { replay, weaveEnabled: parsed.weaveEnabled });
   }
 
   if (parsed.type !== 'garden') return false;
@@ -1540,6 +1691,7 @@ function loadGardenFromHash({ replay = false } = {}) {
     weatherId: parsed.weatherId || DEFAULT_WEATHER_ID,
     sourceMode: 'shared',
     hashShareMode: 'garden',
+    weaveEnabled: parsed.weaveEnabled,
     logMessage: pick(transmissions.loaded),
     status: `shared garden loaded: ${blooms.length} blooms • ${getWeatherPresetById(parsed.weatherId || DEFAULT_WEATHER_ID).label}`,
   });
@@ -1589,6 +1741,7 @@ dailySignalBtn.addEventListener('click', () => {
 });
 
 cycleWeatherBtn?.addEventListener('click', cycleWeatherMode);
+toggleWeaveBtn?.addEventListener('click', toggleConstellationWeave);
 
 highlightsGridEl?.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-action][data-id]');
@@ -1657,6 +1810,10 @@ document.addEventListener('keydown', (event) => {
   if (event.key.toLowerCase() === 'w' && !event.metaKey && !event.ctrlKey && !event.altKey && fieldSourceMode !== 'broadcast') {
     event.preventDefault();
     cycleWeatherMode();
+  }
+  if (event.key.toLowerCase() === 'c' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    event.preventDefault();
+    toggleConstellationWeave();
   }
 });
 

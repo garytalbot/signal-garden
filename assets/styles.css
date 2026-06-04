@@ -498,7 +498,7 @@ button[data-state="working"] {
   transform: translate(-50%, -50%) scale(0.92);
   opacity: 0;
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
   transition: opacity 120ms ease, transform 120ms ease, border-color 180ms ease, background 180ms ease;
 }
 .preview::before,
@@ -517,6 +517,22 @@ button[data-state="working"] {
   transform: translate(-50%, -50%) scale(1);
 }
 
+.constellation-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.stage[data-weave="true"] .constellation-overlay {
+  opacity: 1;
+}
+
 .signal-overlay {
   position: absolute;
   inset: 0;
@@ -525,6 +541,22 @@ button[data-state="working"] {
   pointer-events: none;
   overflow: visible;
   z-index: 0;
+}
+
+.constellation-line {
+  stroke: color-mix(in srgb, var(--accent, var(--accent-soft)) 58%, white);
+  stroke-linecap: round;
+  stroke-dasharray: 8 12;
+  opacity: 0;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent, var(--accent-soft)) 35%, transparent));
+  animation: constellation-pulse 5.4s ease-in-out infinite;
+}
+
+.constellation-beacon {
+  fill: color-mix(in srgb, var(--accent, var(--accent-soft)) 78%, white);
+  opacity: 0;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent, var(--accent-soft)) 45%, transparent));
+  animation: constellation-beacon 4.8s ease-in-out infinite;
 }
 
 .garden-critter {
@@ -540,7 +572,7 @@ button[data-state="working"] {
   position: absolute;
   left: var(--critter-x);
   top: var(--critter-y);
-  z-index: 3;
+  z-index: 4;
   min-width: 0;
   padding: 0;
   border: 0;
@@ -728,6 +760,19 @@ button[data-state="working"] {
   100% { opacity: 0; stroke-dashoffset: -36; }
 }
 
+@keyframes constellation-pulse {
+  0%, 100% { opacity: 0.14; stroke-dashoffset: 0; }
+  28% { opacity: 0.34; }
+  50% { opacity: 0.44; }
+  72% { opacity: 0.24; }
+}
+
+@keyframes constellation-beacon {
+  0%, 100% { opacity: 0.2; transform: scale(0.88); }
+  36% { opacity: 0.62; transform: scale(1.06); }
+  58% { opacity: 0.82; transform: scale(1.18); }
+}
+
 @keyframes critter-float {
   0%, 100% { transform: rotate(var(--critter-tilt)) translateY(calc(var(--critter-drift) * -0.35)) scale(var(--critter-scale)); }
   50% { transform: rotate(calc(var(--critter-tilt) * -0.8)) translateY(var(--critter-drift)) scale(calc(var(--critter-scale) * 1.02)); }
@@ -751,7 +796,7 @@ button[data-state="working"] {
   height: 180px;
   transform: translate(-50%, -78%);
   pointer-events: none;
-  z-index: 2;
+  z-index: 3;
 }
 .stem {
   position: absolute;
