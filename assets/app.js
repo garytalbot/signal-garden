@@ -723,6 +723,8 @@ function setAfterimageEnabled(nextEnabled, { syncUrl = true, logMessage = null }
   syncAfterimageUi();
 
   if (!afterimageEnabled) {
+    afterimageCursorTrail = [];
+    afterimageCursorStampAt = 0;
     stage?.querySelectorAll('.afterimage-copy').forEach((node) => node.remove());
   }
 
@@ -1429,6 +1431,80 @@ function spawnAfterimageGhosts(spec, priorPoint = null) {
   }
 }
 
+function pruneAfterimageCursorTrail(now = performance.now()) {
+  afterimageCursorTrail = afterimageCursorTrail.filter((point) => now - point.at < 3600);
+}
+
+function stampAfterimageCursorGhost(x, y, accentIndex = 0, priorPoint = null) {
+  if (!afterimageEnabled || !stage || !template) return;
+
+  const ghost = template.content.firstElementChild.cloneNode(true);
+  const now = performance.now();
+  const originPoint = priorPoint ?? afterimageCursorTrail[afterimageCursorTrail.length - 2] ?? { x, y };
+  const driftX = x - originPoint.x;
+  const driftY = y - originPoint.y;
+  const ghostX = x - driftX * 0.18 + Math.sin((x + y + now) * 0.01) * 3;
+  const ghostY = y - driftY * 0.18 + Math.cos((x - y + now) * 0.01) * 3;
+
+  ghost.classList.add('afterimage-copy');
+  ghost.setAttribute('aria-hidden', 'true');
+  ghost.style.left = `${ghostX}px`;
+  ghost.style.top = `${ghostY}px`;
+  ghost.style.opacity = '0.16';
+  ghost.style.zIndex = '2';
+  ghost.style.pointerEvents = 'none';
+  ghost.style.mixBlendMode = 'screen';
+  ghost.style.filter = 'blur(1.2px) saturate(0.72)';
+  ghost.style.transition = 'opacity 1.5s ease-out, transform 1.5s ease-out, filter 1.5s ease-out';
+  ghost.style.setProperty('--accent', getAccentToken(accentIndex));
+  ghost.style.setProperty('--stem-height', '42px');
+  ghost.style.setProperty('--ring-a', '44px');
+  ghost.style.setProperty('--ring-b', '76px');
+  ghost.style.setProperty('--tilt', `${round1(Math.sin((x + y) * 0.02) * 18)}deg`);
+  ghost.querySelector('.label').textContent = '';
+  ghost.querySelector('.label').style.opacity = '0';
+  ghost.querySelector('.core').style.opacity = '0.68';
+  ghost.querySelector('.ring-a').style.opacity = '0.42';
+  ghost.querySelector('.ring-b').style.opacity = '0.28';
+  ghost.querySelector('.spark-a').style.opacity = '0.24';
+  ghost.querySelector('.spark-b').style.opacity = '0.24';
+  ghost.style.transform = 'translate(-50%, -78%) scale(0.64)';
+
+  stage.appendChild(ghost);
+  window.requestAnimationFrame(() => {
+    ghost.style.opacity = '0';
+    ghost.style.transform = 'translate(-50%, -78%) translate(0px, 0px) scale(0.72)';
+  });
+
+  window.setTimeout(() => ghost.remove(), 1900);
+}
+
+function recordAfterimageCursorPoint(x, y, accentIndex = 0, { stampGhost = false, priorPoint = null } = {}) {
+  if (!afterimageEnabled) return;
+
+  const now = performance.now();
+  pruneAfterimageCursorTrail(now);
+  afterimageCursorTrail.push({
+    x: round1(x),
+    y: round1(y),
+    accentIndex,
+    at: now,
+  });
+
+  while (afterimageCursorTrail.length > AFTERIMAGE_CURSOR_LIMIT) {
+    afterimageCursorTrail.shift();
+  }
+
+  if (!stampGhost) return;
+
+  if (now - afterimageCursorStampAt < 70) return;
+  const anchor = priorPoint ?? afterimageCursorTrail[afterimageCursorTrail.length - 2] ?? null;
+  if (anchor && Math.hypot(x - anchor.x, y - anchor.y) < 10) return;
+
+  afterimageCursorStampAt = now;
+  stampAfterimageCursorGhost(x, y, accentIndex, anchor);
+}
+
 function renderBloom(spec, options = {}) {
   const { logPlant = true, syncUrl = true, animateLink = true } = options;
   const node = template.content.firstElementChild.cloneNode(true);
@@ -1450,6 +1526,7 @@ function renderBloom(spec, options = {}) {
   }
   if (afterimageEnabled) {
     spawnAfterimageGhosts(spec, priorPoint);
+    recordAfterimageCursorPoint(spec.x, spec.y, spec.accentIndex);
   }
   previousBloomPoint = { x: spec.x, y: spec.y };
 
@@ -1660,6 +1737,8 @@ function resetField({ logMessage = null, status = 'awaiting first contact', keep
   clearReplayTimers();
   stage.querySelectorAll('.bloom').forEach((bloom) => bloom.remove());
   stage.querySelectorAll('.afterimage-copy').forEach((ghost) => ghost.remove());
+  afterimageCursorTrail = [];
+  afterimageCursorStampAt = 0;
   if (signalOverlayFlashGroup) signalOverlayFlashGroup.replaceChildren();
   if (signalOverlayChorusGroup) signalOverlayChorusGroup.replaceChildren();
   signalCursorPoint = null;
@@ -1774,6 +1853,7 @@ function buildExportSvg() {
     { label: 'SOURCE', value: sourceLabel },
     { label: 'LAST BLOOM', value: lastBloomName },
     { label: 'COUNT', value: String(bloomHistory.length) },
+    { label: 'AFTERIMAGES', value: afterimageEnabled ? 'ON' : 'OFF' },
     { label: 'SIGNAL', value: escapeXml(signalModeLabel.toUpperCase()) },
   ];
 
@@ -1807,6 +1887,39 @@ function buildExportSvg() {
           <circle cx="${segment.x2.toFixed(1)}" cy="${segment.y2.toFixed(1)}" r="${Math.max(8, segment.headRadius * 2.15).toFixed(1)}" fill="${color}" opacity="0.16"/>
         </g>
       `;
+    }).join('')
+    : '';
+
+  const afterimageSegments = afterimageEnabled
+    ? bloomHistory.slice(-10).map((spec, index) => {
+      const accent = getAccentColor(spec.accentIndex, currentWeatherPreset);
+      const previous = index > 0 ? bloomHistory[index - 1] : null;
+      const driftX = previous ? spec.x - previous.x : 0;
+      const driftY = previous ? spec.y - previous.y : 0;
+      const echoes = previous
+        ? [
+          { offset: 0.18, opacity: 0.24, scale: 0.98 },
+          { offset: 0.38, opacity: 0.15, scale: 0.94 },
+        ]
+        : [
+          { offset: 0.1, opacity: 0.18, scale: 0.97 },
+          { offset: 0.28, opacity: 0.11, scale: 0.93 },
+        ];
+      const centerY = spec.y - spec.stemHeight;
+
+      return echoes.map((echo, echoIndex) => {
+        const echoX = spec.x - driftX * echo.offset + Math.sin((spec.x + spec.y + index * 19 + echoIndex * 7) * 0.01) * 4;
+        const echoY = spec.y - driftY * echo.offset + Math.cos((spec.x - spec.y + index * 17 + echoIndex * 5) * 0.012) * 4;
+        const echoCenterY = echoY - spec.stemHeight;
+        return `
+          <g opacity="${echo.opacity.toFixed(2)}">
+            <line x1="${echoX}" y1="${echoY - 12}" x2="${echoX}" y2="${echoCenterY}" stroke="${accent}" stroke-width="3.2" stroke-linecap="round" opacity="0.58"/>
+            <ellipse cx="${echoX}" cy="${echoCenterY}" rx="${(spec.ringA / 2).toFixed(1)}" ry="${Math.max(8, Math.round(spec.ringA * 0.31)).toFixed(1)}" fill="none" stroke="${accent}" stroke-width="1.6" opacity="0.5" transform="rotate(${spec.tilt} ${echoX} ${echoCenterY})"/>
+            <ellipse cx="${echoX}" cy="${echoCenterY}" rx="${(spec.ringB / 2).toFixed(1)}" ry="${Math.max(10, Math.round(spec.ringB * 0.15)).toFixed(1)}" fill="none" stroke="${accent}" stroke-width="1" stroke-dasharray="5 6" opacity="0.34" transform="rotate(${spec.tilt * -1.4} ${echoX} ${echoCenterY})"/>
+            <circle cx="${echoX}" cy="${echoCenterY}" r="${Math.max(7, Math.round(9 * echo.scale)).toFixed(1)}" fill="${accent}" opacity="0.78"/>
+          </g>
+        `;
+      }).join('');
     }).join('')
     : '';
 
@@ -1939,6 +2052,7 @@ function buildExportSvg() {
         </g>
         ${meteorSegments}
         ${weaveSegments}
+        ${afterimageSegments}
         ${signalChorusSegments}
         ${links}
         ${blooms}
@@ -2580,11 +2694,25 @@ function loadGardenFromHash({ replay = false } = {}) {
   });
 }
 
+function describeModeStack() {
+  return [
+    `constellations ${constellationWeaveEnabled ? 'on' : 'off'}`,
+    `meteor shower ${meteorShowerEnabled ? 'on' : 'off'}`,
+    `afterimages ${afterimageEnabled ? 'on' : 'off'}`,
+    `signal chorus ${signalChorusEnabled ? 'on' : 'off'}`,
+  ].join(' • ');
+}
+
 stage.addEventListener('pointermove', (event) => {
   const rect = stage.getBoundingClientRect();
   const x = event.clientX - rect.left;
   const y = event.clientY - rect.top;
+  const priorCursorPoint = signalCursorPoint ? { ...signalCursorPoint } : null;
   signalCursorPoint = { x, y };
+  recordAfterimageCursorPoint(x, y, bloomHistory[bloomHistory.length - 1]?.accentIndex ?? 0, {
+    stampGhost: true,
+    priorPoint: priorCursorPoint,
+  });
   updatePreview(x, y);
   if (!previewVisible) showPreview();
   if (signalChorusEnabled) renderSignalOverlay();
