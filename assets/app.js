@@ -787,7 +787,7 @@ function shiftUtcDate(date, offsetDays) {
 function getCritterSeed() {
   const lastSpec = bloomHistory[bloomHistory.length - 1];
   const anchor = lastSpec
-    ? `${lastSpec.adjectiveIndex}:${lastSpec.nounIndex}:${lastSpec.accentIndex}:${bloomHistory.length}`
+    ? `${lastSpec.adjectiveIndex}:${lastSpec.nounIndex}:${lastSpec.accentIndex}:${bloomHistory.length}:${currentWeatherPreset.id}`
     : `${fieldSourceMode}:${currentBroadcastKey ?? 'open'}:${currentWeatherPreset.id}`;
   return `signal-garden:critter:${anchor}`;
 }
@@ -1955,6 +1955,7 @@ function buildExportSvg() {
   pruneAfterimageCursorTrail(now);
   const afterimageModeLabel = getAfterimageLabel();
   const afterimageBadgeLabel = afterimageModeLabel;
+  const residentSpec = bloomHistory.length ? (currentCritterSpec ?? buildCritterSpec()) : null;
   const lastBloom = bloomHistory[bloomHistory.length - 1] ?? null;
   const lastBloomName = lastBloom
     ? escapeXml(makeNameFromIndexes(lastBloom.adjectiveIndex, lastBloom.nounIndex))
@@ -2152,6 +2153,42 @@ function buildExportSvg() {
     `;
   }).join('');
 
+  const residentExport = residentSpec
+    ? (() => {
+      const residentPanelX = Math.max(24, width - 208);
+      const residentPanelY = Math.max(24, height - 126);
+      const halo = residentSpec.halo.map((firefly, index) => {
+        const x = 34 + firefly.x * 0.82;
+        const y = 34 + firefly.y * 0.82;
+        const glow = firefly.glow;
+        const innerRadius = Math.max(1.8, firefly.size * 0.35);
+        const outerRadius = Math.max(5, innerRadius * 2.1);
+        const pulse = index % 2 === 0 ? 0.16 : 0.1;
+        return `
+          <g opacity="${firefly.opacity.toFixed(2)}">
+            <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${outerRadius.toFixed(1)}" fill="${glow}" opacity="${pulse.toFixed(2)}"/>
+            <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${innerRadius.toFixed(1)}" fill="${glow}" opacity="0.92"/>
+          </g>
+        `;
+      }).join('');
+
+      return `
+        <g transform="translate(${residentPanelX} ${residentPanelY})">
+          <rect width="180" height="74" rx="20" ry="20" fill="${exportTheme.badgeFill}" stroke="${exportTheme.badgeStroke}"/>
+          ${halo}
+          <circle cx="34" cy="37" r="17" fill="${residentSpec.bodyHue}" opacity="0.92"/>
+          <circle cx="34" cy="37" r="17" fill="none" stroke="${residentSpec.ringHue}" stroke-width="1.4" opacity="0.52"/>
+          <circle cx="29" cy="35" r="2.4" fill="#07111a"/>
+          <circle cx="39" cy="35" r="2.4" fill="#07111a"/>
+          <path d="M 28 43 Q 34 47 40 43" fill="none" stroke="#07111a" stroke-width="1.6" stroke-linecap="round"/>
+          <text x="62" y="30" fill="${exportTheme.brand}" font-size="10" font-family="Inter, system-ui, sans-serif" letter-spacing="2">RESIDENT</text>
+          <text x="62" y="48" fill="${exportTheme.text}" font-size="13" font-family="Inter, system-ui, sans-serif">${escapeXml(residentSpec.title)}</text>
+          <text x="62" y="62" fill="${exportTheme.muted}" font-size="10" font-family="Inter, system-ui, sans-serif">${escapeXml(residentSpec.mood)}</text>
+        </g>
+      `;
+    })()
+    : '';
+
   return {
     width,
     height,
@@ -2213,6 +2250,7 @@ function buildExportSvg() {
         ${signalChorusSegments}
         ${links}
         ${blooms}
+        ${residentExport}
         <g transform="translate(24 ${height - 138})">
           <rect width="${Math.max(220, width - 48)}" height="98" rx="24" ry="24" fill="${exportTheme.badgeFill}" stroke="${exportTheme.badgeStroke}"/>
           ${summaryMarkup}
