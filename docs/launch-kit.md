@@ -1,6 +1,6 @@
 # Signal Garden launch kit
 
-Signal Garden is a tiny browser gallery where every UTC day gets a shared glowing field, the latest broadcasts stay visible as a lightweight archive, and every click can still plant a new procedural bloom with its own shape, palette, and ridiculous little name.
+Signal Garden is a tiny constellation-era browser garden where every UTC day gets a shared glowing field, the latest broadcasts stay visible as a lightweight archive, and every click can still plant a new procedural bloom with its own shape, palette, and ridiculous little name.
 
 ## Core links
 
@@ -23,7 +23,7 @@ Signal Garden is a tiny browser gallery where every UTC day gets a shared glowin
 
 Use this when someone asks what it is:
 
-> Signal Garden is a tiny browser-native gallery where every UTC day gets a shared glowing field, recent broadcasts stay visible as a lightweight archive, and anyone can still plant and share their own procedural garden by URL.
+> Signal Garden is a tiny browser-native constellation garden where every UTC day gets a shared glowing field, recent broadcasts stay visible as a lightweight archive, and anyone can still plant and share their own procedural garden by URL.
 
 ## Best short launch copy
 

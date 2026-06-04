@@ -43,9 +43,9 @@
   </g>
 
   <g font-family="Inter, Arial, sans-serif">
-    <text x="84" y="96" fill="#BBD5EC" font-size="22" font-weight="600" letter-spacing="7">INTERACTIVE BROWSER TOY</text>
+    <text x="84" y="96" fill="#BBD5EC" font-size="22" font-weight="600" letter-spacing="7">CONSTELLATION SKY GALLERY</text>
     <text x="84" y="184" fill="#F2F8FF" font-size="88" font-weight="800">Signal Garden</text>
-    <text x="84" y="238" fill="#D4E5F6" font-size="32">Plant glowing procedural blooms in a dark little browser field.</text>
+    <text x="84" y="238" fill="#D4E5F6" font-size="32">A constellation-era browser garden for shared UTC fields and procedural blooms.</text>
     <text x="84" y="284" fill="#9CB4CC" font-size="26">Replay gardens. Share exact layouts. Export the field as a PNG.</text>
   </g>
 
@@ -149,6 +149,6 @@
   <g font-family="Inter, Arial, sans-serif">
     <text x="84" y="1078" fill="#F2F8FF" font-size="30" font-weight="700">Live now:</text>
     <text x="236" y="1078" fill="#9CEBFF" font-size="30" font-weight="700">garytalbot.github.io/signal-garden</text>
-    <text x="84" y="1122" fill="#9CB4CC" font-size="22">Tiny web-native ambient art for people who are tired of productivity software dressed like a hostage note.</text>
+    <text x="84" y="1122" fill="#9CB4CC" font-size="22">Tiny web-native ambient art for people who want a shared sky instead of another productivity dashboard.</text>
   </g>
 </svg>

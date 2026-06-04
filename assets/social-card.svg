@@ -13,5 +13,5 @@
   <line x1="600" y1="500" x2="600" y2="360" stroke="#7ee7ff" stroke-width="8" stroke-linecap="round"/>
   <circle cx="600" cy="340" r="32" fill="#ffffff"/>
   <text x="90" y="470" fill="#EBF5FF" font-size="88" font-family="Inter, Arial, sans-serif" font-weight="700">Signal Garden</text>
-  <text x="90" y="535" fill="#95ABC0" font-size="34" font-family="Inter, Arial, sans-serif">Plant glowing procedural blooms in a dark little browser field.</text>
+  <text x="90" y="535" fill="#95ABC0" font-size="34" font-family="Inter, Arial, sans-serif">A constellation-era browser garden for shared UTC fields and procedural blooms.</text>
 </svg>

@@ -1,6 +1,6 @@
 # Signal Garden
 
-A tiny browser gallery where every UTC day gets a shared glowing field — and every click can still plant a new procedural bloom with its own shape, palette, and tiny name.
+A tiny constellation-era browser garden where every UTC day gets a shared glowing field, the archive keeps the sky alive, and every click can still plant a new procedural bloom with its own shape, palette, and tiny name.
 
 ![Signal Garden interface showing planted blooms and recent broadcast archive cards](assets/launch/demo-ui.png)
 
@@ -14,7 +14,7 @@ A tiny browser gallery where every UTC day gets a shared glowing field — and e
 
 ## Why it exists
 
-Because not every repo should be a dashboard, a wrapper, or a productivity vitamin. Sometimes the internet deserves a strange little object with atmosphere.
+Because not every repo should be a dashboard, a wrapper, or a productivity vitamin. Sometimes the internet deserves a strange little object with atmosphere, a public sky, and a reason to feel a little ceremonial.
 
 ## What makes it easier to share now
 

@@ -524,12 +524,28 @@ button[data-state="working"] {
   height: 100%;
   pointer-events: none;
   overflow: visible;
-  z-index: 1;
+  z-index: 2;
   opacity: 0;
   transition: opacity 220ms ease;
 }
 
 .stage[data-weave="true"] .constellation-overlay {
+  opacity: 1;
+}
+
+.meteor-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.stage[data-meteor="true"] .meteor-overlay {
   opacity: 1;
 }
 
@@ -557,6 +573,41 @@ button[data-state="working"] {
   opacity: 0;
   filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent, var(--accent-soft)) 45%, transparent));
   animation: constellation-beacon 4.8s ease-in-out infinite;
+}
+
+.meteor-shower-group {
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--weather-accent-1) 38%, transparent));
+}
+
+.meteor-shower {
+  opacity: 0;
+  animation-name: meteor-fall;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.meteor-shower-line {
+  stroke: var(--accent, var(--weather-accent-1));
+  stroke-linecap: round;
+  stroke-width: var(--meteor-width, 2px);
+  opacity: calc(0.4 + (var(--meteor-glow, 0.7) * 0.36));
+  filter:
+    drop-shadow(0 0 8px color-mix(in srgb, var(--accent, var(--weather-accent-1)) 40%, transparent))
+    drop-shadow(0 0 20px color-mix(in srgb, var(--accent, var(--weather-accent-1)) 20%, transparent));
+}
+
+.meteor-shower-flare,
+.meteor-shower-head {
+  fill: var(--accent, var(--weather-accent-1));
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--accent, var(--weather-accent-1)) 55%, transparent));
+}
+
+.meteor-shower-flare {
+  opacity: 0.24;
+}
+
+.meteor-shower-head {
+  opacity: 0.88;
 }
 
 .garden-critter {
@@ -771,6 +822,13 @@ button[data-state="working"] {
   0%, 100% { opacity: 0.2; transform: scale(0.88); }
   36% { opacity: 0.62; transform: scale(1.06); }
   58% { opacity: 0.82; transform: scale(1.18); }
+}
+
+@keyframes meteor-fall {
+  0% { opacity: 0; transform: translateY(-14px) translateX(0) scale(0.94); }
+  12% { opacity: 1; }
+  58% { opacity: 0.92; }
+  100% { opacity: 0; transform: translateY(16px) translateX(16px) scale(1.02); }
 }
 
 @keyframes critter-float {

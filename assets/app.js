@@ -1,11 +1,13 @@
 const stage = document.getElementById('stage');
 const constellationOverlay = document.getElementById('constellation-overlay');
+const meteorOverlay = document.getElementById('meteor-overlay');
 const signalOverlay = document.getElementById('signal-overlay');
 const template = document.getElementById('bloom-template');
 const countEl = document.getElementById('count');
 const moodEl = document.getElementById('mood');
 const weatherModeEl = document.getElementById('weatherMode');
 const weaveModeEl = document.getElementById('weaveMode');
+const meteorModeEl = document.getElementById('meteorMode');
 const lastNameEl = document.getElementById('lastName');
 const sourceLabelEl = document.getElementById('sourceLabel');
 const residentNameEl = document.getElementById('residentName');
@@ -15,6 +17,7 @@ const randomizeBtn = document.getElementById('randomize');
 const dailySignalBtn = document.getElementById('dailySignal');
 const cycleWeatherBtn = document.getElementById('cycleWeather');
 const toggleWeaveBtn = document.getElementById('toggleWeave');
+const toggleMeteorBtn = document.getElementById('toggleMeteor');
 const undoBtn = document.getElementById('undo');
 const clearBtn = document.getElementById('clear');
 const hintEl = document.getElementById('hint');
@@ -282,6 +285,7 @@ let currentBroadcastKey = null;
 let currentWeatherPreset = WEATHER_PRESETS[0];
 let currentCritterSpec = null;
 let constellationWeaveEnabled = false;
+let meteorShowerEnabled = false;
 
 function rand(min, max, randomFn = Math.random) {
   return randomFn() * (max - min) + min;
@@ -346,6 +350,24 @@ function syncWeaveUi() {
   }
 }
 
+function syncMeteorUi() {
+  if (stage) {
+    stage.dataset.meteor = String(meteorShowerEnabled);
+  }
+
+  if (meteorModeEl) {
+    meteorModeEl.textContent = meteorShowerEnabled ? 'on' : 'off';
+  }
+
+  if (toggleMeteorBtn) {
+    toggleMeteorBtn.textContent = meteorShowerEnabled ? 'meteor shower: on' : 'meteor shower: off';
+    toggleMeteorBtn.setAttribute('aria-pressed', String(meteorShowerEnabled));
+    toggleMeteorBtn.title = meteorShowerEnabled
+      ? 'Dim the falling meteor streaks.'
+      : 'Turn on a falling meteor shower over the garden.';
+  }
+}
+
 function setWeatherPreset(weatherId, options = {}) {
   const { syncUrl = true, logMessage = null, status = 'weather shifted' } = options;
   currentWeatherPreset = getWeatherPresetById(weatherId);
@@ -363,6 +385,7 @@ function setWeatherPreset(weatherId, options = {}) {
   syncWeatherUi();
   syncArchiveStatus();
   renderConstellationOverlay();
+  renderMeteorOverlay();
 
   if (logMessage) {
     logField(logMessage, status);
@@ -591,9 +614,10 @@ function syncControls() {
 
   hintEl.textContent = disabled
     ? 'Move your cursor to aim a bloom. Click to plant. Press U to undo.'
-    : 'Click to plant. Press U to undo the last bloom. Press C to toggle constellations. Press W to switch weather when the field is yours.';
+    : 'Click to plant. Press U to undo the last bloom. Press C to toggle constellations. Press M to toggle the meteor shower. Press W to switch weather when the field is yours.';
 
   syncWeaveUi();
+  syncMeteorUi();
   syncWeatherUi();
 }
 
@@ -703,6 +727,117 @@ function renderConstellationOverlay() {
   constellationOverlay.appendChild(group);
 }
 
+function getMeteorSeed() {
+  const trail = bloomHistory
+    .slice(-6)
+    .map((spec) => `${Math.round(spec.x)}:${Math.round(spec.y)}:${spec.accentIndex}`)
+    .join('|') || 'empty';
+
+  return `signal-garden:meteor:${currentWeatherPreset.id}:${fieldSourceMode}:${currentBroadcastKey ?? 'open'}:${constellationWeaveEnabled ? 'weave' : 'plain'}:${trail}`;
+}
+
+function buildMeteorShowerSegments({ width = stage?.clientWidth ?? CANONICAL_STAGE_WIDTH, height = stage?.clientHeight ?? CANONICAL_STAGE_HEIGHT } = {}) {
+  const rng = makeSeededRandom(getMeteorSeed());
+  const streakCount = clamp(4 + Math.floor(bloomHistory.length / 8) + Math.floor(rand(0, 3, rng)), 4, 11);
+  const segments = [];
+
+  for (let index = 0; index < streakCount; index += 1) {
+    const fromTop = rand(0, 1, rng) < 0.72;
+    const x1 = fromTop
+      ? rand(width * 0.06, width * 0.94, rng)
+      : rand(width * 0.6, width * 1.04, rng);
+    const y1 = fromTop
+      ? rand(-18, height * 0.18, rng)
+      : rand(height * 0.08, height * 0.62, rng);
+    const length = rand(width * 0.18, width * 0.36, rng);
+    const fall = rand(height * 0.12, height * 0.34, rng);
+    const diagonal = rand(width * 0.05, width * 0.12, rng);
+    const x2 = clamp(x1 - length - diagonal, -60, width + 60);
+    const y2 = clamp(y1 + fall, -48, height + 48);
+    const accentIndex = Math.floor(rand(0, ACCENT_SLOT_COUNT, rng));
+    const strokeWidth = rand(1.2, 3.2, rng);
+    const delay = rand(0, 2.4, rng);
+    const duration = rand(4.8, 8.2, rng);
+    const glow = rand(0.5, 1, rng);
+    const headRadius = rand(2.8, 6, rng);
+
+    segments.push({
+      id: `${index}-${Math.round(x1)}-${Math.round(y1)}`,
+      x1,
+      y1,
+      x2,
+      y2,
+      accentIndex,
+      strokeWidth,
+      delay,
+      duration,
+      glow,
+      headRadius,
+      trailLength: Math.hypot(x2 - x1, y2 - y1),
+    });
+  }
+
+  return segments.sort((a, b) => a.delay - b.delay);
+}
+
+function renderMeteorOverlay() {
+  if (!meteorOverlay) return;
+
+  const width = Math.max(1, Math.round(stage?.clientWidth ?? CANONICAL_STAGE_WIDTH));
+  const height = Math.max(1, Math.round(stage?.clientHeight ?? CANONICAL_STAGE_HEIGHT));
+  meteorOverlay.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  meteorOverlay.setAttribute('preserveAspectRatio', 'none');
+  meteorOverlay.innerHTML = '';
+
+  if (!meteorShowerEnabled) return;
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const group = document.createElementNS(svgNS, 'g');
+  group.setAttribute('class', 'meteor-shower-group');
+
+  buildMeteorShowerSegments({ width, height }).forEach((segment) => {
+    const streak = document.createElementNS(svgNS, 'g');
+    streak.setAttribute('class', 'meteor-shower');
+    streak.style.animationDelay = `${segment.delay.toFixed(2)}s`;
+    streak.style.animationDuration = `${segment.duration.toFixed(2)}s`;
+
+    const line = document.createElementNS(svgNS, 'line');
+    line.setAttribute('x1', segment.x1.toFixed(1));
+    line.setAttribute('y1', segment.y1.toFixed(1));
+    line.setAttribute('x2', segment.x2.toFixed(1));
+    line.setAttribute('y2', segment.y2.toFixed(1));
+    line.classList.add('meteor-shower-line');
+    line.style.setProperty('--accent', getAccentToken(segment.accentIndex));
+    line.style.setProperty('--meteor-width', `${segment.strokeWidth.toFixed(2)}px`);
+    line.style.setProperty('--meteor-glow', String(segment.glow));
+    line.style.animationDelay = `${segment.delay.toFixed(2)}s`;
+    line.style.animationDuration = `${segment.duration.toFixed(2)}s`;
+
+    const flare = document.createElementNS(svgNS, 'circle');
+    flare.setAttribute('cx', segment.x2.toFixed(1));
+    flare.setAttribute('cy', segment.y2.toFixed(1));
+    flare.setAttribute('r', Math.max(7, segment.headRadius * 2.2).toFixed(1));
+    flare.classList.add('meteor-shower-flare');
+    flare.style.setProperty('--accent', getAccentToken(segment.accentIndex));
+    flare.style.animationDelay = `${(segment.delay + 0.18).toFixed(2)}s`;
+    flare.style.animationDuration = `${segment.duration.toFixed(2)}s`;
+
+    const head = document.createElementNS(svgNS, 'circle');
+    head.setAttribute('cx', segment.x2.toFixed(1));
+    head.setAttribute('cy', segment.y2.toFixed(1));
+    head.setAttribute('r', segment.headRadius.toFixed(1));
+    head.classList.add('meteor-shower-head');
+    head.style.setProperty('--accent', getAccentToken(segment.accentIndex));
+    head.style.animationDelay = `${(segment.delay + 0.1).toFixed(2)}s`;
+    head.style.animationDuration = `${segment.duration.toFixed(2)}s`;
+
+    streak.append(line, flare, head);
+    group.appendChild(streak);
+  });
+
+  meteorOverlay.appendChild(group);
+}
+
 function round1(value) {
   return Number(value.toFixed(1));
 }
@@ -771,6 +906,7 @@ function renderBloom(spec, options = {}) {
   syncArchiveStatus();
   updateCritterUi();
   renderConstellationOverlay();
+  renderMeteorOverlay();
   if (syncUrl) syncShareState();
 }
 
@@ -840,11 +976,15 @@ function buildHashString() {
     params.set('weather', currentWeatherPreset.id);
   }
 
-  if (!params.toString()) return '';
-
   if (constellationWeaveEnabled) {
     params.set('weave', '1');
   }
+
+  if (meteorShowerEnabled) {
+    params.set('meteor', '1');
+  }
+
+  if (!params.toString()) return '';
 
   return params.toString();
 }
@@ -875,6 +1015,27 @@ function setConstellationWeave(nextEnabled, { syncUrl = true, logMessage = null 
   if (syncUrl) syncShareState();
 }
 
+function setMeteorShowerEnabled(nextEnabled, { syncUrl = true, logMessage = null } = {}) {
+  meteorShowerEnabled = Boolean(nextEnabled);
+  syncMeteorUi();
+  renderMeteorOverlay();
+
+  if (logMessage) {
+    logField(logMessage, meteorShowerEnabled ? 'meteor shower on' : 'meteor shower off');
+  }
+
+  if (syncUrl) syncShareState();
+}
+
+function toggleMeteorShower() {
+  const nextEnabled = !meteorShowerEnabled;
+  setMeteorShowerEnabled(nextEnabled, {
+    logMessage: nextEnabled
+      ? 'The sky opened up and a meteor shower started tracing silver gossip across the field.'
+      : 'The meteor shower drifted away, leaving only the afterglow behind.',
+  });
+}
+
 function toggleConstellationWeave() {
   const nextEnabled = !constellationWeaveEnabled;
   setConstellationWeave(nextEnabled, {
@@ -900,6 +1061,7 @@ function resetField({ logMessage = null, status = 'awaiting first contact', keep
   syncArchiveStatus();
   updateCritterUi();
   renderConstellationOverlay();
+  renderMeteorOverlay();
   if (syncUrl) syncShareState();
 }
 
@@ -946,6 +1108,7 @@ function undoLastBloom() {
   syncArchiveStatus();
   updateCritterUi();
   renderConstellationOverlay();
+  renderMeteorOverlay();
   syncShareState();
 }
 
@@ -966,6 +1129,7 @@ function buildExportSvg() {
   const weatherLabel = escapeXml(currentWeatherPreset.label.toUpperCase());
   const sourceLabel = escapeXml(sourceLabelEl.textContent || 'open field');
   const exportTheme = currentWeatherPreset.export;
+  const skyModeLabel = meteorShowerEnabled ? 'meteor shower on' : 'meteor shower off';
   const lastBloom = bloomHistory[bloomHistory.length - 1] ?? null;
   const lastBloomName = lastBloom
     ? escapeXml(makeNameFromIndexes(lastBloom.adjectiveIndex, lastBloom.nounIndex))
@@ -985,6 +1149,8 @@ function buildExportSvg() {
       : `${bloomHistory.length} blooms • weather set to ${currentWeatherPreset.label}`
   );
   const footerCopy = escapeXml(`signal.garden • ${fieldSourceMode === 'broadcast' && currentBroadcastKey ? currentBroadcastKey : 'portable field'}`);
+  const skyModeBadgeWidth = Math.min(178, Math.max(132, width - 272));
+  const skyModeBadgeX = Math.max(16, width - skyModeBadgeWidth - 64);
   const summaryItems = [
     { label: 'WEATHER', value: weatherLabel },
     { label: 'SOURCE', value: sourceLabel },
@@ -1006,6 +1172,20 @@ function buildExportSvg() {
         <g opacity="${Math.max(0.24, 0.58 - segment.distance / 520).toFixed(2)}">
           <line x1="${segment.from.x}" y1="${segment.from.y}" x2="${segment.to.x}" y2="${segment.to.y}" stroke="${color}" stroke-width="${Math.max(1, 2.2 - segment.distance / 220).toFixed(2)}" stroke-linecap="round" stroke-dasharray="7 12" opacity="0.6"/>
           <circle cx="${((segment.from.x + segment.to.x) / 2).toFixed(1)}" cy="${((segment.from.y + segment.to.y) / 2).toFixed(1)}" r="${radius}" fill="${color}" opacity="0.72"/>
+        </g>
+      `;
+    }).join('')
+    : '';
+
+  const meteorSegments = meteorShowerEnabled
+    ? buildMeteorShowerSegments({ width, height }).map((segment) => {
+      const color = getAccentColor(segment.accentIndex, currentWeatherPreset);
+      const fade = Math.max(0.35, 0.9 - segment.delay / 3.5);
+      return `
+        <g opacity="${fade.toFixed(2)}">
+          <line x1="${segment.x1.toFixed(1)}" y1="${segment.y1.toFixed(1)}" x2="${segment.x2.toFixed(1)}" y2="${segment.y2.toFixed(1)}" stroke="${color}" stroke-width="${segment.strokeWidth.toFixed(2)}" stroke-linecap="round" stroke-dasharray="${Math.max(14, Math.round(segment.trailLength / 5))} ${Math.max(8, Math.round(segment.trailLength / 9))}" opacity="0.72"/>
+          <circle cx="${segment.x2.toFixed(1)}" cy="${segment.y2.toFixed(1)}" r="${segment.headRadius.toFixed(1)}" fill="${color}" opacity="0.9"/>
+          <circle cx="${segment.x2.toFixed(1)}" cy="${segment.y2.toFixed(1)}" r="${Math.max(8, segment.headRadius * 2.15).toFixed(1)}" fill="${color}" opacity="0.16"/>
         </g>
       `;
     }).join('')
@@ -1101,7 +1281,12 @@ function buildExportSvg() {
           <text x="36" y="78" fill="${exportTheme.text}" font-size="30" font-weight="700" font-family="Inter, system-ui, sans-serif">${gardenTitle}</text>
           <text x="36" y="104" fill="${exportTheme.muted}" font-size="14" font-family="Inter, system-ui, sans-serif">${gardenSubtitle}</text>
           <text x="${Math.max(220, width - 84)}" y="48" text-anchor="end" fill="${exportTheme.brand}" font-size="12" font-family="Inter, system-ui, sans-serif" letter-spacing="2">SIGNAL GARDEN</text>
+          <g transform="translate(${skyModeBadgeX} 14)">
+            <rect width="${skyModeBadgeWidth}" height="28" rx="999" ry="999" fill="${exportTheme.badgeFill}" stroke="${exportTheme.badgeStroke}"/>
+            <text x="${skyModeBadgeWidth / 2}" y="19" text-anchor="middle" fill="${exportTheme.brand}" font-size="10" font-family="Inter, system-ui, sans-serif" letter-spacing="2">${escapeXml(skyModeLabel.toUpperCase())}</text>
+          </g>
         </g>
+        ${meteorSegments}
         ${weaveSegments}
         ${links}
         ${blooms}
@@ -1118,7 +1303,7 @@ function buildExportSvg() {
 
 function makePostcardFilename() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  return `signal-garden-${currentWeatherPreset.id}-${timestamp}.png`;
+  return `signal-garden-${currentWeatherPreset.id}${meteorShowerEnabled ? '-meteor' : ''}-${timestamp}.png`;
 }
 
 async function renderGardenPngBlob() {
@@ -1183,7 +1368,7 @@ async function exportGardenPng() {
 
     exportPngBtn.dataset.state = 'done';
     exportPngBtn.textContent = 'PNG exported';
-    logField('Garden export complete. The field has been pressed into a labeled weather postcard.', 'png ready');
+    logField('Garden export complete. The field has been pressed into a labeled weather postcard.', meteorShowerEnabled ? 'meteor postcard ready' : 'png ready');
     window.clearTimeout(exportToastTimer);
     exportToastTimer = window.setTimeout(() => {
       exportPngBtn.dataset.state = 'idle';
@@ -1210,7 +1395,7 @@ async function shareGardenPostcard() {
     const pngBlob = await renderGardenPngBlob();
     const filename = makePostcardFilename();
     const shareUrl = makeShareUrl();
-    const shareText = `Signal Garden • ${currentWeatherPreset.label} • ${bloomHistory.length} blooms`;
+    const shareText = `Signal Garden • ${currentWeatherPreset.label} • ${bloomHistory.length} blooms • ${meteorShowerEnabled ? 'meteor shower on' : 'meteor shower off'}`;
     const postcardFile = new File([pngBlob], filename, { type: 'image/png' });
     const sharePayload = {
       title: 'Signal Garden postcard',
@@ -1224,13 +1409,13 @@ ${shareUrl}`,
       await navigator.share(sharePayload);
       sharePostcardBtn.dataset.state = 'done';
       sharePostcardBtn.textContent = 'postcard shared';
-      logField('Postcard shared with the full garden attached. Extremely portable weather.', `postcard shared • ${currentWeatherPreset.label}`);
+      logField('Postcard shared with the full garden attached. Extremely portable weather.', meteorShowerEnabled ? `postcard shared • ${currentWeatherPreset.label} • meteor` : `postcard shared • ${currentWeatherPreset.label}`);
     } else {
       downloadBlob(pngBlob, filename);
       await copyTextToClipboard(shareUrl, 'Copy this Signal Garden postcard link:');
       sharePostcardBtn.dataset.state = 'done';
       sharePostcardBtn.textContent = 'saved + link copied';
-      logField('Native share skipped the party, so the postcard was downloaded and the matching link copied instead.', 'postcard saved locally');
+      logField('Native share skipped the party, so the postcard was downloaded and the matching link copied instead.', meteorShowerEnabled ? 'postcard saved locally • meteor' : 'postcard saved locally');
     }
 
     window.clearTimeout(sharePostcardBtn.copyStateTimer);
@@ -1590,6 +1775,7 @@ function applySharedSequence(sequence, {
   hashShareMode = 'garden',
   broadcastKey = null,
   weaveEnabled = constellationWeaveEnabled,
+  meteorEnabled = meteorShowerEnabled,
   logMessage = pick(transmissions.loaded),
   status = null,
 } = {}) {
@@ -1602,6 +1788,8 @@ function applySharedSequence(sequence, {
   setWeatherPreset(weatherId || DEFAULT_WEATHER_ID, { syncUrl: false });
 
   if (replay) {
+    setConstellationWeave(weaveEnabled, { syncUrl: false });
+    setMeteorShowerEnabled(meteorEnabled, { syncUrl: false });
     replayGarden(blooms, {
       restoreFromHash: true,
       shareMode: hashShareMode,
@@ -1620,13 +1808,14 @@ function applySharedSequence(sequence, {
     });
   });
   setConstellationWeave(weaveEnabled, { syncUrl: false });
+  setMeteorShowerEnabled(meteorEnabled, { syncUrl: false });
   logField(logMessage, status ?? `${sourceMode === 'broadcast' ? 'daily signal tuned' : 'shared garden loaded'}: ${blooms.length} blooms • ${currentWeatherPreset.label}`);
   suppressHashSync = false;
   syncShareState();
   return true;
 }
 
-function loadDailyBroadcast(key = getUtcDateKey(), { replay = false, weaveEnabled = constellationWeaveEnabled } = {}) {
+function loadDailyBroadcast(key = getUtcDateKey(), { replay = false, weaveEnabled = constellationWeaveEnabled, meteorEnabled = meteorShowerEnabled } = {}) {
   if (!isBroadcastKey(key)) return false;
 
   const blooms = buildDailyGarden(key);
@@ -1640,6 +1829,7 @@ function loadDailyBroadcast(key = getUtcDateKey(), { replay = false, weaveEnable
     hashShareMode: 'broadcast',
     broadcastKey: key,
     weaveEnabled,
+    meteorEnabled,
     logMessage: `${pick(transmissions.daily).replace('{date}', key)} Weather report: ${weatherPreset.label}.`,
     status: `daily signal tuned: ${blooms.length} blooms`,
   });
@@ -1651,12 +1841,14 @@ function parseHashState() {
 
   const params = new URLSearchParams(hash);
   const weaveEnabled = params.get('weave') === '1' || params.get('weave') === 'true';
+  const meteorEnabled = params.get('meteor') === '1' || params.get('meteor') === 'true';
 
   if (params.has('broadcast')) {
     return {
       type: 'broadcast',
       broadcastKey: params.get('broadcast')?.trim() ?? '',
       weaveEnabled,
+      meteorEnabled,
     };
   }
 
@@ -1666,6 +1858,15 @@ function parseHashState() {
       encodedGarden: params.get('garden')?.trim() ?? '',
       weatherId: params.get('weather')?.trim() ?? '',
       weaveEnabled,
+      meteorEnabled,
+    };
+  }
+
+  if (weaveEnabled || meteorEnabled) {
+    return {
+      type: 'modes',
+      weaveEnabled,
+      meteorEnabled,
     };
   }
 
@@ -1676,8 +1877,17 @@ function loadGardenFromHash({ replay = false } = {}) {
   const parsed = parseHashState();
   if (!parsed) return false;
 
+  if (parsed.type === 'modes') {
+    suppressHashSync = true;
+    setConstellationWeave(parsed.weaveEnabled, { syncUrl: false });
+    setMeteorShowerEnabled(parsed.meteorEnabled, { syncUrl: false });
+    suppressHashSync = false;
+    syncShareState();
+    return true;
+  }
+
   if (parsed.type === 'broadcast') {
-    return loadDailyBroadcast(parsed.broadcastKey, { replay, weaveEnabled: parsed.weaveEnabled });
+    return loadDailyBroadcast(parsed.broadcastKey, { replay, weaveEnabled: parsed.weaveEnabled, meteorEnabled: parsed.meteorEnabled });
   }
 
   if (parsed.type !== 'garden') return false;
@@ -1692,6 +1902,7 @@ function loadGardenFromHash({ replay = false } = {}) {
     sourceMode: 'shared',
     hashShareMode: 'garden',
     weaveEnabled: parsed.weaveEnabled,
+    meteorEnabled: parsed.meteorEnabled,
     logMessage: pick(transmissions.loaded),
     status: `shared garden loaded: ${blooms.length} blooms • ${getWeatherPresetById(parsed.weatherId || DEFAULT_WEATHER_ID).label}`,
   });
@@ -1742,6 +1953,7 @@ dailySignalBtn.addEventListener('click', () => {
 
 cycleWeatherBtn?.addEventListener('click', cycleWeatherMode);
 toggleWeaveBtn?.addEventListener('click', toggleConstellationWeave);
+toggleMeteorBtn?.addEventListener('click', toggleMeteorShower);
 
 highlightsGridEl?.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-action][data-id]');
@@ -1814,6 +2026,10 @@ document.addEventListener('keydown', (event) => {
   if (event.key.toLowerCase() === 'c' && !event.metaKey && !event.ctrlKey && !event.altKey) {
     event.preventDefault();
     toggleConstellationWeave();
+  }
+  if (event.key.toLowerCase() === 'm' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    event.preventDefault();
+    toggleMeteorShower();
   }
 });
 

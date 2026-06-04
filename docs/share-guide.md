@@ -1,6 +1,6 @@
 # Signal Garden sharing guide
 
-Use the right surface for the right kind of traffic.
+Use the right surface for the right kind of traffic. The public story is a constellation-era garden, so the copy should feel shared, luminous, and a little ceremonial.
 
 ## 1) Main app link for first contact
 
