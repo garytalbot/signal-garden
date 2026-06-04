@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Signal Garden — constellation-era browser gallery</title>
-  <meta name="description" content="A tiny constellation-era browser garden where every UTC day gets a shared glowing field and every click can still plant a new procedural bloom.">
+  <title>Signal Garden — ghost afterimage browser gallery</title>
+  <meta name="description" content="A tiny ghost afterimage browser garden where every UTC day gets a shared glowing field and every click can still plant a new procedural bloom.">
   <meta name="theme-color" content="#181535">
   <meta name="color-scheme" content="dark only">
   <meta name="application-name" content="Signal Garden">
@@ -13,13 +13,13 @@
   <meta name="apple-mobile-web-app-title" content="Signal Garden">
   <meta name="msapplication-TileColor" content="#181535">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Signal Garden — constellation-era browser gallery">
-  <meta name="twitter:description" content="A tiny constellation-era browser garden with a shared UTC daily signal, a lightweight archive, exact-garden links, and PNG export.">
+  <meta name="twitter:title" content="Signal Garden — ghost afterimage browser gallery">
+  <meta name="twitter:description" content="A tiny ghost afterimage browser garden with a shared UTC daily signal, a lightweight archive, exact-garden links, and PNG export.">
   <meta name="twitter:image" content="https://garytalbot.github.io/signal-garden/assets/social-card.svg">
   <meta name="twitter:image:alt" content="Signal Garden interface showing glowing blooms, constellation lines, and recent daily signal archive cards.">
   <meta name="twitter:site" content="@GaryTalbot87">
-  <meta property="og:title" content="Signal Garden — constellation-era browser gallery">
-  <meta property="og:description" content="A tiny constellation-era browser garden with a shared UTC daily signal, a lightweight archive, exact-garden links, and PNG export.">
+  <meta property="og:title" content="Signal Garden — ghost afterimage browser gallery">
+  <meta property="og:description" content="A tiny ghost afterimage browser garden with a shared UTC daily signal, a lightweight archive, exact-garden links, and PNG export.">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Signal Garden">
   <meta property="og:url" content="https://garytalbot.github.io/signal-garden/">
@@ -46,7 +46,7 @@
             <h1>Signal Garden</h1>
           </div>
         </div>
-        <p class="lede">Signal Garden is a tiny constellation-era browser garden: every UTC day gets a shared field, the newest broadcasts live below as a browsable archive, and you can still plant your own glowing nonsense whenever the mood strikes.</p>
+        <p class="lede">Signal Garden is a tiny constellation-era browser garden: every UTC day gets a shared field, the newest broadcasts live below as a browsable archive, and the new ghostly afterimage mode lets the chorus linger a little longer in the glass.</p>
       </div>
       <div class="controls">
         <section class="control-group control-group--primary" aria-label="Planting controls">
@@ -58,12 +58,17 @@
           </div>
         </section>
         <section class="control-group control-group--modes" aria-label="Mode controls">
-          <p class="control-label">new mode / sky weave</p>
+          <p class="control-label">ghost afterimage / sky weave</p>
+          <div class="mode-banner" aria-hidden="true">
+            <span class="mode-chip">afterimage mode</span>
+            <span class="mode-banner-copy">Afterimage mode leaves a lingering ghost over the blooms.</span>
+          </div>
           <p class="control-note">The signal chorus is the weird switch. The HUD below mirrors its state, along with the other ambient toggles.</p>
           <div class="control-row">
             <button id="toggleWeave" aria-pressed="false">constellations: off</button>
             <button id="toggleMeteor" aria-pressed="false">meteor shower: off</button>
-            <button id="toggleHarmony" aria-pressed="false">signal chorus: off</button>
+            <button id="toggleAfterimage" class="mode-toggle mode-toggle--afterimage" aria-pressed="false">afterimages: off</button>
+            <button id="toggleHarmony">signal chorus: off</button>
           </div>
         </section>
         <section class="control-group control-group--secondary" aria-label="Sharing and editing controls">
@@ -87,6 +92,7 @@
         <div class="hud-tile"><span>weather mode</span><strong id="weatherMode">violet hush</strong></div>
         <div class="hud-tile hud-tile--focus"><span>sky weave</span><strong id="weaveMode">off</strong></div>
         <div class="hud-tile"><span>meteor shower</span><strong id="meteorMode">off</strong></div>
+        <div class="hud-tile hud-tile--afterimage"><span>afterimages</span><strong id="afterimageMode">off</strong><em class="hud-tile-kicker">ghost bloom trail</em></div>
         <div class="hud-tile"><span>signal chorus</span><strong id="harmonyMode">off</strong></div>
         <div class="hud-tile"><span>last specimen</span><strong id="lastName">none yet</strong></div>
         <div class="hud-tile hud-tile--source"><span>field source</span><strong id="sourceLabel">open field</strong></div>

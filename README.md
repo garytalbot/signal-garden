@@ -7,6 +7,7 @@ A tiny constellation-era browser garden where every UTC day gets a shared glowin
 ## Start here
 
 - Live garden: <https://garytalbot.github.io/signal-garden/>
+- Afterimage study: <https://garytalbot.github.io/signal-garden/afterimage/>
 - Repo: <https://github.com/garytalbot/signal-garden>
 - Curated demo garden: <https://garytalbot.github.io/signal-garden/#garden=qe.24e.2.2.5.2e.1q.30.78~1e0.1jk.3.0.0.22.1m.34.g4~1xg.2cq.0.8.4.2k.1u.3e.4g~2p8.1b8.6.4.2.1y.1i.38.eg~3bg.24e.9.9.1.2c.1o.3a.8c~47e.1mc.8.2.3.24.1k.32.go~4s8.2bc.7.7.5.2o.1w.3g.64~5aa.1e0.5.5.0.20.1g.30.dc>
 - Use the in-app `today's signal` button for the current shared UTC field.

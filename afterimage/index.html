@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A phosphor afterimage study from Signal Garden: ghost trails, bloom echoes, and a small living screen burn-in chamber.">
+  <title>Signal Garden Afterimage Study</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #06070c;
+      --panel: rgba(10, 14, 24, 0.72);
+      --panel-edge: rgba(190, 220, 255, 0.18);
+      --text: #eef5ff;
+      --muted: #9eb1d3;
+      --accent: #8cffcf;
+      --accent-2: #7ab7ff;
+      --accent-3: #ff88d8;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(76, 165, 255, 0.09), transparent 28%),
+        radial-gradient(circle at 80% 15%, rgba(255, 108, 205, 0.08), transparent 24%),
+        radial-gradient(circle at 50% 85%, rgba(140, 255, 207, 0.06), transparent 26%),
+        linear-gradient(180deg, #04050a 0%, #050810 45%, #020308 100%);
+      color: var(--text);
+      font: 400 16px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01) 1px, transparent 1px);
+      background-size: 100% 3px, 3px 100%;
+      mix-blend-mode: screen;
+      opacity: 0.18;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      cursor: crosshair;
+    }
+
+    .hud {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      width: min(420px, calc(100vw - 40px));
+      padding: 18px 18px 16px;
+      border: 1px solid var(--panel-edge);
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(9, 14, 24, 0.88), rgba(8, 10, 16, 0.70));
+      box-shadow:
+        0 18px 60px rgba(0, 0, 0, 0.44),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      z-index: 2;
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      color: var(--accent);
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 0.95;
+      letter-spacing: -0.05em;
+    }
+
+    .lede {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      max-width: 36ch;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .stat {
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .stat strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.05));
+      color: var(--text);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font: inherit;
+      cursor: pointer;
+      transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(140, 255, 207, 0.55);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .hint {
+      margin: 12px 0 0;
+      color: rgba(238, 245, 255, 0.78);
+      font-size: 13px;
+    }
+
+    .corner {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(7, 10, 16, 0.64);
+      color: rgba(238, 245, 255, 0.72);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      z-index: 2;
+    }
+
+    .corner strong {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    @media (max-width: 720px) {
+      .hud {
+        top: 12px;
+        left: 12px;
+        width: calc(100vw - 24px);
+        padding: 16px 16px 14px;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .corner {
+        right: 12px;
+        bottom: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="stage" aria-label="afterimage study canvas"></canvas>
+
+  <section class="hud" aria-label="afterimage study controls">
+    <p class="eyebrow">signal garden side chamber</p>
+    <h1>afterimage study</h1>
+    <p class="lede">Move the pointer and leave a little screen burn behind. Each trace is a ghost, not a feature. The screen remembers anyway.</p>
+    <div class="stats" aria-live="polite">
+      <div class="stat"><span>palette</span><strong id="paletteLabel">Phosphor Bloom</strong></div>
+      <div class="stat"><span>ghosts</span><strong id="ghostCount">0</strong></div>
+      <div class="stat"><span>pulse</span><strong id="pulseState">idle</strong></div>
+    </div>
+    <div class="controls">
+      <button id="paletteBtn" type="button">cycle palette</button>
+      <button id="pulseBtn" type="button">pulse the field</button>
+      <button id="resetBtn" type="button">wipe ghosts</button>
+    </div>
+    <p class="hint">Pointer / tap: paint afterimages. Space: pulse. Click: cycle palette. R: reset. The garden hates empty silence.</p>
+  </section>
+
+  <div class="corner"><strong>signal</strong> / afterimage chamber</div>
+
+  <script>
+    const canvas = document.getElementById('stage');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const paletteLabel = document.getElementById('paletteLabel');
+    const ghostCount = document.getElementById('ghostCount');
+    const pulseState = document.getElementById('pulseState');
+    const paletteBtn = document.getElementById('paletteBtn');
+    const pulseBtn = document.getElementById('pulseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    const palettes = [
+      {
+        name: 'Phosphor Bloom',
+        colors: ['#8cffcf', '#68b7ff', '#f58bff', '#fef9c3']
+      },
+      {
+        name: 'Sodium Burn',
+        colors: ['#ffd166', '#ff8c42', '#f76f8e', '#fff1a8']
+      },
+      {
+        name: 'Aurora Static',
+        colors: ['#8df0ff', '#9b8cff', '#ff95c8', '#d7ffad']
+      }
+    ];
+
+    const ghosts = [];
+    const pulses = [];
+    const pointer = { x: 0, y: 0, active: false, trailX: 0, trailY: 0 };
+    let paletteIndex = 0;
+    let lastStamp = 0;
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+    let frame = 0;
+    let pulseTicker = 0;
+    let reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function resize() {
+      dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      width = Math.floor(window.innerWidth);
+      height = Math.floor(window.innerHeight);
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = '#04050a';
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    function currentPalette() {
+      return palettes[paletteIndex % palettes.length];
+    }
+
+    function updateHud() {
+      paletteLabel.textContent = currentPalette().name;
+      ghostCount.textContent = String(ghosts.length + pulses.length);
+    }
+
+    function rand(min, max) {
+      return min + Math.random() * (max - min);
+    }
+
+    function chooseColor(index = 0) {
+      const colors = currentPalette().colors;
+      return colors[index % colors.length];
+    }
+
+    function stampGhost(x, y, opts = {}) {
+      const stamp = {
+        x,
+        y,
+        vx: opts.vx ?? rand(-0.55, 0.55),
+        vy: opts.vy ?? rand(-0.55, 0.55),
+        radius: opts.radius ?? rand(10, 28),
+        life: opts.life ?? rand(60, 110),
+        hue: opts.hue ?? Math.floor(rand(0, currentPalette().colors.length)),
+        wobble: rand(0, Math.PI * 2),
+        glow: opts.glow ?? rand(0.45, 1),
+        glyph: opts.glyph ?? ['◌', '✦', '◍', '·'][Math.floor(rand(0, 4))]
+      };
+      ghosts.push(stamp);
+    }
+
+    function triggerPulse(x = pointer.x, y = pointer.y) {
+      pulses.push({
+        x,
+        y,
+        radius: 6,
+        life: 72,
+        maxLife: 72
+      });
+      pulseTicker = 12;
+      pulseState.textContent = 'charged';
+      for (let i = 0; i < 10; i += 1) {
+        stampGhost(
+          x + rand(-18, 18),
+          y + rand(-18, 18),
+          {
+            radius: rand(8, 22),
+            life: rand(55, 95),
+            hue: i,
+            glow: rand(0.6, 1.2),
+            vx: rand(-1.2, 1.2),
+            vy: rand(-1.2, 1.2)
+          }
+        );
+      }
+    }
+
+    function cyclePalette() {
+      paletteIndex = (paletteIndex + 1) % palettes.length;
+      updateHud();
+      triggerPulse(pointer.x || width * 0.5, pointer.y || height * 0.5);
+    }
+
+    function resetField() {
+      ghosts.length = 0;
+      pulses.length = 0;
+      pointer.active = false;
+      pulseTicker = 0;
+      pulseState.textContent = 'idle';
+      ctx.fillStyle = '#04050a';
+      ctx.fillRect(0, 0, width, height);
+      updateHud();
+    }
+
+    function drawBackdrop() {
+      ctx.save();
+      ctx.fillStyle = 'rgba(4, 5, 10, 0.14)';
+      ctx.fillRect(0, 0, width, height);
+      ctx.globalCompositeOperation = 'screen';
+
+      const grad = ctx.createRadialGradient(
+        width * 0.5,
+        height * 0.5,
+        0,
+        width * 0.5,
+        height * 0.5,
+        Math.max(width, height) * 0.85
+      );
+      grad.addColorStop(0, 'rgba(20, 26, 44, 0.20)');
+      grad.addColorStop(0.45, 'rgba(10, 14, 24, 0.08)');
+      grad.addColorStop(1, 'rgba(4, 5, 10, 0.00)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+      ctx.lineWidth = 1;
+      const spacing = 48;
+      const offset = (frame * 0.18) % spacing;
+      for (let x = -spacing; x < width + spacing; x += spacing) {
+        ctx.beginPath();
+        ctx.moveTo(x + offset, 0);
+        ctx.lineTo(x + offset, height);
+        ctx.stroke();
+      }
+      for (let y = -spacing; y < height + spacing; y += spacing) {
+        ctx.beginPath();
+        ctx.moveTo(0, y + offset * 0.7);
+        ctx.lineTo(width, y + offset * 0.7);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    function drawGhost(ghost) {
+      const palette = currentPalette().colors;
+      const fade = Math.max(0, ghost.life / 110);
+      const color = palette[ghost.hue % palette.length];
+      const wobble = Math.sin((frame * 0.04) + ghost.wobble) * 2.4;
+      const radius = ghost.radius * (0.5 + fade * 0.8);
+
+      ctx.save();
+      ctx.translate(ghost.x + wobble, ghost.y - wobble * 0.35);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 24 * ghost.glow * fade;
+      ctx.fillStyle = hexToRgba(color, 0.14 + fade * 0.42);
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 1.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = hexToRgba(color, 0.18 + fade * 0.54);
+      ctx.lineWidth = Math.max(1, radius * 0.08);
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = hexToRgba('#ffffff', 0.10 + fade * 0.25);
+      ctx.font = `${Math.max(10, radius * 1.1)}px ui-sans-serif, system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(ghost.glyph, 0, 1);
+      ctx.restore();
+    }
+
+    function drawPulse(pulse) {
+      const t = 1 - pulse.life / pulse.maxLife;
+      const radius = pulse.radius + t * Math.max(width, height) * 0.18;
+      const alpha = Math.max(0, 0.35 * (1 - t));
+      const color = currentPalette().colors[(frame + 1) % currentPalette().colors.length];
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = hexToRgba(color, alpha);
+      ctx.lineWidth = 2 + t * 6;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 20 * (1 - t);
+      ctx.beginPath();
+      ctx.arc(pulse.x, pulse.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function hexToRgba(hex, alpha) {
+      const normalized = hex.replace('#', '');
+      const bigint = parseInt(normalized.length === 3
+        ? normalized.split('').map((part) => part + part).join('')
+        : normalized, 16);
+      const r = (bigint >> 16) & 255;
+      const g = (bigint >> 8) & 255;
+      const b = bigint & 255;
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    function animate() {
+      frame += 1;
+
+      drawBackdrop();
+
+      for (let i = pulses.length - 1; i >= 0; i -= 1) {
+        const pulse = pulses[i];
+        pulse.life -= 1.2;
+        drawPulse(pulse);
+        if (pulse.life <= 0) pulses.splice(i, 1);
+      }
+
+      for (let i = ghosts.length - 1; i >= 0; i -= 1) {
+        const ghost = ghosts[i];
+        ghost.life -= reducedMotion ? 2.2 : 1.35;
+        ghost.x += ghost.vx;
+        ghost.y += ghost.vy;
+        ghost.vx *= 0.992;
+        ghost.vy *= 0.992;
+        drawGhost(ghost);
+        if (ghost.life <= 0) ghosts.splice(i, 1);
+      }
+
+      if (pointer.active && !reducedMotion && frame % 2 === 0) {
+        const dx = pointer.x - pointer.trailX;
+        const dy = pointer.y - pointer.trailY;
+        const drift = Math.hypot(dx, dy);
+        if (drift > 1.5) {
+          const segmentCount = Math.min(4, Math.max(1, Math.round(drift / 30)));
+          for (let i = 0; i < segmentCount; i += 1) {
+            const t = i / segmentCount;
+            stampGhost(
+              pointer.trailX + dx * t + rand(-3, 3),
+              pointer.trailY + dy * t + rand(-3, 3),
+              {
+                radius: rand(8, 18),
+                life: rand(28, 70),
+                hue: (frame + i) % currentPalette().colors.length,
+                glow: rand(0.45, 0.95),
+                vx: rand(-0.4, 0.4),
+                vy: rand(-0.4, 0.4),
+                glyph: ['◌', '✦', '·', '✶'][Math.floor(rand(0, 4))]
+              }
+            );
+          }
+        }
+        pointer.trailX = pointer.x;
+        pointer.trailY = pointer.y;
+      }
+
+      if (pulseTicker > 0) {
+        pulseTicker -= 1;
+        if (pulseTicker === 0) {
+          pulseState.textContent = 'glowing';
+          setTimeout(() => {
+            if (pulseTicker === 0) pulseState.textContent = 'idle';
+          }, 240);
+        }
+      }
+
+      updateHud();
+      requestAnimationFrame(animate);
+    }
+
+    function spawnPointerGhosts(x, y) {
+      pointer.x = x;
+      pointer.y = y;
+      if (!pointer.active) {
+        pointer.active = true;
+        pointer.trailX = x;
+        pointer.trailY = y;
+      }
+      const spread = reducedMotion ? 2 : 5;
+      for (let i = 0; i < spread; i += 1) {
+        const angle = (Math.PI * 2 * i) / spread;
+        stampGhost(
+          x + Math.cos(angle) * rand(0, 12),
+          y + Math.sin(angle) * rand(0, 12),
+          {
+            radius: rand(10, 20),
+            life: rand(45, 88),
+            hue: i,
+            glow: rand(0.7, 1.4),
+            vx: Math.cos(angle) * rand(-0.3, 0.5),
+            vy: Math.sin(angle) * rand(-0.3, 0.5)
+          }
+        );
+      }
+      if (Date.now() - lastStamp > 70) {
+        stampGhost(x, y, {
+          radius: rand(12, 24),
+          life: rand(60, 105),
+          hue: Math.floor(rand(0, currentPalette().colors.length)),
+          glow: rand(0.8, 1.3),
+          glyph: ['◌', '◍', '✦', '·'][Math.floor(rand(0, 4))]
+        });
+        lastStamp = Date.now();
+      }
+      pulseState.textContent = 'alive';
+    }
+
+    canvas.addEventListener('pointerdown', (event) => {
+      canvas.setPointerCapture?.(event.pointerId);
+      pointer.active = true;
+      spawnPointerGhosts(event.clientX, event.clientY);
+      triggerPulse(event.clientX, event.clientY);
+    });
+
+    canvas.addEventListener('pointermove', (event) => {
+      if (!pointer.active && event.buttons === 0) {
+        return;
+      }
+      spawnPointerGhosts(event.clientX, event.clientY);
+    });
+
+    window.addEventListener('pointerup', () => {
+      pointer.active = false;
+      pulseState.textContent = 'idle';
+    });
+
+    window.addEventListener('keydown', (event) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key === ' ' || event.code === 'Space') {
+        event.preventDefault();
+        triggerPulse(pointer.x || width * 0.5, pointer.y || height * 0.5);
+      } else if (event.key === 'r' || event.key === 'R') {
+        event.preventDefault();
+        resetField();
+      } else if (event.key === 'p' || event.key === 'P' || event.key === 'c' || event.key === 'C') {
+        event.preventDefault();
+        cyclePalette();
+      }
+    });
+
+    paletteBtn.addEventListener('click', cyclePalette);
+    pulseBtn.addEventListener('click', () => triggerPulse(pointer.x || width * 0.5, pointer.y || height * 0.5));
+    resetBtn.addEventListener('click', resetField);
+
+    window.addEventListener('resize', resize);
+    window.addEventListener('blur', () => { pointer.active = false; });
+
+    resize();
+    updateHud();
+    triggerPulse(width * 0.5, height * 0.5);
+    animate();
+  </script>
+</body>
+</html>

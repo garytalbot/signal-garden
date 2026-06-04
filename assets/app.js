@@ -9,6 +9,7 @@ const moodEl = document.getElementById('mood');
 const weatherModeEl = document.getElementById('weatherMode');
 const weaveModeEl = document.getElementById('weaveMode');
 const meteorModeEl = document.getElementById('meteorMode');
+const afterimageModeEl = document.getElementById('afterimageMode');
 const harmonyModeEl = document.getElementById('harmonyMode');
 const lastNameEl = document.getElementById('lastName');
 const sourceLabelEl = document.getElementById('sourceLabel');
@@ -20,6 +21,7 @@ const dailySignalBtn = document.getElementById('dailySignal');
 const cycleWeatherBtn = document.getElementById('cycleWeather');
 const toggleWeaveBtn = document.getElementById('toggleWeave');
 const toggleMeteorBtn = document.getElementById('toggleMeteor');
+const toggleAfterimageBtn = document.getElementById('toggleAfterimage');
 const toggleHarmonyBtn = document.getElementById('toggleHarmony');
 const undoBtn = document.getElementById('undo');
 const clearBtn = document.getElementById('clear');
@@ -290,11 +292,16 @@ let currentWeatherPreset = WEATHER_PRESETS[0];
 let currentCritterSpec = null;
 let constellationWeaveEnabled = false;
 let meteorShowerEnabled = false;
+let afterimageEnabled = false;
+let afterimageCursorTrail = [];
+let afterimageCursorStampAt = 0;
 let signalChorusEnabled = false;
 let signalOverlayFlashGroup = null;
 let signalOverlayChorusGroup = null;
 let signalCursorPoint = null;
 let signalChorusFrame = null;
+const AFTERIMAGE_GHOST_LIMIT = 24;
+const AFTERIMAGE_CURSOR_LIMIT = 18;
 
 function rand(min, max, randomFn = Math.random) {
   return randomFn() * (max - min) + min;
@@ -668,6 +675,31 @@ function syncMeteorUi() {
   }
 }
 
+function syncAfterimageUi() {
+  if (afterimageModeEl) {
+    afterimageModeEl.textContent = afterimageEnabled ? 'on' : 'off';
+  }
+
+  if (toggleAfterimageBtn) {
+    toggleAfterimageBtn.textContent = afterimageEnabled ? 'afterimages: on' : 'afterimages: off';
+    toggleAfterimageBtn.setAttribute('aria-pressed', String(afterimageEnabled));
+    toggleAfterimageBtn.title = afterimageEnabled
+      ? 'Quiet the ghost bloom afterimages.'
+      : 'Wake the phosphor afterimages that trail recent blooms.';
+  }
+
+  if (toggleHarmonyBtn) {
+    toggleHarmonyBtn.hidden = true;
+  }
+
+  if (harmonyModeEl) {
+    const legacyHudTile = harmonyModeEl.closest('.hud-tile');
+    if (legacyHudTile) legacyHudTile.hidden = true;
+  }
+
+  renderAfterimageState();
+}
+
 function syncHarmonyUi() {
   if (stage) {
     stage.dataset.chorus = String(signalChorusEnabled);
@@ -678,12 +710,33 @@ function syncHarmonyUi() {
   }
 
   if (toggleHarmonyBtn) {
-    toggleHarmonyBtn.textContent = signalChorusEnabled ? 'signal chorus: on' : 'signal chorus: off';
+    toggleHarmonyBtn.textContent = signalChorusEnabled ? 'afterimages: on' : 'afterimages: off';
     toggleHarmonyBtn.setAttribute('aria-pressed', String(signalChorusEnabled));
     toggleHarmonyBtn.title = signalChorusEnabled
-      ? 'Quiet the living signal chorus.'
-      : 'Wake the hidden signal overlay into a living chorus.';
+      ? 'Quiet the living afterimages.'
+      : 'Wake the hidden afterimage trail into motion.';
   }
+}
+
+function setAfterimageEnabled(nextEnabled, { syncUrl = true, logMessage = null } = {}) {
+  afterimageEnabled = Boolean(nextEnabled);
+  syncAfterimageUi();
+
+  if (!afterimageEnabled) {
+    stage?.querySelectorAll('.afterimage-copy').forEach((node) => node.remove());
+  }
+
+  if (logMessage) {
+    logField(logMessage, afterimageEnabled ? 'afterimages on' : 'afterimages off');
+  }
+
+  if (syncUrl) syncShareState();
+}
+
+function renderAfterimageState() {
+  if (!stage) return;
+  stage.dataset.afterimage = String(afterimageEnabled);
+  stage.dataset.afterimages = String(afterimageEnabled);
 }
 
 function setWeatherPreset(weatherId, options = {}) {
@@ -871,7 +924,7 @@ function logField(message, status = 'recording strange botany') {
 }
 
 function choosePlantTransmission(name, hadLink, x, y) {
-  const crowding = Array.from(stage.querySelectorAll('.bloom')).filter((bloom) => {
+  const crowding = getLiveBloomElements().filter((bloom) => {
     const bloomX = parseFloat(bloom.style.left);
     const bloomY = parseFloat(bloom.style.top);
     return Math.hypot(bloomX - x, bloomY - y) < 120;
@@ -894,6 +947,10 @@ function choosePlantTransmission(name, hadLink, x, y) {
   }
 
   return pick(transmissions.regular).replace('{name}', name);
+}
+
+function getLiveBloomElements() {
+  return stage ? Array.from(stage.querySelectorAll('.bloom:not(.afterimage-copy)')) : [];
 }
 
 function updateFieldSourceLabel() {
@@ -932,11 +989,12 @@ function syncControls() {
   else stage.removeAttribute('data-empty');
 
   hintEl.textContent = disabled
-    ? 'Move your cursor to aim a bloom. Click to plant. Press U to undo. Press H to wake the signal chorus.'
-    : 'Click to plant. Press U to undo the last bloom. Press C to toggle constellations. Press M to toggle the meteor shower. Press H to toggle the signal chorus. Press W to switch weather when the field is yours.';
+    ? 'Move your cursor to aim a bloom. Click to plant. Press U to undo. Press A for afterimages. Press H to wake the signal chorus.'
+    : 'Click to plant. Press U to undo the last bloom. Press C to toggle constellations. Press M to toggle the meteor shower. Press A to toggle afterimages. Press H to toggle the signal chorus. Press W to switch weather when the field is yours.';
 
   syncWeaveUi();
   syncMeteorUi();
+  syncAfterimageUi();
   syncHarmonyUi();
   syncWeatherUi();
 }
@@ -1311,11 +1369,72 @@ function makeBloomSpec(x, y, randomFn = Math.random) {
   };
 }
 
+function spawnAfterimageGhosts(spec, priorPoint = null) {
+  if (!afterimageEnabled || !stage || !template) return;
+
+  const name = makeNameFromIndexes(spec.adjectiveIndex, spec.nounIndex);
+  const basePoint = priorPoint ?? { x: spec.x, y: spec.y };
+  const driftX = spec.x - basePoint.x;
+  const driftY = spec.y - basePoint.y;
+  const echoes = priorPoint
+    ? [
+      { offset: 0.18, opacity: 0.24, scale: 0.98, blur: 0.7, life: 1900 },
+      { offset: 0.36, opacity: 0.16, scale: 0.94, blur: 1, life: 2300 },
+      { offset: 0.56, opacity: 0.1, scale: 0.9, blur: 1.4, life: 2700 },
+    ]
+    : [
+      { offset: 0.1, opacity: 0.18, scale: 0.97, blur: 0.7, life: 1700 },
+      { offset: 0.28, opacity: 0.11, scale: 0.93, blur: 1.1, life: 2100 },
+    ];
+
+  echoes.forEach((echo, index) => {
+    const ghost = template.content.firstElementChild.cloneNode(true);
+    const echoX = spec.x - driftX * echo.offset + Math.sin((spec.x + spec.y + index * 17) * 0.015) * (6 + index * 2);
+    const echoY = spec.y - driftY * echo.offset + Math.cos((spec.x - spec.y + index * 13) * 0.018) * (5 + index * 1.5);
+
+    ghost.classList.add('afterimage-copy');
+    ghost.setAttribute('aria-hidden', 'true');
+    ghost.style.left = `${echoX}px`;
+    ghost.style.top = `${echoY}px`;
+    ghost.style.opacity = String(echo.opacity);
+    ghost.style.zIndex = '2';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.mixBlendMode = 'screen';
+    ghost.style.filter = `blur(${echo.blur}px) saturate(0.7)`;
+    ghost.style.transition = 'opacity 1.8s ease-out, transform 1.8s ease-out, filter 1.8s ease-out';
+    ghost.style.setProperty('--accent', getAccentToken(spec.accentIndex));
+    ghost.style.setProperty('--stem-height', `${spec.stemHeight}px`);
+    ghost.style.setProperty('--ring-a', `${spec.ringA}px`);
+    ghost.style.setProperty('--ring-b', `${spec.ringB}px`);
+    ghost.style.setProperty('--tilt', `${spec.tilt}deg`);
+    ghost.querySelector('.label').textContent = name;
+    ghost.querySelector('.label').style.opacity = '0.68';
+    ghost.querySelector('.core').style.opacity = '0.82';
+    ghost.querySelector('.ring-a').style.opacity = '0.5';
+    ghost.querySelector('.ring-b').style.opacity = '0.36';
+    ghost.style.transform = `translate(-50%, -78%) translate(${driftX * echo.offset}px, ${driftY * echo.offset}px) scale(${echo.scale})`;
+
+    stage.appendChild(ghost);
+    window.requestAnimationFrame(() => {
+      ghost.style.opacity = '0';
+      ghost.style.transform = `translate(-50%, -78%) translate(${driftX * (echo.offset + 0.08)}px, ${driftY * (echo.offset + 0.08)}px) scale(${Math.min(1.02, echo.scale + 0.03)})`;
+    });
+
+    window.setTimeout(() => ghost.remove(), echo.life);
+  });
+
+  const ghostCount = stage.querySelectorAll('.afterimage-copy').length;
+  if (ghostCount > AFTERIMAGE_GHOST_LIMIT) {
+    stage.querySelector('.afterimage-copy')?.remove();
+  }
+}
+
 function renderBloom(spec, options = {}) {
   const { logPlant = true, syncUrl = true, animateLink = true } = options;
   const node = template.content.firstElementChild.cloneNode(true);
   const name = makeNameFromIndexes(spec.adjectiveIndex, spec.nounIndex);
   const hadLink = Boolean(previousBloomPoint);
+  const priorPoint = previousBloomPoint ? { ...previousBloomPoint } : null;
 
   node.style.left = `${spec.x}px`;
   node.style.top = `${spec.y}px`;
@@ -1328,6 +1447,9 @@ function renderBloom(spec, options = {}) {
 
   if (animateLink) {
     drawSignalLink(previousBloomPoint, { x: spec.x, y: spec.y }, spec.accentIndex);
+  }
+  if (afterimageEnabled) {
+    spawnAfterimageGhosts(spec, priorPoint);
   }
   previousBloomPoint = { x: spec.x, y: spec.y };
 
@@ -1343,7 +1465,7 @@ function renderBloom(spec, options = {}) {
   }
 
   if (bloomCount > MAX_BLOOMS) {
-    stage.querySelector('.bloom')?.remove();
+    stage.querySelector('.bloom:not(.afterimage-copy)')?.remove();
     bloomHistory.shift();
     bloomCount -= 1;
     countEl.textContent = String(bloomCount);
@@ -1358,6 +1480,7 @@ function renderBloom(spec, options = {}) {
   updateCritterUi();
   renderConstellationOverlay();
   renderMeteorOverlay();
+  renderAfterimageState();
   renderSignalOverlay();
   if (syncUrl) syncShareState();
 }
@@ -1436,8 +1559,8 @@ function buildHashString() {
     params.set('meteor', '1');
   }
 
-  if (signalChorusEnabled) {
-    params.set('chorus', '1');
+  if (afterimageEnabled) {
+    params.set('afterimage', '1');
   }
 
   if (!params.toString()) return '';
@@ -1491,7 +1614,7 @@ function setSignalChorusEnabled(nextEnabled, { syncUrl = true, logMessage = null
   renderSignalOverlay();
 
   if (logMessage) {
-    logField(logMessage, signalChorusEnabled ? 'signal chorus on' : 'signal chorus off');
+    logField(logMessage, signalChorusEnabled ? 'afterimages on' : 'afterimages off');
   }
 
   if (syncUrl) syncShareState();
@@ -1503,6 +1626,15 @@ function toggleMeteorShower() {
     logMessage: nextEnabled
       ? 'The sky opened up and a meteor shower started tracing silver gossip across the field.'
       : 'The meteor shower drifted away, leaving only the afterglow behind.',
+  });
+}
+
+function toggleAfterimageField() {
+  const nextEnabled = !afterimageEnabled;
+  setAfterimageEnabled(nextEnabled, {
+    logMessage: nextEnabled
+      ? 'The blooms started leaving afterimages behind, like phosphor trapped in glass.'
+      : 'The afterimages faded out and the field went plain again.',
   });
 }
 
@@ -1519,14 +1651,15 @@ function toggleHarmonyField() {
   const nextEnabled = !signalChorusEnabled;
   setSignalChorusEnabled(nextEnabled, {
     logMessage: nextEnabled
-      ? 'The signal chorus woke up and started ring-singing through the blooms.'
-      : 'The signal chorus settled back into the dirt and went quiet.',
+      ? 'The afterimage field woke up and started ring-singing through the blooms.'
+      : 'The afterimage field settled back into the dirt and went quiet.',
   });
 }
 
 function resetField({ logMessage = null, status = 'awaiting first contact', keepLogs = false, syncUrl = true, mood = true } = {}) {
   clearReplayTimers();
   stage.querySelectorAll('.bloom').forEach((bloom) => bloom.remove());
+  stage.querySelectorAll('.afterimage-copy').forEach((ghost) => ghost.remove());
   if (signalOverlayFlashGroup) signalOverlayFlashGroup.replaceChildren();
   if (signalOverlayChorusGroup) signalOverlayChorusGroup.replaceChildren();
   signalCursorPoint = null;
@@ -1561,7 +1694,7 @@ function prepareEditableField() {
 }
 
 function undoLastBloom() {
-  const blooms = stage.querySelectorAll('.bloom');
+  const blooms = getLiveBloomElements();
   const latestBloom = blooms[blooms.length - 1];
   if (!latestBloom) return;
 
@@ -1571,7 +1704,7 @@ function undoLastBloom() {
   bloomCount = Math.max(0, bloomCount - 1);
   countEl.textContent = String(bloomCount);
 
-  const remainingBlooms = stage.querySelectorAll('.bloom');
+  const remainingBlooms = getLiveBloomElements();
   const nextLastBloom = remainingBlooms[remainingBlooms.length - 1];
   lastNameEl.textContent = nextLastBloom?.querySelector('.label')?.textContent ?? 'none yet';
 
@@ -1887,7 +2020,7 @@ async function exportGardenPng() {
 
     exportPngBtn.dataset.state = 'done';
     exportPngBtn.textContent = 'PNG exported';
-    logField('Garden export complete. The field has been pressed into a labeled weather postcard.', signalChorusEnabled ? 'chorus postcard ready' : meteorShowerEnabled ? 'meteor postcard ready' : 'png ready');
+    logField('Garden export complete. The field has been pressed into a labeled weather postcard.', signalChorusEnabled ? 'afterimage postcard ready' : meteorShowerEnabled ? 'meteor postcard ready' : 'png ready');
     window.clearTimeout(exportToastTimer);
     exportToastTimer = window.setTimeout(() => {
       exportPngBtn.dataset.state = 'idle';
@@ -1914,7 +2047,7 @@ async function shareGardenPostcard() {
     const pngBlob = await renderGardenPngBlob();
     const filename = makePostcardFilename();
     const shareUrl = makeShareUrl();
-    const shareText = `Signal Garden • ${currentWeatherPreset.label} • ${bloomHistory.length} blooms • ${meteorShowerEnabled ? 'meteor shower on' : 'meteor shower off'} • ${signalChorusEnabled ? 'signal chorus on' : 'signal chorus off'}`;
+    const shareText = `Signal Garden • ${currentWeatherPreset.label} • ${bloomHistory.length} blooms • ${meteorShowerEnabled ? 'meteor shower on' : 'meteor shower off'} • ${signalChorusEnabled ? 'afterimages on' : 'afterimages off'}`;
     const postcardFile = new File([pngBlob], filename, { type: 'image/png' });
     const sharePayload = {
       title: 'Signal Garden postcard',
@@ -1928,7 +2061,7 @@ ${shareUrl}`,
       await navigator.share(sharePayload);
       sharePostcardBtn.dataset.state = 'done';
       sharePostcardBtn.textContent = 'postcard shared';
-      logField('Postcard shared with the full garden attached. Extremely portable weather.', signalChorusEnabled ? `postcard shared • ${currentWeatherPreset.label} • chorus` : meteorShowerEnabled ? `postcard shared • ${currentWeatherPreset.label} • meteor` : `postcard shared • ${currentWeatherPreset.label}`);
+      logField('Postcard shared with the full garden attached. Extremely portable weather.', signalChorusEnabled ? `postcard shared • ${currentWeatherPreset.label} • afterimage` : meteorShowerEnabled ? `postcard shared • ${currentWeatherPreset.label} • meteor` : `postcard shared • ${currentWeatherPreset.label}`);
     } else {
       downloadBlob(pngBlob, filename);
       await copyTextToClipboard(shareUrl, 'Copy this Signal Garden postcard link:');
@@ -2295,6 +2428,7 @@ function applySharedSequence(sequence, {
   broadcastKey = null,
   weaveEnabled = constellationWeaveEnabled,
   meteorEnabled = meteorShowerEnabled,
+  afterimageEnabled: afterimageModeEnabled = afterimageEnabled,
   chorusEnabled = signalChorusEnabled,
   logMessage = pick(transmissions.loaded),
   status = null,
@@ -2310,6 +2444,7 @@ function applySharedSequence(sequence, {
   if (replay) {
     setConstellationWeave(weaveEnabled, { syncUrl: false });
     setMeteorShowerEnabled(meteorEnabled, { syncUrl: false });
+    setAfterimageEnabled(afterimageModeEnabled, { syncUrl: false });
     setSignalChorusEnabled(chorusEnabled, { syncUrl: false });
     replayGarden(blooms, {
       restoreFromHash: true,
@@ -2330,6 +2465,7 @@ function applySharedSequence(sequence, {
   });
   setConstellationWeave(weaveEnabled, { syncUrl: false });
   setMeteorShowerEnabled(meteorEnabled, { syncUrl: false });
+  setAfterimageEnabled(afterimageModeEnabled, { syncUrl: false });
   setSignalChorusEnabled(chorusEnabled, { syncUrl: false });
   logField(logMessage, status ?? `${sourceMode === 'broadcast' ? 'daily signal tuned' : 'shared garden loaded'}: ${blooms.length} blooms • ${currentWeatherPreset.label}`);
   suppressHashSync = false;
@@ -2337,7 +2473,7 @@ function applySharedSequence(sequence, {
   return true;
 }
 
-function loadDailyBroadcast(key = getUtcDateKey(), { replay = false, weaveEnabled = constellationWeaveEnabled, meteorEnabled = meteorShowerEnabled, chorusEnabled = signalChorusEnabled } = {}) {
+function loadDailyBroadcast(key = getUtcDateKey(), { replay = false, weaveEnabled = constellationWeaveEnabled, meteorEnabled = meteorShowerEnabled, afterimageEnabled: afterimageModeEnabled = afterimageEnabled, chorusEnabled = signalChorusEnabled } = {}) {
   if (!isBroadcastKey(key)) return false;
 
   const blooms = buildDailyGarden(key);
@@ -2352,6 +2488,7 @@ function loadDailyBroadcast(key = getUtcDateKey(), { replay = false, weaveEnable
     broadcastKey: key,
     weaveEnabled,
     meteorEnabled,
+    afterimageEnabled: afterimageModeEnabled,
     chorusEnabled,
     logMessage: `${pick(transmissions.daily).replace('{date}', key)} Weather report: ${weatherPreset.label}.`,
     status: `daily signal tuned: ${blooms.length} blooms`,
@@ -2365,6 +2502,7 @@ function parseHashState() {
   const params = new URLSearchParams(hash);
   const weaveEnabled = params.get('weave') === '1' || params.get('weave') === 'true';
   const meteorEnabled = params.get('meteor') === '1' || params.get('meteor') === 'true';
+  const afterimageEnabled = params.get('afterimage') === '1' || params.get('afterimage') === 'true' || params.get('afterimages') === '1' || params.get('afterimages') === 'true';
   const chorusEnabled = params.get('chorus') === '1' || params.get('chorus') === 'true' || params.get('harmony') === '1' || params.get('harmony') === 'true';
 
   if (params.has('broadcast')) {
@@ -2373,6 +2511,7 @@ function parseHashState() {
       broadcastKey: params.get('broadcast')?.trim() ?? '',
       weaveEnabled,
       meteorEnabled,
+      afterimageEnabled,
       chorusEnabled,
     };
   }
@@ -2384,15 +2523,17 @@ function parseHashState() {
       weatherId: params.get('weather')?.trim() ?? '',
       weaveEnabled,
       meteorEnabled,
+      afterimageEnabled,
       chorusEnabled,
     };
   }
 
-  if (weaveEnabled || meteorEnabled || chorusEnabled) {
+  if (weaveEnabled || meteorEnabled || afterimageEnabled || chorusEnabled) {
     return {
       type: 'modes',
       weaveEnabled,
       meteorEnabled,
+      afterimageEnabled,
       chorusEnabled,
     };
   }
@@ -2408,6 +2549,7 @@ function loadGardenFromHash({ replay = false } = {}) {
     suppressHashSync = true;
     setConstellationWeave(parsed.weaveEnabled, { syncUrl: false });
     setMeteorShowerEnabled(parsed.meteorEnabled, { syncUrl: false });
+    setAfterimageEnabled(parsed.afterimageEnabled, { syncUrl: false });
     setSignalChorusEnabled(parsed.chorusEnabled, { syncUrl: false });
     suppressHashSync = false;
     syncShareState();
@@ -2415,7 +2557,7 @@ function loadGardenFromHash({ replay = false } = {}) {
   }
 
   if (parsed.type === 'broadcast') {
-    return loadDailyBroadcast(parsed.broadcastKey, { replay, weaveEnabled: parsed.weaveEnabled, meteorEnabled: parsed.meteorEnabled, chorusEnabled: parsed.chorusEnabled });
+    return loadDailyBroadcast(parsed.broadcastKey, { replay, weaveEnabled: parsed.weaveEnabled, meteorEnabled: parsed.meteorEnabled, afterimageEnabled: parsed.afterimageEnabled, chorusEnabled: parsed.chorusEnabled });
   }
 
   if (parsed.type !== 'garden') return false;
@@ -2431,6 +2573,7 @@ function loadGardenFromHash({ replay = false } = {}) {
     hashShareMode: 'garden',
     weaveEnabled: parsed.weaveEnabled,
     meteorEnabled: parsed.meteorEnabled,
+    afterimageEnabled: parsed.afterimageEnabled,
     chorusEnabled: parsed.chorusEnabled,
     logMessage: pick(transmissions.loaded),
     status: `shared garden loaded: ${blooms.length} blooms • ${getWeatherPresetById(parsed.weatherId || DEFAULT_WEATHER_ID).label}`,
@@ -2492,6 +2635,7 @@ dailySignalBtn.addEventListener('click', () => {
 cycleWeatherBtn?.addEventListener('click', cycleWeatherMode);
 toggleWeaveBtn?.addEventListener('click', toggleConstellationWeave);
 toggleMeteorBtn?.addEventListener('click', toggleMeteorShower);
+toggleAfterimageBtn?.addEventListener('click', toggleAfterimageField);
 toggleHarmonyBtn?.addEventListener('click', toggleHarmonyField);
 
 highlightsGridEl?.addEventListener('click', (event) => {
@@ -2569,6 +2713,10 @@ document.addEventListener('keydown', (event) => {
   if (event.key.toLowerCase() === 'm' && !event.metaKey && !event.ctrlKey && !event.altKey) {
     event.preventDefault();
     toggleMeteorShower();
+  }
+  if (event.key.toLowerCase() === 'a' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    event.preventDefault();
+    toggleAfterimageField();
   }
   if (event.key.toLowerCase() === 'h' && !event.metaKey && !event.ctrlKey && !event.altKey) {
     event.preventDefault();
