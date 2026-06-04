@@ -378,6 +378,10 @@ h1 { margin: 0; font-size: clamp(2.4rem, 5vw, 5rem); line-height: 0.95; }
 .control-group--secondary .control-row button {
   flex: 0 1 auto;
 }
+
+.control-group--modes .control-row button {
+  flex: 1 1 10rem;
+}
 button {
   border: 1px solid var(--button-line);
   background: var(--button-fill);
@@ -492,6 +496,81 @@ button[aria-pressed="true"] {
     0 0 0 1px rgba(255, 255, 255, 0.16),
     0 0 18px rgba(255, 255, 255, 0.24),
     0 0 32px rgba(195, 214, 255, 0.3);
+}
+
+.mode-toggle--chorus {
+  position: relative;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--weather-accent-1) 60%, var(--button-line));
+  background:
+    linear-gradient(180deg, rgba(8, 24, 28, 0.92), rgba(5, 14, 20, 0.9)),
+    linear-gradient(135deg, rgba(112, 255, 220, 0.18), rgba(123, 234, 255, 0.06) 42%, rgba(183, 255, 94, 0.08));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 14px 32px rgba(0, 0, 0, 0.16);
+}
+
+.mode-toggle--chorus::before,
+.mode-toggle--chorus::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.mode-toggle--chorus::before {
+  inset: -50% -18% auto;
+  height: 132%;
+  background:
+    radial-gradient(circle at 34% 50%, rgba(112, 255, 220, 0.18), transparent 28%),
+    radial-gradient(circle at 68% 44%, rgba(183, 255, 94, 0.16), transparent 24%),
+    linear-gradient(120deg, transparent 26%, rgba(255, 255, 255, 0.14) 48%, transparent 70%);
+  opacity: 0.56;
+  transform: translateX(-14%) rotate(8deg);
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+
+.mode-toggle--chorus::after {
+  right: 15px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.92), rgba(112, 255, 220, 0.34) 44%, transparent 72%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 0 16px rgba(112, 255, 220, 0.3),
+    0 0 28px rgba(183, 255, 94, 0.18);
+  transform: translateY(-50%);
+  opacity: 0.9;
+}
+
+.mode-toggle--chorus:hover:not(:disabled)::before,
+.mode-toggle--chorus[aria-pressed="true"]::before {
+  opacity: 0.92;
+  transform: translateX(10%) rotate(4deg);
+}
+
+.mode-toggle--chorus[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--weather-accent-1) 68%, white);
+  background:
+    linear-gradient(180deg, rgba(8, 34, 36, 0.98), rgba(4, 16, 20, 0.94)),
+    linear-gradient(135deg, rgba(112, 255, 220, 0.22), rgba(183, 255, 94, 0.12) 44%, rgba(123, 212, 255, 0.1));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0 24px rgba(112, 255, 220, 0.24),
+    0 0 42px rgba(183, 255, 94, 0.16);
+}
+
+.mode-toggle--chorus[aria-pressed="true"]::after {
+  width: 14px;
+  height: 14px;
+  opacity: 1;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 0 18px rgba(112, 255, 220, 0.32),
+    0 0 34px rgba(183, 255, 94, 0.24);
 }
 
 .stage-wrap { margin-top: 18px; }
@@ -734,6 +813,26 @@ button[aria-pressed="true"] {
 .hud-tile--afterimage strong {
   color: color-mix(in srgb, var(--text) 90%, var(--accent-soft));
   text-shadow: 0 0 16px rgba(195, 214, 255, 0.15);
+}
+
+.hud-tile--chorus {
+  border-color: color-mix(in srgb, var(--weather-accent-1) 56%, var(--line));
+  background:
+    linear-gradient(180deg, rgba(10, 26, 26, 0.9), rgba(5, 13, 18, 0.78)),
+    linear-gradient(135deg, rgba(112, 255, 220, 0.1), rgba(123, 212, 255, 0.08) 46%, rgba(183, 255, 94, 0.08));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 18px 36px rgba(0, 0, 0, 0.18);
+}
+
+.hud-tile--chorus strong {
+  color: color-mix(in srgb, var(--text) 88%, var(--weather-accent-1));
+  text-shadow: 0 0 16px rgba(112, 255, 220, 0.16);
+}
+
+.hud-tile--chorus .hud-tile-kicker {
+  color: color-mix(in srgb, var(--muted) 82%, var(--weather-accent-1));
 }
 
 .hud-tile-kicker {
@@ -1424,6 +1523,7 @@ button[aria-pressed="true"] {
     gap: 8px;
   }
   .control-group--primary .control-row button,
+  .control-group--modes .control-row button,
   .control-group--secondary .control-row button {
     flex: 1 1 100%;
   }

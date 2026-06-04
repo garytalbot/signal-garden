@@ -242,6 +242,9 @@ const ARCHIVE_DAYS = 12;
 const ARCHIVE_PREVIEW_WIDTH = 320;
 const ARCHIVE_PREVIEW_HEIGHT = 240;
 const BROADCAST_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const CRITTER_HALO_STYLE_ID = 'critter-halo-inline-styles';
+const CRITTER_HALO_MIN = 3;
+const CRITTER_HALO_MAX = 6;
 const GALLERY_HIGHLIGHTS = [
   {
     id: 'midnight-promenade',
@@ -684,17 +687,8 @@ function syncAfterimageUi() {
     toggleAfterimageBtn.textContent = afterimageEnabled ? 'afterimages: on' : 'afterimages: off';
     toggleAfterimageBtn.setAttribute('aria-pressed', String(afterimageEnabled));
     toggleAfterimageBtn.title = afterimageEnabled
-      ? 'Quiet the ghost bloom afterimages.'
-      : 'Wake the phosphor afterimages that trail recent blooms.';
-  }
-
-  if (toggleHarmonyBtn) {
-    toggleHarmonyBtn.hidden = true;
-  }
-
-  if (harmonyModeEl) {
-    const legacyHudTile = harmonyModeEl.closest('.hud-tile');
-    if (legacyHudTile) legacyHudTile.hidden = true;
+      ? 'Quiet the afterimages.'
+      : 'Wake the afterimages that trail recent blooms and cursor motion.';
   }
 
   renderAfterimageState();
@@ -710,11 +704,11 @@ function syncHarmonyUi() {
   }
 
   if (toggleHarmonyBtn) {
-    toggleHarmonyBtn.textContent = signalChorusEnabled ? 'afterimages: on' : 'afterimages: off';
+    toggleHarmonyBtn.textContent = signalChorusEnabled ? 'signal chorus: on' : 'signal chorus: off';
     toggleHarmonyBtn.setAttribute('aria-pressed', String(signalChorusEnabled));
     toggleHarmonyBtn.title = signalChorusEnabled
-      ? 'Quiet the living afterimages.'
-      : 'Wake the hidden afterimage trail into motion.';
+      ? 'Quiet the living signal chorus.'
+      : 'Wake the hidden signal overlay into a living chorus.';
   }
 }
 
@@ -739,6 +733,10 @@ function renderAfterimageState() {
   if (!stage) return;
   stage.dataset.afterimage = String(afterimageEnabled);
   stage.dataset.afterimages = String(afterimageEnabled);
+}
+
+function getAfterimageLabel() {
+  return afterimageEnabled ? 'afterimages on' : 'afterimages off';
 }
 
 function setWeatherPreset(weatherId, options = {}) {
@@ -794,6 +792,122 @@ function getCritterSeed() {
   return `signal-garden:critter:${anchor}`;
 }
 
+function getCritterHaloSeed() {
+  const lastSpec = bloomHistory[bloomHistory.length - 1];
+  const anchor = lastSpec
+    ? `${lastSpec.adjectiveIndex}:${lastSpec.nounIndex}:${lastSpec.accentIndex}:${Math.round(lastSpec.x)}:${Math.round(lastSpec.y)}:${bloomHistory.length}`
+    : `${fieldSourceMode}:${currentBroadcastKey ?? 'open'}:${currentWeatherPreset.id}:empty`;
+  return `signal-garden:critter-halo:${currentWeatherPreset.id}:${anchor}`;
+}
+
+function ensureCritterHaloStyles() {
+  if (document.getElementById(CRITTER_HALO_STYLE_ID)) return;
+
+  const style = document.createElement('style');
+  style.id = CRITTER_HALO_STYLE_ID;
+  style.textContent = `
+    .garden-critter .critter-halo {
+      position: absolute;
+      inset: -30px;
+      pointer-events: none;
+      border-radius: 999px;
+      opacity: 0;
+      transition: opacity 180ms ease, transform 220ms ease, filter 220ms ease;
+      mix-blend-mode: screen;
+      filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.12));
+    }
+
+    .garden-critter[data-visible="true"] .critter-halo {
+      opacity: 1;
+    }
+
+    .garden-critter[data-inspecting="true"] .critter-halo {
+      transform: translateY(-1px) scale(1.02);
+      filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.18));
+    }
+
+    .garden-critter .critter-firefly {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: var(--firefly-size, 6px);
+      height: var(--firefly-size, 6px);
+      border-radius: 999px;
+      transform: translate(-50%, -50%) translate3d(var(--firefly-x, 0px), var(--firefly-y, 0px), 0) scale(var(--firefly-scale, 1));
+      opacity: var(--firefly-opacity, 0.6);
+      animation:
+        critter-firefly-drift var(--firefly-duration, 6s) ease-in-out infinite,
+        critter-firefly-flicker var(--firefly-flicker, 1.9s) steps(2, end) infinite;
+      animation-delay: var(--firefly-delay, 0s);
+      background:
+        radial-gradient(circle at 38% 34%, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.36) 24%, transparent 30%),
+        radial-gradient(circle, var(--firefly-glow, rgba(255, 255, 255, 0.68)), transparent 72%);
+      box-shadow:
+        0 0 10px var(--firefly-glow, rgba(255, 255, 255, 0.68)),
+        0 0 18px color-mix(in srgb, var(--firefly-glow, rgba(255, 255, 255, 0.68)) 58%, transparent);
+    }
+
+    .garden-critter .critter-firefly::after {
+      content: "";
+      position: absolute;
+      inset: -80%;
+      border-radius: inherit;
+      background: radial-gradient(circle, var(--firefly-glow, rgba(255, 255, 255, 0.52)) 0%, transparent 66%);
+      opacity: 0.22;
+      filter: blur(1px);
+    }
+
+    @keyframes critter-firefly-drift {
+      0%, 100% {
+        transform: translate(-50%, -50%) translate3d(var(--firefly-x, 0px), var(--firefly-y, 0px), 0) scale(var(--firefly-scale, 1));
+      }
+      50% {
+        transform: translate(-50%, -50%) translate3d(calc(var(--firefly-x, 0px) * 1.18), calc(var(--firefly-y, 0px) * 0.84), 0) scale(calc(var(--firefly-scale, 1) * 1.12));
+      }
+    }
+
+    @keyframes critter-firefly-flicker {
+      0%, 100% { opacity: calc(var(--firefly-opacity, 0.6) * 0.92); }
+      50% { opacity: calc(var(--firefly-opacity, 0.6) * 1.18); }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function buildCritterHalo({ bodyHue, ringHue } = {}) {
+  const rng = makeSeededRandom(getCritterHaloSeed());
+  const fireflyCount = Math.max(CRITTER_HALO_MIN, Math.min(CRITTER_HALO_MAX, CRITTER_HALO_MIN + Math.floor(rand(0, 4, rng))));
+  const halo = [];
+
+  for (let index = 0; index < fireflyCount; index += 1) {
+    const angle = rand(0, Math.PI * 2, rng) + index * 0.72;
+    const orbitX = rand(16, 42, rng) * Math.cos(angle);
+    const orbitY = rand(10, 24, rng) * Math.sin(angle) - rand(4, 14, rng);
+    const size = round1(rand(4.2, 7.4, rng));
+    const opacity = round1(rand(0.38, 0.74, rng));
+    const duration = round1(rand(4.2, 7.8, rng));
+    const delay = round1(rand(0, 1.8, rng));
+    const flicker = round1(rand(1.2, 2.6, rng));
+    const accentIndex = Math.floor(rand(0, ACCENT_SLOT_COUNT, rng));
+    const accent = getAccentColor(accentIndex, currentWeatherPreset);
+    const tint = index % 2 === 0 ? bodyHue : ringHue;
+
+    halo.push({
+      x: round1(orbitX),
+      y: round1(orbitY),
+      size,
+      opacity,
+      duration,
+      delay,
+      flicker,
+      glow: index % 3 === 0 ? accent : tint,
+      scale: round1(rand(0.82, 1.16, rng)),
+    });
+  }
+
+  return halo;
+}
+
 function buildCritterSpec() {
   const rng = makeSeededRandom(getCritterSeed());
   const adjectiveIndex = Math.floor(rand(0, adjectives.length, rng));
@@ -810,6 +924,7 @@ function buildCritterSpec() {
   const blink = rand(2.8, 5.6, rng);
   const mood = critterMoods[Math.floor(rand(0, critterMoods.length, rng))];
   const title = `${adjectives[adjectiveIndex]} ${critterTitles[titleIndex]}`;
+  const halo = buildCritterHalo({ bodyHue, ringHue });
 
   return {
     title,
@@ -823,6 +938,7 @@ function buildCritterSpec() {
     bodyHue,
     ringHue,
     blink: Number(blink.toFixed(2)),
+    halo,
   };
 }
 
@@ -836,10 +952,12 @@ function updateCritterUi() {
   if (residentMoodEl) residentMoodEl.textContent = critterMood;
   if (!gardenCritterEl) return;
 
+  ensureCritterHaloStyles();
   gardenCritterEl.hidden = !hasBlooms;
   gardenCritterEl.disabled = !hasBlooms;
   gardenCritterEl.setAttribute('aria-label', hasBlooms ? `${critterName}, ${critterMood}` : 'Garden resident is waiting');
   gardenCritterEl.dataset.visible = String(hasBlooms);
+  gardenCritterEl.dataset.inspecting = 'false';
   gardenCritterEl.style.setProperty('--critter-x', `${currentCritterSpec.laneX}%`);
   gardenCritterEl.style.setProperty('--critter-y', `${currentCritterSpec.laneY}%`);
   gardenCritterEl.style.setProperty('--critter-scale', String(currentCritterSpec.scale));
@@ -849,7 +967,15 @@ function updateCritterUi() {
   gardenCritterEl.style.setProperty('--critter-body', currentCritterSpec.bodyHue);
   gardenCritterEl.style.setProperty('--critter-ring', currentCritterSpec.ringHue);
   gardenCritterEl.style.setProperty('--critter-blink', `${currentCritterSpec.blink}s`);
+  const haloMarkup = (currentCritterSpec.halo || []).map((firefly) => `
+    <span
+      class="critter-firefly"
+      aria-hidden="true"
+      style="--firefly-x: ${firefly.x}px; --firefly-y: ${firefly.y}px; --firefly-size: ${firefly.size}px; --firefly-opacity: ${firefly.opacity}; --firefly-duration: ${firefly.duration}s; --firefly-delay: ${firefly.delay}s; --firefly-flicker: ${firefly.flicker}s; --firefly-scale: ${firefly.scale}; --firefly-glow: ${firefly.glow};"
+    ></span>
+  `).join('');
   gardenCritterEl.innerHTML = `
+    <span class="critter-halo" aria-hidden="true">${haloMarkup}</span>
     <span class="critter-body">
       <span class="critter-orbit"></span>
       <span class="critter-eye critter-eye-a"></span>
@@ -991,8 +1117,8 @@ function syncControls() {
   else stage.removeAttribute('data-empty');
 
   hintEl.textContent = disabled
-    ? 'Move your cursor to aim a bloom. Click to plant. Press U to undo. Press A for afterimages. Press H to wake the signal chorus.'
-    : 'Click to plant. Press U to undo the last bloom. Press C to toggle constellations. Press M to toggle the meteor shower. Press A to toggle afterimages. Press H to toggle the signal chorus. Press W to switch weather when the field is yours.';
+    ? 'Move your cursor to aim a bloom. Click to plant. Press U to undo. Press A for afterimages.'
+    : 'Click to plant. Press U to undo the last bloom. Press C to toggle constellations. Press M to toggle the meteor shower. Press A to toggle afterimages. Press W to switch weather when the field is yours.';
 
   syncWeaveUi();
   syncMeteorUi();
@@ -1380,13 +1506,13 @@ function spawnAfterimageGhosts(spec, priorPoint = null) {
   const driftY = spec.y - basePoint.y;
   const echoes = priorPoint
     ? [
-      { offset: 0.18, opacity: 0.24, scale: 0.98, blur: 0.7, life: 1900 },
-      { offset: 0.36, opacity: 0.16, scale: 0.94, blur: 1, life: 2300 },
-      { offset: 0.56, opacity: 0.1, scale: 0.9, blur: 1.4, life: 2700 },
+      { offset: 0.16, opacity: 0.2, scale: 0.98, blur: 0.8, life: 2900 },
+      { offset: 0.34, opacity: 0.13, scale: 0.94, blur: 1.1, life: 3600 },
+      { offset: 0.54, opacity: 0.08, scale: 0.9, blur: 1.5, life: 4400 },
     ]
     : [
-      { offset: 0.1, opacity: 0.18, scale: 0.97, blur: 0.7, life: 1700 },
-      { offset: 0.28, opacity: 0.11, scale: 0.93, blur: 1.1, life: 2100 },
+      { offset: 0.08, opacity: 0.16, scale: 0.97, blur: 0.8, life: 2500 },
+      { offset: 0.24, opacity: 0.1, scale: 0.93, blur: 1.15, life: 3300 },
     ];
 
   echoes.forEach((echo, index) => {
@@ -1403,7 +1529,7 @@ function spawnAfterimageGhosts(spec, priorPoint = null) {
     ghost.style.pointerEvents = 'none';
     ghost.style.mixBlendMode = 'screen';
     ghost.style.filter = `blur(${echo.blur}px) saturate(0.7)`;
-    ghost.style.transition = 'opacity 1.8s ease-out, transform 1.8s ease-out, filter 1.8s ease-out';
+    ghost.style.transition = 'opacity 2.8s ease-out, transform 2.8s ease-out, filter 2.8s ease-out';
     ghost.style.setProperty('--accent', getAccentToken(spec.accentIndex));
     ghost.style.setProperty('--stem-height', `${spec.stemHeight}px`);
     ghost.style.setProperty('--ring-a', `${spec.ringA}px`);
@@ -1455,7 +1581,7 @@ function stampAfterimageCursorGhost(x, y, accentIndex = 0, priorPoint = null) {
   ghost.style.pointerEvents = 'none';
   ghost.style.mixBlendMode = 'screen';
   ghost.style.filter = 'blur(1.2px) saturate(0.72)';
-  ghost.style.transition = 'opacity 1.5s ease-out, transform 1.5s ease-out, filter 1.5s ease-out';
+  ghost.style.transition = 'opacity 2.2s ease-out, transform 2.2s ease-out, filter 2.2s ease-out';
   ghost.style.setProperty('--accent', getAccentToken(accentIndex));
   ghost.style.setProperty('--stem-height', '42px');
   ghost.style.setProperty('--ring-a', '44px');
@@ -1476,7 +1602,7 @@ function stampAfterimageCursorGhost(x, y, accentIndex = 0, priorPoint = null) {
     ghost.style.transform = 'translate(-50%, -78%) translate(0px, 0px) scale(0.72)';
   });
 
-  window.setTimeout(() => ghost.remove(), 1900);
+  window.setTimeout(() => ghost.remove(), 2600);
 }
 
 function recordAfterimageCursorPoint(x, y, accentIndex = 0, { stampGhost = false, priorPoint = null } = {}) {
@@ -1691,7 +1817,7 @@ function setSignalChorusEnabled(nextEnabled, { syncUrl = true, logMessage = null
   renderSignalOverlay();
 
   if (logMessage) {
-    logField(logMessage, signalChorusEnabled ? 'afterimages on' : 'afterimages off');
+    logField(logMessage, signalChorusEnabled ? 'signal chorus on' : 'signal chorus off');
   }
 
   if (syncUrl) syncShareState();
@@ -1710,7 +1836,7 @@ function toggleAfterimageField() {
   const nextEnabled = !afterimageEnabled;
   setAfterimageEnabled(nextEnabled, {
     logMessage: nextEnabled
-      ? 'The blooms started leaving afterimages behind, like phosphor trapped in glass.'
+      ? 'The blooms started leaving afterimages behind, like screen burn-in in glass.'
       : 'The afterimages faded out and the field went plain again.',
   });
 }
@@ -1728,8 +1854,8 @@ function toggleHarmonyField() {
   const nextEnabled = !signalChorusEnabled;
   setSignalChorusEnabled(nextEnabled, {
     logMessage: nextEnabled
-      ? 'The afterimage field woke up and started ring-singing through the blooms.'
-      : 'The afterimage field settled back into the dirt and went quiet.',
+      ? 'The signal chorus woke up and started ring-singing through the blooms.'
+      : 'The signal chorus settled back into the dirt and went quiet.',
   });
 }
 
@@ -1825,8 +1951,10 @@ function buildExportSvg() {
   const weatherLabel = escapeXml(currentWeatherPreset.label.toUpperCase());
   const sourceLabel = escapeXml(sourceLabelEl.textContent || 'open field');
   const exportTheme = currentWeatherPreset.export;
-  const skyModeLabel = meteorShowerEnabled ? 'meteor shower on' : 'meteor shower off';
-  const signalModeLabel = signalChorusEnabled ? 'signal chorus on' : 'signal chorus off';
+  const now = performance.now();
+  pruneAfterimageCursorTrail(now);
+  const afterimageModeLabel = getAfterimageLabel();
+  const afterimageBadgeLabel = afterimageModeLabel;
   const lastBloom = bloomHistory[bloomHistory.length - 1] ?? null;
   const lastBloomName = lastBloom
     ? escapeXml(makeNameFromIndexes(lastBloom.adjectiveIndex, lastBloom.nounIndex))
@@ -1842,10 +1970,10 @@ function buildExportSvg() {
   );
   const gardenSubtitle = escapeXml(
     fieldSourceMode === 'broadcast' && currentBroadcastKey
-      ? `UTC broadcast ${currentBroadcastKey} • ${bloomHistory.length} blooms`
-      : `${bloomHistory.length} blooms • weather set to ${currentWeatherPreset.label}`
+      ? `UTC broadcast ${currentBroadcastKey} • ${bloomHistory.length} blooms • ${afterimageModeLabel}`
+      : `${bloomHistory.length} blooms • weather set to ${currentWeatherPreset.label} • ${afterimageModeLabel}`
   );
-  const footerCopy = escapeXml(`signal.garden • ${fieldSourceMode === 'broadcast' && currentBroadcastKey ? currentBroadcastKey : 'portable field'}`);
+  const footerCopy = escapeXml(`signal.garden • ${fieldSourceMode === 'broadcast' && currentBroadcastKey ? currentBroadcastKey : 'portable field'} • ${afterimageModeLabel}`);
   const skyModeBadgeWidth = Math.min(178, Math.max(132, width - 272));
   const skyModeBadgeX = Math.max(16, width - skyModeBadgeWidth - 64);
   const summaryItems = [
@@ -1853,8 +1981,7 @@ function buildExportSvg() {
     { label: 'SOURCE', value: sourceLabel },
     { label: 'LAST BLOOM', value: lastBloomName },
     { label: 'COUNT', value: String(bloomHistory.length) },
-    { label: 'AFTERIMAGES', value: afterimageEnabled ? 'ON' : 'OFF' },
-    { label: 'SIGNAL', value: escapeXml(signalModeLabel.toUpperCase()) },
+    { label: 'AFTERIMAGE', value: escapeXml(afterimageModeLabel.toUpperCase()) },
   ];
 
   const links = bloomHistory.slice(1).map((spec, index) => {
@@ -1890,10 +2017,17 @@ function buildExportSvg() {
     }).join('')
     : '';
 
+  const afterimageSlice = bloomHistory.slice(-10);
+  const afterimageSliceStart = bloomHistory.length - afterimageSlice.length;
+
   const afterimageSegments = afterimageEnabled
-    ? bloomHistory.slice(-10).map((spec, index) => {
+    ? afterimageSlice.map((spec, index) => {
       const accent = getAccentColor(spec.accentIndex, currentWeatherPreset);
-      const previous = index > 0 ? bloomHistory[index - 1] : null;
+      const previous = index > 0
+        ? afterimageSlice[index - 1]
+        : afterimageSliceStart > 0
+          ? bloomHistory[afterimageSliceStart - 1]
+          : null;
       const driftX = previous ? spec.x - previous.x : 0;
       const driftY = previous ? spec.y - previous.y : 0;
       const echoes = previous
@@ -1920,6 +2054,28 @@ function buildExportSvg() {
           </g>
         `;
       }).join('');
+    }).join('')
+    : '';
+
+  const afterimageCursorSegments = afterimageEnabled
+    ? afterimageCursorTrail.map((point, index) => {
+      const previous = index > 0 ? afterimageCursorTrail[index - 1] : null;
+      const accent = getAccentColor(point.accentIndex, currentWeatherPreset);
+      const age = Math.max(0, now - point.at);
+      const fade = clamp(1 - age / 3600, 0.06, 0.38);
+      const trailWidth = Math.max(1, 2.8 - index * 0.08);
+      const radius = Math.max(4.5, 10 - index * 0.28);
+
+      return `
+        <g opacity="${fade.toFixed(2)}">
+          ${previous
+            ? `<line x1="${previous.x.toFixed(1)}" y1="${previous.y.toFixed(1)}" x2="${point.x.toFixed(1)}" y2="${point.y.toFixed(1)}" stroke="${accent}" stroke-width="${trailWidth.toFixed(2)}" stroke-linecap="round" stroke-dasharray="${Math.max(8, Math.round(Math.hypot(point.x - previous.x, point.y - previous.y) / 4))} ${Math.max(10, Math.round(Math.hypot(point.x - previous.x, point.y - previous.y) / 7))}" opacity="0.4"/>`
+            : ''
+          }
+          <circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="${radius.toFixed(1)}" fill="${accent}" opacity="0.7"/>
+          <circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="${(radius * 1.7).toFixed(1)}" fill="${accent}" opacity="0.12"/>
+        </g>
+      `;
     }).join('')
     : '';
 
@@ -1986,7 +2142,7 @@ function buildExportSvg() {
     : `<text x="36" y="48" fill="${exportTheme.muted}" font-size="14" font-family="Inter, system-ui, sans-serif">Your garden is empty. Plant the first signal.</text>`;
 
   const summaryMarkup = summaryItems.map((item, index) => {
-    const columnWidth = Math.max(140, Math.floor((width - 112) / summaryItems.length));
+    const columnWidth = Math.max(110, Math.floor((width - 112) / summaryItems.length));
     const x = 40 + columnWidth * index;
     return `
       <g transform="translate(${x} 32)">
@@ -2047,12 +2203,13 @@ function buildExportSvg() {
           <text x="${Math.max(220, width - 84)}" y="48" text-anchor="end" fill="${exportTheme.brand}" font-size="12" font-family="Inter, system-ui, sans-serif" letter-spacing="2">SIGNAL GARDEN</text>
           <g transform="translate(${skyModeBadgeX} 14)">
             <rect width="${skyModeBadgeWidth}" height="28" rx="999" ry="999" fill="${exportTheme.badgeFill}" stroke="${exportTheme.badgeStroke}"/>
-            <text x="${skyModeBadgeWidth / 2}" y="19" text-anchor="middle" fill="${exportTheme.brand}" font-size="10" font-family="Inter, system-ui, sans-serif" letter-spacing="2">${escapeXml(skyModeLabel.toUpperCase())}</text>
+            <text x="${skyModeBadgeWidth / 2}" y="19" text-anchor="middle" fill="${exportTheme.brand}" font-size="10" font-family="Inter, system-ui, sans-serif" letter-spacing="2">${escapeXml(afterimageBadgeLabel.toUpperCase())}</text>
           </g>
         </g>
         ${meteorSegments}
         ${weaveSegments}
         ${afterimageSegments}
+        ${afterimageCursorSegments}
         ${signalChorusSegments}
         ${links}
         ${blooms}
@@ -2069,7 +2226,7 @@ function buildExportSvg() {
 
 function makePostcardFilename() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  return `signal-garden-${currentWeatherPreset.id}${meteorShowerEnabled ? '-meteor' : ''}${signalChorusEnabled ? '-chorus' : ''}-${timestamp}.png`;
+  return `signal-garden-${currentWeatherPreset.id}${constellationWeaveEnabled ? '-weave' : ''}${meteorShowerEnabled ? '-meteor' : ''}${afterimageEnabled ? '-afterimages' : ''}-${timestamp}.png`;
 }
 
 async function renderGardenPngBlob() {
@@ -2134,7 +2291,7 @@ async function exportGardenPng() {
 
     exportPngBtn.dataset.state = 'done';
     exportPngBtn.textContent = 'PNG exported';
-    logField('Garden export complete. The field has been pressed into a labeled weather postcard.', signalChorusEnabled ? 'afterimage postcard ready' : meteorShowerEnabled ? 'meteor postcard ready' : 'png ready');
+    logField('Garden export complete. The field has been pressed into a labeled weather postcard.', afterimageEnabled ? 'afterimages postcard ready' : signalChorusEnabled ? 'chorus postcard ready' : meteorShowerEnabled ? 'meteor postcard ready' : 'png ready');
     window.clearTimeout(exportToastTimer);
     exportToastTimer = window.setTimeout(() => {
       exportPngBtn.dataset.state = 'idle';
@@ -2161,7 +2318,7 @@ async function shareGardenPostcard() {
     const pngBlob = await renderGardenPngBlob();
     const filename = makePostcardFilename();
     const shareUrl = makeShareUrl();
-    const shareText = `Signal Garden • ${currentWeatherPreset.label} • ${bloomHistory.length} blooms • ${meteorShowerEnabled ? 'meteor shower on' : 'meteor shower off'} • ${signalChorusEnabled ? 'afterimages on' : 'afterimages off'}`;
+    const shareText = `Signal Garden • ${currentWeatherPreset.label} • ${bloomHistory.length} blooms • ${describeModeStack()}`;
     const postcardFile = new File([pngBlob], filename, { type: 'image/png' });
     const sharePayload = {
       title: 'Signal Garden postcard',
@@ -2175,13 +2332,13 @@ ${shareUrl}`,
       await navigator.share(sharePayload);
       sharePostcardBtn.dataset.state = 'done';
       sharePostcardBtn.textContent = 'postcard shared';
-      logField('Postcard shared with the full garden attached. Extremely portable weather.', signalChorusEnabled ? `postcard shared • ${currentWeatherPreset.label} • afterimage` : meteorShowerEnabled ? `postcard shared • ${currentWeatherPreset.label} • meteor` : `postcard shared • ${currentWeatherPreset.label}`);
+      logField('Postcard shared with the full garden attached. Extremely portable weather.', afterimageEnabled ? `postcard shared • ${currentWeatherPreset.label} • afterimages` : signalChorusEnabled ? `postcard shared • ${currentWeatherPreset.label} • chorus` : meteorShowerEnabled ? `postcard shared • ${currentWeatherPreset.label} • meteor` : `postcard shared • ${currentWeatherPreset.label}`);
     } else {
       downloadBlob(pngBlob, filename);
       await copyTextToClipboard(shareUrl, 'Copy this Signal Garden postcard link:');
       sharePostcardBtn.dataset.state = 'done';
       sharePostcardBtn.textContent = 'saved + link copied';
-      logField('Native share skipped the party, so the postcard was downloaded and the matching link copied instead.', meteorShowerEnabled ? 'postcard saved locally • meteor' : 'postcard saved locally');
+      logField('Native share skipped the party, so the postcard was downloaded and the matching link copied instead.', afterimageEnabled ? 'postcard saved locally • afterimages' : signalChorusEnabled ? 'postcard saved locally • chorus' : meteorShowerEnabled ? 'postcard saved locally • meteor' : 'postcard saved locally');
     }
 
     window.clearTimeout(sharePostcardBtn.copyStateTimer);
@@ -2699,7 +2856,6 @@ function describeModeStack() {
     `constellations ${constellationWeaveEnabled ? 'on' : 'off'}`,
     `meteor shower ${meteorShowerEnabled ? 'on' : 'off'}`,
     `afterimages ${afterimageEnabled ? 'on' : 'off'}`,
-    `signal chorus ${signalChorusEnabled ? 'on' : 'off'}`,
   ].join(' • ');
 }
 
@@ -2855,8 +3011,11 @@ document.addEventListener('keydown', (event) => {
 gardenCritterEl?.addEventListener('click', () => {
   if (!currentCritterSpec || !bloomHistory.length) return;
   gardenCritterEl.dataset.bumped = 'true';
-  window.setTimeout(() => {
+  gardenCritterEl.dataset.inspecting = 'true';
+  window.clearTimeout(gardenCritterEl.inspectTimer);
+  gardenCritterEl.inspectTimer = window.setTimeout(() => {
     gardenCritterEl.dataset.bumped = 'false';
+    gardenCritterEl.dataset.inspecting = 'false';
   }, 520);
 
   const specimen = bloomHistory[bloomHistory.length - 1];
