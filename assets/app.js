@@ -303,6 +303,7 @@ let signalOverlayFlashGroup = null;
 let signalOverlayChorusGroup = null;
 let signalCursorPoint = null;
 let signalChorusFrame = null;
+let signalChorusVisibilityBound = false;
 const AFTERIMAGE_GHOST_LIMIT = 24;
 const AFTERIMAGE_CURSOR_LIMIT = 18;
 
@@ -606,6 +607,7 @@ function buildSignalChorusLayout({ width = stage?.clientWidth ?? CANONICAL_STAGE
 
 function startSignalChorusLoop() {
   if (signalChorusFrame !== null) return;
+  if (document.hidden) return;
 
   const tick = () => {
     if (!signalChorusEnabled) {
@@ -625,6 +627,20 @@ function stopSignalChorusLoop() {
     window.cancelAnimationFrame(signalChorusFrame);
     signalChorusFrame = null;
   }
+}
+
+function syncSignalChorusLoop() {
+  if (!signalChorusEnabled) {
+    stopSignalChorusLoop();
+    return;
+  }
+
+  if (document.hidden) {
+    stopSignalChorusLoop();
+    return;
+  }
+
+  startSignalChorusLoop();
 }
 
 function getIdleMood(preset = currentWeatherPreset) {
@@ -1812,8 +1828,7 @@ function setMeteorShowerEnabled(nextEnabled, { syncUrl = true, logMessage = null
 function setSignalChorusEnabled(nextEnabled, { syncUrl = true, logMessage = null } = {}) {
   signalChorusEnabled = Boolean(nextEnabled);
   syncHarmonyUi();
-  if (signalChorusEnabled) startSignalChorusLoop();
-  else stopSignalChorusLoop();
+  syncSignalChorusLoop();
   renderSignalOverlay();
 
   if (logMessage) {
@@ -3045,6 +3060,19 @@ document.addEventListener('keydown', (event) => {
     toggleHarmonyField();
   }
 });
+
+if (!signalChorusVisibilityBound) {
+  signalChorusVisibilityBound = true;
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopSignalChorusLoop();
+      return;
+    }
+
+    syncSignalChorusLoop();
+    if (signalChorusEnabled) renderSignalOverlay();
+  });
+}
 
 gardenCritterEl?.addEventListener('click', () => {
   if (!currentCritterSpec || !bloomHistory.length) return;
