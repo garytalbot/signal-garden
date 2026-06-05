@@ -163,8 +163,25 @@
             <button id="copyHerbarium" class="copy-button" data-action="copy" type="button">copy herbarium</button>
             <button id="exportHerbarium" class="copy-button" data-action="export" type="button">herbarium postcard</button>
           </div>
+          <div class="herbarium-filterbar" style="display:flex;flex-wrap:wrap;gap:.45rem;align-items:center;margin-top:.75rem;">
+            <span class="control-label">browse</span>
+            <button class="copy-button" data-herbarium-filter="all" type="button" aria-pressed="true">all</button>
+            <button class="copy-button" data-herbarium-filter="plants" type="button" aria-pressed="false">blooms</button>
+            <button class="copy-button" data-herbarium-filter="replays" type="button" aria-pressed="false">replay history</button>
+            <button class="copy-button" data-herbarium-filter="imports" type="button" aria-pressed="false">imports</button>
+            <button class="copy-button" data-herbarium-filter="resets" type="button" aria-pressed="false">resets</button>
+          </div>
         </div>
         <ol id="herbariumList" class="herbarium-list" aria-live="polite"></ol>
+      </article>
+      <article class="log-card">
+        <div class="log-head">
+          <div>
+            <h2>Pollen Atlas</h2>
+            <p>A side chamber for drifting pollen relics, seed dust, and browser-local grain memory. Open the atlas when you want the garden to feel more like a cabinet than a plot.</p>
+          </div>
+          <a class="copy-button" href="pollen-atlas/" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">open atlas</a>
+        </div>
       </article>
     </section>
   </main>

@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A self-contained Signal Garden chamber for studying drifting pollen relics, seed dust, and browser-local bloom memory.">
+  <title>Signal Garden Pollen Atlas</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #071018;
+      --bg-2: #0d1623;
+      --panel: rgba(11, 18, 29, 0.84);
+      --panel-soft: rgba(255, 255, 255, 0.04);
+      --line: rgba(174, 214, 255, 0.15);
+      --line-strong: rgba(174, 214, 255, 0.24);
+      --text: #eef6ff;
+      --muted: #9fb5ce;
+      --accent: #95ffcb;
+      --accent-2: #7ab8ff;
+      --accent-3: #ff92d6;
+      --shadow: rgba(0, 0, 0, 0.38);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 15% 18%, rgba(122, 184, 255, 0.12), transparent 30%),
+        radial-gradient(circle at 85% 15%, rgba(255, 146, 214, 0.11), transparent 28%),
+        radial-gradient(circle at 50% 88%, rgba(149, 255, 203, 0.09), transparent 30%),
+        linear-gradient(180deg, #050a11 0%, #07111b 46%, #050810 100%);
+      color: var(--text);
+      font: 400 16px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(rgba(255,255,255,0.03), rgba(255,255,255,0.01) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01) 1px, transparent 1px);
+      background-size: 100% 3px, 3px 100%;
+      opacity: 0.12;
+      mix-blend-mode: screen;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+
+    .shell {
+      position: relative;
+      z-index: 2;
+      width: min(1180px, calc(100vw - 40px));
+      margin: 20px auto;
+      min-height: calc(100vh - 40px);
+      display: grid;
+      grid-template-columns: minmax(320px, 1.15fr) minmax(320px, 0.85fr);
+      gap: 16px;
+      pointer-events: none;
+    }
+
+    .panel {
+      pointer-events: auto;
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      background: linear-gradient(180deg, rgba(11, 18, 29, 0.88), rgba(9, 12, 20, 0.74));
+      box-shadow:
+        0 22px 70px var(--shadow),
+        inset 0 1px 0 rgba(255,255,255,0.07);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .atlas {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 20px;
+    }
+
+    .eyebrow {
+      margin: 0;
+      color: var(--accent);
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 5vw, 64px);
+      line-height: 0.92;
+      letter-spacing: -0.06em;
+    }
+
+    .lede {
+      margin: 0;
+      max-width: 38ch;
+      color: var(--muted);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 12px;
+      background: var(--panel-soft);
+    }
+
+    .stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .stat strong {
+      display: block;
+      margin-top: 5px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .specimens {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    button {
+      font: inherit;
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+      padding: 12px 13px;
+      text-align: left;
+      cursor: pointer;
+      transition: transform 130ms ease, border-color 130ms ease, background 130ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(149, 255, 203, 0.5);
+      background: linear-gradient(180deg, rgba(149,255,203,0.10), rgba(255,255,255,0.03));
+    }
+
+    button.active {
+      border-color: rgba(122, 184, 255, 0.7);
+      box-shadow: inset 0 0 0 1px rgba(122, 184, 255, 0.2);
+    }
+
+    .specimens button strong,
+    .specimens button span {
+      display: block;
+    }
+
+    .specimens button strong {
+      font-size: 15px;
+      margin-bottom: 2px;
+    }
+
+    .specimens button span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .actions button {
+      text-align: center;
+      padding: 11px 14px;
+    }
+
+    .studio {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 20px;
+    }
+
+    .glass {
+      min-height: 350px;
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,0.11);
+      background:
+        radial-gradient(circle at 30% 22%, rgba(149,255,203,0.12), transparent 24%),
+        radial-gradient(circle at 74% 24%, rgba(122,184,255,0.12), transparent 22%),
+        radial-gradient(circle at 50% 70%, rgba(255,146,214,0.09), transparent 30%),
+        linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .glass::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.07) 24%, transparent 36%),
+        linear-gradient(180deg, rgba(255,255,255,0.04), transparent 28%, rgba(0,0,0,0.12));
+      mix-blend-mode: screen;
+      pointer-events: none;
+    }
+
+    .specimen-title {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 42px);
+      letter-spacing: -0.06em;
+      line-height: 0.95;
+      position: relative;
+      z-index: 1;
+    }
+
+    .caption {
+      margin: 10px 0 0;
+      color: var(--muted);
+      max-width: 42ch;
+      position: relative;
+      z-index: 1;
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .meta-card {
+      padding: 12px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+    }
+
+    .meta-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .meta-card strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .note {
+      margin: 0;
+      color: rgba(238,246,255,0.82);
+      font-size: 14px;
+    }
+
+    .footer {
+      margin-top: auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      color: rgba(238,246,255,0.72);
+      font-size: 13px;
+    }
+
+    .footer code {
+      padding: 3px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04);
+      color: var(--accent);
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 13px;
+      min-height: 1.5em;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04);
+    }
+
+    .chip b {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .glow {
+      color: var(--accent-3);
+    }
+
+    @media (max-width: 980px) {
+      html, body {
+        overflow: auto;
+      }
+
+      .shell {
+        width: min(760px, calc(100vw - 24px));
+        margin: 12px auto;
+        min-height: auto;
+        grid-template-columns: 1fr;
+        padding-bottom: 12px;
+      }
+
+      .glass {
+        min-height: 280px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .atlas, .studio {
+        padding: 16px;
+      }
+
+      .stats, .meta, .specimens {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="field" aria-hidden="true"></canvas>
+
+  <main class="shell">
+    <section class="panel atlas" aria-labelledby="title">
+      <p class="eyebrow">signal garden side chamber</p>
+      <h1 id="title">pollen atlas</h1>
+      <p class="lede">A browser-local cabinet of airborne relics. Pick a specimen, watch its dust drift through the glass, and let the room remember which bloom you touched last.</p>
+
+      <div class="stats" aria-live="polite">
+        <div class="stat"><span>specimens</span><strong id="specimenCount">0</strong></div>
+        <div class="stat"><span>current grain</span><strong id="currentGrain">—</strong></div>
+        <div class="stat"><span>drift</span><strong id="driftLabel">slow</strong></div>
+      </div>
+
+      <div class="specimens" id="specimenList" aria-label="pollen specimens"></div>
+
+      <div class="actions">
+        <button id="shuffleBtn" type="button">shuffle drift</button>
+        <button id="quietBtn" type="button">quiet the glass</button>
+        <button id="clearBtn" type="button">clear selection</button>
+      </div>
+
+      <p class="status" id="status">The cabinet is listening.</p>
+    </section>
+
+    <section class="panel studio" aria-labelledby="studioTitle">
+      <div class="glass" aria-live="polite">
+        <p class="eyebrow">specimen tray</p>
+        <h2 class="specimen-title" id="studioTitle">—</h2>
+        <p class="caption" id="studioCaption">Choose a grain from the atlas.</p>
+      </div>
+
+      <div class="meta">
+        <div class="meta-card"><span>family</span><strong id="familyLabel">—</strong></div>
+        <div class="meta-card"><span>season</span><strong id="seasonLabel">—</strong></div>
+        <div class="meta-card"><span>color note</span><strong id="colorLabel">—</strong></div>
+        <div class="meta-card"><span>memory tag</span><strong id="memoryLabel">—</strong></div>
+      </div>
+
+      <p class="note" id="noteText">Pollen is just a tiny passport that forgot where it was supposed to go.</p>
+
+      <div class="footer">
+        <span class="chip"><b>click</b> a grain</span>
+        <span class="chip"><b>space</b> shakes the tray</span>
+        <span class="chip"><b>r</b> recalls the last specimen</span>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('field');
+    const ctx = canvas.getContext('2d');
+    const specimenList = document.getElementById('specimenList');
+    const specimenCount = document.getElementById('specimenCount');
+    const currentGrain = document.getElementById('currentGrain');
+    const driftLabel = document.getElementById('driftLabel');
+    const statusEl = document.getElementById('status');
+    const studioTitle = document.getElementById('studioTitle');
+    const studioCaption = document.getElementById('studioCaption');
+    const familyLabel = document.getElementById('familyLabel');
+    const seasonLabel = document.getElementById('seasonLabel');
+    const colorLabel = document.getElementById('colorLabel');
+    const memoryLabel = document.getElementById('memoryLabel');
+    const noteText = document.getElementById('noteText');
+    const shuffleBtn = document.getElementById('shuffleBtn');
+    const quietBtn = document.getElementById('quietBtn');
+    const clearBtn = document.getElementById('clearBtn');
+
+    const STORAGE_KEY = 'signal-garden:pollen-atlas:last';
+    const specimens = [
+      {
+        id: 'glass-thistle',
+        name: 'Glass Thistle',
+        family: 'Asteraceae',
+        season: 'late summer',
+        color: 'ice green / pale gold',
+        memory: 'a dry whisper with a metallic edge',
+        note: 'A brittle survivor. It leaves a ring-shaped echo in the air, like a small engine remembering flight.',
+        caption: 'Thin spines, bright dust, no apology.',
+        hue: 148,
+      },
+      {
+        id: 'moon-clover',
+        name: 'Moon Clover',
+        family: 'Fabaceae',
+        season: 'first rain',
+        color: 'silver lime / chalk pink',
+        memory: 'soft, recursive, almost ceremonial',
+        note: 'Pulses in tidy triples. It looks domesticated until it starts drifting in perfect spirals.',
+        caption: 'A lawn relic that learned how to glow.',
+        hue: 110,
+      },
+      {
+        id: 'ember-foxglove',
+        name: 'Ember Foxglove',
+        family: 'Plantaginaceae',
+        season: 'dusk bloom',
+        color: 'ember coral / storm violet',
+        memory: 'a warning dressed as perfume',
+        note: 'The dust arrives with a low, theatrical shimmer. It always feels like the room is being introduced to itself.',
+        caption: 'Tall bells, warm warning, dramatic drift.',
+        hue: 327,
+      },
+      {
+        id: 'cloud-anemone',
+        name: 'Cloud Anemone',
+        family: 'Ranunculaceae',
+        season: 'cold spring',
+        color: 'mist blue / white ash',
+        memory: 'light enough to be mistaken for breath',
+        note: 'Moves as if each grain is consulting the next one before it turns. The whole specimen sounds like snow in a paper bag.',
+        caption: 'A hush that survived botanically.',
+        hue: 205,
+      },
+      {
+        id: 'honey-sedge',
+        name: 'Honey Sedge',
+        family: 'Cyperaceae',
+        season: 'midday heat',
+        color: 'amber wheat / tarnished brass',
+        memory: 'sun-baked, practical, long-lived',
+        note: 'Not a bloom so much as a disciplined dispersal. It stays busy even when the room pretends to be still.',
+        caption: 'Grass intelligence with a sweet aftertaste.',
+        hue: 44,
+      },
+      {
+        id: 'violet-rue',
+        name: 'Violet Rue',
+        family: 'Rutaceae',
+        season: 'winter windows',
+        color: 'deep plum / electric lilac',
+        memory: 'a little cold, a little luminous',
+        note: 'The grains hover in a dusk-colored haze, as if the plant kept one secret for every petal and forgot to waste any of them.',
+        caption: 'Small, bitter, and beautifully overqualified.',
+        hue: 275,
+      }
+    ];
+
+    const driftModes = [
+      { label: 'slow', speed: 0.32, jitter: 0.7, glow: 0.5 },
+      { label: 'breathing', speed: 0.55, jitter: 1.1, glow: 0.8 },
+      { label: 'restless', speed: 0.95, jitter: 1.7, glow: 1.0 }
+    ];
+
+    const motes = [];
+    let selectedIndex = 0;
+    let dpr = 1;
+    let width = 0;
+    let height = 0;
+    let modeIndex = 0;
+    let quiet = false;
+    let frame = 0;
+
+    function resize() {
+      dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      seedMotes();
+    }
+
+    function seeded(index, offset = 0) {
+      const value = Math.sin((index + 1.37) * 127.1 + offset * 311.7) * 43758.5453;
+      return value - Math.floor(value);
+    }
+
+    function seedMotes() {
+      motes.length = 0;
+      const count = Math.max(80, Math.floor((width * height) / 14000));
+      const selected = specimens[selectedIndex];
+      for (let i = 0; i < count; i++) {
+        motes.push({
+          x: seeded(i, 0.2) * width,
+          y: seeded(i, 0.7) * height,
+          vx: (seeded(i, 1.2) - 0.5) * 0.6,
+          vy: (seeded(i, 1.9) - 0.5) * 0.45,
+          radius: 0.9 + seeded(i, 2.2) * 2.3,
+          hue: (selected.hue + seeded(i, 2.9) * 40 - 20 + i * 7) % 360,
+          alpha: 0.12 + seeded(i, 3.4) * 0.4,
+          twirl: seeded(i, 4.1) * Math.PI * 2
+        });
+      }
+    }
+
+    function renderSpecimens() {
+      specimenList.innerHTML = '';
+      specimens.forEach((specimen, index) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = index === selectedIndex ? 'active' : '';
+        btn.innerHTML = `<strong>${specimen.name}</strong><span>${specimen.family}</span>`;
+        btn.title = specimen.caption;
+        btn.addEventListener('click', () => selectSpecimen(index, true));
+        specimenList.appendChild(btn);
+      });
+      specimenCount.textContent = String(specimens.length);
+    }
+
+    function saveSelection(index) {
+      localStorage.setItem(STORAGE_KEY, specimens[index].id);
+    }
+
+    function loadSelection() {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) return 0;
+      const found = specimens.findIndex((item) => item.id === stored);
+      return found >= 0 ? found : 0;
+    }
+
+    function selectSpecimen(index, remember = false) {
+      selectedIndex = (index + specimens.length) % specimens.length;
+      const specimen = specimens[selectedIndex];
+      studioTitle.textContent = specimen.name;
+      studioCaption.textContent = specimen.caption;
+      familyLabel.textContent = specimen.family;
+      seasonLabel.textContent = specimen.season;
+      colorLabel.textContent = specimen.color;
+      memoryLabel.textContent = specimen.memory;
+      currentGrain.textContent = specimen.name;
+      noteText.textContent = specimen.note;
+      statusEl.textContent = `Holding ${specimen.name}. The cabinet has gone ${driftModes[modeIndex].label}.`;
+      renderSpecimens();
+      seedMotes();
+      if (remember) saveSelection(selectedIndex);
+    }
+
+    function shuffleDrift() {
+      modeIndex = (modeIndex + 1) % driftModes.length;
+      driftLabel.textContent = driftModes[modeIndex].label;
+      statusEl.textContent = `Drift mode shifted to ${driftModes[modeIndex].label}.`;
+    }
+
+    function toggleQuiet() {
+      quiet = !quiet;
+      quietBtn.textContent = quiet ? 'wake the glass' : 'quiet the glass';
+      statusEl.textContent = quiet ? 'The field hushed itself.' : 'The field resumed its small weather.';
+    }
+
+    function clearSelection() {
+      localStorage.removeItem(STORAGE_KEY);
+      selectSpecimen(0, false);
+      statusEl.textContent = 'Selection cleared. The first specimen is back in the tray.';
+    }
+
+    function draw() {
+      frame += 1;
+      const mode = driftModes[modeIndex];
+      ctx.clearRect(0, 0, width, height);
+
+      ctx.fillStyle = 'rgba(5, 8, 12, 0.28)';
+      ctx.fillRect(0, 0, width, height);
+
+      const selected = specimens[selectedIndex];
+
+      motes.forEach((mote, index) => {
+        const wobble = Math.sin(frame * 0.009 + mote.twirl) * mode.jitter;
+        mote.x += mote.vx * mode.speed + wobble * 0.11;
+        mote.y += mote.vy * mode.speed + Math.cos(frame * 0.008 + mote.twirl) * 0.05;
+
+        if (mote.x < -10) mote.x = width + 10;
+        if (mote.x > width + 10) mote.x = -10;
+        if (mote.y < -10) mote.y = height + 10;
+        if (mote.y > height + 10) mote.y = -10;
+
+        const pulse = quiet ? 0.35 : 0.62 + Math.sin(frame * 0.03 + index * 0.2) * 0.18;
+        const alpha = mote.alpha * pulse * (0.6 + mode.glow * 0.4);
+
+        ctx.beginPath();
+        ctx.fillStyle = `hsla(${mote.hue}, 92%, 72%, ${alpha})`;
+        ctx.arc(mote.x, mote.y, mote.radius * (0.7 + pulse), 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      const haloRadius = Math.min(width, height) * (quiet ? 0.12 : 0.18);
+      const haloX = width * 0.68;
+      const haloY = height * 0.36;
+      const gradient = ctx.createRadialGradient(haloX, haloY, 10, haloX, haloY, haloRadius);
+      gradient.addColorStop(0, `hsla(${selected.hue}, 90%, 70%, ${quiet ? 0.12 : 0.22})`);
+      gradient.addColorStop(0.45, `hsla(${(selected.hue + 30) % 360}, 90%, 64%, ${quiet ? 0.06 : 0.12})`);
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(haloX, haloY, haloRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.save();
+      ctx.translate(width * 0.68, height * 0.36);
+      ctx.rotate(Math.sin(frame * 0.004) * 0.18);
+      ctx.strokeStyle = `hsla(${selected.hue}, 92%, 74%, ${quiet ? 0.25 : 0.48})`;
+      ctx.lineWidth = 1.2;
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.arc(0, 0, 54 + i * 18, frame * 0.01 + i * 0.6, frame * 0.01 + Math.PI * 1.4 + i * 0.4);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      requestAnimationFrame(draw);
+    }
+
+    function restore() {
+      selectedIndex = loadSelection();
+      driftLabel.textContent = driftModes[modeIndex].label;
+      selectSpecimen(selectedIndex, false);
+    }
+
+    window.addEventListener('resize', resize);
+    window.addEventListener('keydown', (event) => {
+      if (event.key === ' ') {
+        event.preventDefault();
+        shuffleDrift();
+      } else if (event.key.toLowerCase() === 'r') {
+        selectSpecimen(selectedIndex, true);
+        statusEl.textContent = `Recalled ${specimens[selectedIndex].name}.`;
+      }
+    });
+
+    shuffleBtn.addEventListener('click', shuffleDrift);
+    quietBtn.addEventListener('click', toggleQuiet);
+    clearBtn.addEventListener('click', clearSelection);
+
+    resize();
+    restore();
+    requestAnimationFrame(draw);
+  </script>
+</body>
+</html>

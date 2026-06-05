@@ -33,6 +33,7 @@ const herbariumListEl = document.getElementById('herbariumList');
 const herbariumStatusEl = document.getElementById('herbariumStatus');
 const copyHerbariumBtn = document.getElementById('copyHerbarium');
 const exportHerbariumBtn = document.getElementById('exportHerbarium');
+const herbariumFilterButtons = Array.from(document.querySelectorAll('[data-herbarium-filter]'));
 const archiveGridEl = document.getElementById('archiveGrid');
 const archiveStatusEl = document.getElementById('archiveStatus');
 const highlightsGridEl = document.getElementById('highlightsGrid');
@@ -283,15 +284,41 @@ const GALLERY_HIGHLIGHTS = [
     encodedGarden: 'uu.1yo.4.1.0.24.1o.34.as~1mk.2d8.1.8.3.2g.1u.3c.d0~2f0.1f4.7.5.2.20.1k.30.7k~34q.274.2.2.4.2m.20.3i.b8~3xs.1m8.8.7.5.22.1g.2u.gw~4s0.24o.0.0.1.2e.1w.36.5o~5l4.1be.5.9.4.24.1m.32.f4',
   },
 ];
+const SEASONAL_HIGHLIGHT_LABELS = ['winter', 'spring', 'summer', 'autumn'];
 const HERBARIUM_STORAGE_KEY = 'signal-garden:herbarium';
-const HERBARIUM_LIMIT = 8;
+const HERBARIUM_FILTER_STORAGE_KEY = 'signal-garden:herbarium-filter';
+const HERBARIUM_LIMIT = 24;
+const HERBARIUM_FILTERS = {
+  all: {
+    label: 'all memory',
+    matches: () => true,
+  },
+  plants: {
+    label: 'blooms',
+    matches: (entry) => entry.kind === 'plant',
+  },
+  replays: {
+    label: 'replay history',
+    matches: (entry) => entry.kind === 'replay',
+  },
+  imports: {
+    label: 'imports',
+    matches: (entry) => entry.kind === 'load',
+  },
+  resets: {
+    label: 'resets',
+    matches: (entry) => entry.kind === 'undo' || entry.kind === 'clear',
+  },
+};
 
 let bloomCount = 0;
 let previousBloomPoint = null;
 let previewVisible = false;
 let bloomHistory = [];
 let herbariumEntries = [];
+let herbariumFilter = 'all';
 let replayTimers = [];
+let galleryRotationTimer = null;
 let shareToastTimer = null;
 let exportToastTimer = null;
 let suppressHashSync = false;
@@ -1045,6 +1072,48 @@ function chooseMoodFromSpec(spec, preset = currentWeatherPreset) {
   return moodBank[(spec.adjectiveIndex * 3 + spec.nounIndex + spec.accentIndex) % moodBank.length];
 }
 
+function getUtcDayOfYear(referenceDate = new Date()) {
+  const startOfYear = Date.UTC(referenceDate.getUTCFullYear(), 0, 0);
+  const currentDay = Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), referenceDate.getUTCDate());
+  return Math.floor((currentDay - startOfYear) / 86400000);
+}
+
+function getSeasonalHighlightRotation(referenceDate = new Date()) {
+  const seasonIndex = Math.floor(referenceDate.getUTCMonth() / 3) % SEASONAL_HIGHLIGHT_LABELS.length;
+  const seasonLabel = SEASONAL_HIGHLIGHT_LABELS[seasonIndex] ?? 'seasonal';
+  const featuredIndex = (getUtcDayOfYear(referenceDate) + seasonIndex * 2) % GALLERY_HIGHLIGHTS.length;
+
+  return {
+    seasonIndex,
+    seasonLabel,
+    featuredIndex,
+    featuredEntry: GALLERY_HIGHLIGHTS[featuredIndex] ?? GALLERY_HIGHLIGHTS[0],
+  };
+}
+
+function getSeasonalHighlightOrder(referenceDate = new Date()) {
+  const { featuredIndex } = getSeasonalHighlightRotation(referenceDate);
+  return GALLERY_HIGHLIGHTS.slice(featuredIndex).concat(GALLERY_HIGHLIGHTS.slice(0, featuredIndex));
+}
+
+function getSeasonalHighlightLabel(referenceDate = new Date()) {
+  return getSeasonalHighlightRotation(referenceDate).seasonLabel;
+}
+
+function scheduleHighlightRotationRefresh() {
+  if (galleryRotationTimer !== null) {
+    window.clearTimeout(galleryRotationTimer);
+    galleryRotationTimer = null;
+  }
+
+  const now = new Date();
+  const nextUtcMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  const delay = Math.max(1000, nextUtcMidnight - now.getTime() + 150);
+  galleryRotationTimer = window.setTimeout(() => {
+    renderHighlights();
+  }, delay);
+}
+
 function setMood(nextMood = getIdleMood()) {
   moodEl.textContent = nextMood;
 }
@@ -1092,6 +1161,7 @@ function loadHerbariumEntries() {
         const at = Number(entry.at);
         const weatherId = String(entry.weatherId ?? '').trim();
         const accentIndex = Number(entry.accentIndex);
+        const kind = inferHerbariumKind(entry);
 
         return {
           name: name || 'unnamed bloom',
@@ -1100,6 +1170,7 @@ function loadHerbariumEntries() {
           at: Number.isFinite(at) ? at : Date.now(),
           weatherId: weatherId || currentWeatherPreset.id,
           accentIndex: Number.isFinite(accentIndex) ? accentIndex : 0,
+          kind,
         };
       })
       .filter(Boolean)
@@ -1121,8 +1192,90 @@ function herbariumStamp(at) {
   return new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function normalizeHerbariumFilter(filter = 'all') {
+  return Object.prototype.hasOwnProperty.call(HERBARIUM_FILTERS, filter) ? filter : 'all';
+}
+
+function inferHerbariumKind(entry = {}) {
+  const explicitKind = String(entry.kind ?? '').trim().toLowerCase();
+  if (explicitKind) return explicitKind;
+
+  const label = String(entry.label ?? '').trim().toLowerCase();
+  if (label.includes('replay')) return 'replay';
+  if (label.startsWith('loaded')) return 'load';
+  if (label.includes('undo')) return 'undo';
+  if (label.includes('clear')) return 'clear';
+  return 'plant';
+}
+
+function getHerbariumFilterLabel(filter = herbariumFilter) {
+  return HERBARIUM_FILTERS[normalizeHerbariumFilter(filter)]?.label ?? HERBARIUM_FILTERS.all.label;
+}
+
+function getHerbariumKindLabel(kind = 'plant') {
+  switch (String(kind ?? '').trim().toLowerCase()) {
+    case 'replay':
+      return 'replayed';
+    case 'load':
+      return 'loaded';
+    case 'undo':
+      return 'undone';
+    case 'clear':
+      return 'cleared';
+    default:
+      return 'planted';
+  }
+}
+
+function matchesHerbariumFilter(entry, filter = herbariumFilter) {
+  const active = normalizeHerbariumFilter(filter);
+  return HERBARIUM_FILTERS[active]?.matches(entry) ?? true;
+}
+
+function getVisibleHerbariumEntries(filter = herbariumFilter) {
+  return herbariumEntries.slice(0, HERBARIUM_LIMIT).filter((entry) => matchesHerbariumFilter(entry, filter));
+}
+
+function syncHerbariumFilterUi() {
+  herbariumFilterButtons.forEach((button) => {
+    const filter = normalizeHerbariumFilter(button.dataset.herbariumFilter ?? 'all');
+    const isActive = filter === herbariumFilter;
+    button.setAttribute('aria-pressed', String(isActive));
+    button.dataset.active = String(isActive);
+  });
+}
+
+function loadHerbariumFilter() {
+  try {
+    const raw = window.localStorage.getItem(HERBARIUM_FILTER_STORAGE_KEY);
+    return normalizeHerbariumFilter(String(raw ?? 'all').trim());
+  } catch {
+    return 'all';
+  }
+}
+
+function saveHerbariumFilter() {
+  try {
+    window.localStorage.setItem(HERBARIUM_FILTER_STORAGE_KEY, herbariumFilter);
+  } catch {
+    // Browser-local only: if storage is unavailable, the herbarium forgets the filter too.
+  }
+}
+
+function setHerbariumFilter(nextFilter = 'all', { sync = true } = {}) {
+  herbariumFilter = normalizeHerbariumFilter(nextFilter);
+  if (sync) saveHerbariumFilter();
+  renderHerbarium();
+  syncControls();
+}
+
 function renderHerbarium() {
   if (!herbariumListEl) return;
+  syncHerbariumFilterUi();
+  const visibleEntries = herbariumEntries
+    .slice(0, HERBARIUM_LIMIT)
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => matchesHerbariumFilter(entry));
 
   if (!herbariumEntries.length) {
     herbariumListEl.innerHTML = '<li class="herbarium-empty">No blooms pressed yet. The jar is still waiting to learn your handwriting.</li>';
@@ -1136,17 +1289,30 @@ function renderHerbarium() {
     return;
   }
 
-  const entries = herbariumEntries.slice(0, HERBARIUM_LIMIT);
-  herbariumListEl.innerHTML = entries.map((entry, index) => {
+  if (!visibleEntries.length) {
+    const filterLabel = getHerbariumFilterLabel();
+    herbariumListEl.innerHTML = `<li class="herbarium-empty">No ${escapeXml(filterLabel)} in the jar yet. Try another filter or press “all” to reopen the full archive.</li>`;
+    if (herbariumStatusEl) {
+      herbariumStatusEl.textContent = `showing 0 of ${herbariumEntries.length} blooms • ${filterLabel}`;
+    }
+    if (copyHerbariumBtn) {
+      copyHerbariumBtn.disabled = true;
+      if (exportHerbariumBtn) exportHerbariumBtn.disabled = true;
+    }
+    return;
+  }
+
+  herbariumListEl.innerHTML = visibleEntries.map(({ entry, index }) => {
     const preset = getWeatherPresetById(entry.weatherId ?? currentWeatherPreset.id);
     const swatch = getAccentColor(entry.accentIndex ?? 0, preset);
+    const kind = getHerbariumKindLabel(entry.kind);
 
     return `
       <li class="herbarium-entry">
         <span class="herbarium-swatch" aria-hidden="true" style="--swatch: ${swatch};"></span>
         <span class="herbarium-copy">
           <strong class="herbarium-title">${escapeXml(entry.name)}</strong>
-          <span class="herbarium-meta">${escapeXml(entry.label)} • ${escapeXml(herbariumStamp(entry.at))}</span>
+          <span class="herbarium-meta">${escapeXml(kind)} • ${escapeXml(entry.label)} • ${escapeXml(herbariumStamp(entry.at))}</span>
           <span class="herbarium-note">${escapeXml(entry.weather)}</span>
         </span>
         <button class="copy-button" data-action="copy-entry" data-index="${index}" type="button">copy</button>
@@ -1155,13 +1321,13 @@ function renderHerbarium() {
   }).join('');
 
   if (herbariumStatusEl) {
-    herbariumStatusEl.textContent = `${entries.length} of ${HERBARIUM_LIMIT} blooms pressed into the jar`;
+    herbariumStatusEl.textContent = `${visibleEntries.length} of ${herbariumEntries.length} blooms shown • ${getHerbariumFilterLabel()}`;
   }
   if (copyHerbariumBtn) {
-    copyHerbariumBtn.disabled = false;
+    copyHerbariumBtn.disabled = visibleEntries.length === 0;
   }
   if (exportHerbariumBtn) {
-    exportHerbariumBtn.disabled = false;
+    exportHerbariumBtn.disabled = visibleEntries.length === 0;
   }
 }
 
@@ -1172,6 +1338,7 @@ function recordHerbariumEntry({
   weatherId = currentWeatherPreset.id,
   accentIndex = 0,
   at = Date.now(),
+  kind = null,
 } = {}) {
   const entry = {
     name: String(name ?? 'unnamed bloom').trim() || 'unnamed bloom',
@@ -1180,6 +1347,7 @@ function recordHerbariumEntry({
     weatherId: String(weatherId ?? currentWeatherPreset.id).trim() || currentWeatherPreset.id,
     accentIndex: Number.isFinite(Number(accentIndex)) ? Number(accentIndex) : 0,
     at,
+    kind: inferHerbariumKind({ kind, label }),
   };
 
   herbariumEntries = [entry, ...herbariumEntries].slice(0, HERBARIUM_LIMIT);
@@ -1188,18 +1356,67 @@ function recordHerbariumEntry({
   return entry;
 }
 
-function buildHerbariumPostcardSvg() {
+function hashHerbariumSeed(value) {
+  let hash = 0;
+
+  for (const char of String(value ?? '')) {
+    hash = Math.imul(hash, 31) + char.charCodeAt(0);
+    hash >>>= 0;
+  }
+
+  return hash;
+}
+
+function makeHerbariumCaption(entries, preset) {
+  const captions = [
+    'A pocket field with a memory problem and excellent posture.',
+    'Tiny weather, pressed into a polite little archive.',
+    'A small jar of static pretending to be botany.',
+    'The garden kept one more secret and called it a postcard.',
+    'Bloom count rising. The night is learning to be filed.',
+    'A browser-local bouquet with a quiet pulse and sharp edges.',
+  ];
+  const seed = hashHerbariumSeed(`${preset.id}:${entries.length}:${entries[0]?.name ?? 'empty'}`);
+  return captions[seed % captions.length];
+}
+
+function herbariumPlainText(entries = getVisibleHerbariumEntries()) {
+  const list = Array.isArray(entries) ? entries : [];
+  const filterLabel = getHerbariumFilterLabel();
+  const lines = [
+    'Signal Garden Herbarium',
+    `Filter: ${filterLabel}`,
+    `Captured: ${new Date().toLocaleString()}`,
+    '',
+  ];
+
+  if (!list.length) {
+    lines.push('No visible herbarium entries.');
+    return lines.join('\n');
+  }
+
+  list.forEach((entry, index) => {
+    const stamp = herbariumStamp(entry.at);
+    const kind = getHerbariumKindLabel(entry.kind);
+    lines.push(`${String(index + 1).padStart(2, '0')}. ${entry.name}`);
+    lines.push(`   ${kind} • ${entry.label} • ${entry.weather} • ${stamp}`);
+  });
+
+  return lines.join('\n');
+}
+
+function buildHerbariumPostcardSvg(entries = getVisibleHerbariumEntries()) {
   const width = 1200;
-  const height = 1600;
-  const entries = herbariumEntries.slice(0, HERBARIUM_LIMIT);
+  const rowStart = 250;
+  const rowGap = entries.length > 10 ? 92 : 124;
+  const height = Math.max(1600, rowStart + Math.max(1, entries.length) * rowGap + 260);
   const title = 'Signal Garden Herbarium';
   const subtitle = entries.length
-    ? `A browser-local bloom index of ${entries.length} pressed specimen${entries.length === 1 ? '' : 's'}.`
+    ? `A browser-local bloom index of ${entries.length} visible specimen${entries.length === 1 ? '' : 's'} (${getHerbariumFilterLabel()}).`
     : 'A browser-local bloom index waiting to be pressed into existence.';
   const currentWeather = escapeXml(currentWeatherPreset.label);
-  const countLabel = `${entries.length}/${HERBARIUM_LIMIT}`;
-  const rowStart = 250;
-  const rowGap = 124;
+  const countLabel = `${entries.length}`;
+  const footerCaption = escapeXml(makeHerbariumCaption(entries, currentWeatherPreset));
 
   const rows = (entries.length ? entries : [{ name: 'No blooms yet', weather: currentWeatherPreset.label, label: 'awaiting first contact', at: Date.now(), accentIndex: 0, weatherId: currentWeatherPreset.id }]).map((entry, index) => {
     const preset = getWeatherPresetById(entry.weatherId ?? currentWeatherPreset.id);
@@ -1246,7 +1463,16 @@ function buildHerbariumPostcardSvg() {
       <text x="1128" y="158" text-anchor="end" fill="#ebf5ff" font-size="36" font-family="Inter, system-ui, sans-serif">${countLabel}</text>
       <text x="72" y="234" fill="#95abc0" font-size="14" letter-spacing="3" font-family="Inter, system-ui, sans-serif">BROWSER-LOCAL MEMORY, PRETENDING TO BE BOTANY</text>
       ${rows}
-      <text x="72" y="1530" fill="#95abc0" font-size="16" font-family="Inter, system-ui, sans-serif">Captured from Signal Garden on ${escapeXml(new Date().toLocaleString())}</text>
+      <g transform="translate(72 1412)">
+        <rect width="1056" height="118" rx="24" fill="rgba(9, 18, 30, 0.8)" stroke="rgba(141, 220, 255, 0.16)"/>
+        <text x="30" y="34" fill="#8ddcff" font-size="13" letter-spacing="4" font-family="Inter, system-ui, sans-serif">MODE</text>
+        <text x="30" y="63" fill="#ebf5ff" font-size="24" font-family="Inter, system-ui, sans-serif">${currentWeather}</text>
+        <text x="320" y="34" fill="#8ddcff" font-size="13" letter-spacing="4" font-family="Inter, system-ui, sans-serif">BLOOMS</text>
+        <text x="320" y="63" fill="#ebf5ff" font-size="24" font-family="Inter, system-ui, sans-serif">${countLabel}</text>
+        <text x="570" y="34" fill="#8ddcff" font-size="13" letter-spacing="4" font-family="Inter, system-ui, sans-serif">CAPTION</text>
+        <text x="570" y="66" fill="#95abc0" font-size="22" font-family="Inter, system-ui, sans-serif">${footerCaption}</text>
+      </g>
+      <text x="72" y="${height - 70}" fill="#95abc0" font-size="16" font-family="Inter, system-ui, sans-serif">Captured from Signal Garden on ${escapeXml(new Date().toLocaleString())}</text>
     </svg>
   `;
 }
@@ -1257,23 +1483,25 @@ function makeHerbariumFilename() {
 }
 
 function exportHerbariumPostcard() {
-  const svg = buildHerbariumPostcardSvg();
+  const entries = getVisibleHerbariumEntries();
+  const svg = buildHerbariumPostcardSvg(entries);
   downloadBlob(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }), makeHerbariumFilename());
-  logField('Herbarium postcard exported. The pressed blooms have a passport now.', 'herbarium postcard ready');
+  logField(`Herbarium postcard exported for ${getHerbariumFilterLabel()}. The pressed blooms have a passport now.`, 'herbarium postcard ready');
 }
 
 async function copyHerbarium() {
-  const copied = await copyTextToClipboard(herbariumPlainText(), 'Copy this Signal Garden herbarium:');
+  const visibleEntries = getVisibleHerbariumEntries();
+  const copied = await copyTextToClipboard(herbariumPlainText(visibleEntries), 'Copy this Signal Garden herbarium:');
 
   if (copied) {
     if (copyHerbariumBtn) {
       flashButtonCopyState(copyHerbariumBtn, 'herbarium copied', 'copy herbarium');
     }
-    logField('Herbarium copied. The bloom index can migrate without losing its pollen.', 'herbarium copied');
+    logField(`Herbarium copied for ${getHerbariumFilterLabel()}. The bloom index can migrate without losing its pollen.`, 'herbarium copied');
     return;
   }
 
-  logField('Herbarium copy fell back to the prompt. The archive stays browser-local and mildly defiant.', 'manual copy required');
+  logField(`Herbarium copy fell back to the prompt. The ${getHerbariumFilterLabel()} archive stays browser-local and mildly defiant.`, 'manual copy required');
 }
 
 function choosePlantTransmission(name, hadLink, x, y) {
@@ -1337,11 +1565,12 @@ function syncControls() {
   copyLinkBtn.disabled = disabled;
   sharePostcardBtn.disabled = disabled;
   exportPngBtn.disabled = disabled;
+  const visibleHerbariumEntries = getVisibleHerbariumEntries();
   if (copyHerbariumBtn) {
-    copyHerbariumBtn.disabled = herbariumEntries.length === 0;
+    copyHerbariumBtn.disabled = visibleHerbariumEntries.length === 0;
   }
   if (exportHerbariumBtn) {
-    exportHerbariumBtn.disabled = herbariumEntries.length === 0;
+    exportHerbariumBtn.disabled = visibleHerbariumEntries.length === 0;
   }
 
   if (disabled) stage.setAttribute('data-empty', 'true');
@@ -2822,17 +3051,24 @@ function syncArchiveSelection() {
 function renderHighlights() {
   if (!highlightsGridEl) return;
 
-  const cards = GALLERY_HIGHLIGHTS.map((entry) => {
+  const rotation = getSeasonalHighlightRotation();
+  const seasonalHighlights = getSeasonalHighlightOrder();
+  const seasonLabel = rotation.seasonLabel;
+  const cards = seasonalHighlights.map((entry, index) => {
     const preset = getWeatherPresetById(entry.weatherId);
     const sequence = entry.encodedGarden.split('~').map(decodeBloom).filter(Boolean).slice(0, MAX_BLOOMS);
     const mood = getSequenceMood(sequence, preset);
+    const isFeatured = index === 0;
     const card = document.createElement('article');
     card.className = 'archive-card';
     card.dataset.highlightId = entry.id;
+    card.dataset.featured = String(isFeatured);
+    card.dataset.rotationSeason = seasonLabel;
     card.innerHTML = `
       <div class="archive-preview" aria-hidden="true">${buildArchivePreviewSvg(sequence, preset)}</div>
       <div class="archive-meta">
         <span class="highlight-tag">${escapeXml(entry.tag)}</span>
+        ${isFeatured ? `<span class="highlight-feature">featured today • ${escapeXml(seasonLabel)}</span>` : ''}
         <div class="archive-date">
           <strong>${escapeXml(entry.title)}</strong>
           <span>${escapeXml(preset.label)}</span>
@@ -2850,8 +3086,10 @@ function renderHighlights() {
 
   highlightsGridEl.replaceChildren(...cards);
   if (highlightsStatusEl) {
-    highlightsStatusEl.textContent = `${GALLERY_HIGHLIGHTS.length} curated starter fields across all four weather modes.`;
+    highlightsStatusEl.textContent = `${seasonalHighlights.length} curated starter fields for ${seasonLabel}. Featured pick rotates daily with the UTC season.`;
   }
+
+  scheduleHighlightRotationRefresh();
 }
 
 function syncArchiveStatus() {
@@ -3281,6 +3519,12 @@ herbariumListEl?.addEventListener('click', async (event) => {
   logField(`Pressed note opened in a prompt for ${entry.name}. Clipboard spirits were unavailable.`, 'manual copy required');
 });
 
+herbariumFilterButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    setHerbariumFilter(button.dataset.herbariumFilter ?? 'all');
+  });
+});
+
 clearBtn.addEventListener('click', () => {
   suppressHashSync = false;
   const clearedSpec = bloomHistory[bloomHistory.length - 1];
@@ -3384,6 +3628,7 @@ window.addEventListener('hashchange', () => {
 window.addEventListener('load', () => {
   setFieldSource('open');
   setWeatherPreset(DEFAULT_WEATHER_ID, { syncUrl: false });
+  herbariumFilter = loadHerbariumFilter();
   syncControls();
   renderHighlights();
   renderArchive();

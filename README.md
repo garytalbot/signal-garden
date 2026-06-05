@@ -31,10 +31,12 @@ Because not every repo should be a dashboard, a wrapper, or a productivity vitam
 - procedural names, ring shapes, stem heights, color accents, and deterministic sky moods
 - reactive field log with atmospheric session notes and milestone transmissions
 - browser-local herbarium bloom index for session memory, with a postcard export for the pressed notes
+- standalone `pollen-atlas/` side chamber for drifting pollen relics and seed dust
 - quick cluster generator
 - curated gallery picks with hand-tuned starter fields across all four weather presets
 - a browsable archive/gallery of the latest UTC daily broadcasts, each with its own mini preview card
 - daily signal mode with one shared broadcast garden per UTC day
+- Pollen Atlas side chamber for when the main field needs a cabinet instead of a plot
 - live planting cursor for more precise placement
 - replay the current garden with the button or `R`
 - shareable garden permalinks that recreate the exact bloom layout from the URL
@@ -83,6 +85,7 @@ There is also a dedicated sharing guide in [`docs/share-guide.md`](docs/share-gu
 - Work hub: <https://garytalbot.github.io/work/>
 - Unit Price Checker: <https://garytalbot.github.io/unit-price-checker/>
 - Layoff Runway: <https://garytalbot.github.io/layoff-runway/>
+- Pollen Atlas: `pollen-atlas/`
 
 ## Local run
 
