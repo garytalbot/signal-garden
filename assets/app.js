@@ -29,6 +29,9 @@ const hintEl = document.getElementById('hint');
 const previewEl = document.getElementById('preview');
 const fieldLogEl = document.getElementById('fieldLog');
 const logStatusEl = document.getElementById('logStatus');
+const herbariumListEl = document.getElementById('herbariumList');
+const herbariumStatusEl = document.getElementById('herbariumStatus');
+const copyHerbariumBtn = document.getElementById('copyHerbarium');
 const archiveGridEl = document.getElementById('archiveGrid');
 const archiveStatusEl = document.getElementById('archiveStatus');
 const highlightsGridEl = document.getElementById('highlightsGrid');
@@ -279,11 +282,14 @@ const GALLERY_HIGHLIGHTS = [
     encodedGarden: 'uu.1yo.4.1.0.24.1o.34.as~1mk.2d8.1.8.3.2g.1u.3c.d0~2f0.1f4.7.5.2.20.1k.30.7k~34q.274.2.2.4.2m.20.3i.b8~3xs.1m8.8.7.5.22.1g.2u.gw~4s0.24o.0.0.1.2e.1w.36.5o~5l4.1be.5.9.4.24.1m.32.f4',
   },
 ];
+const HERBARIUM_STORAGE_KEY = 'signal-garden:herbarium';
+const HERBARIUM_LIMIT = 8;
 
 let bloomCount = 0;
 let previousBloomPoint = null;
 let previewVisible = false;
 let bloomHistory = [];
+let herbariumEntries = [];
 let replayTimers = [];
 let shareToastTimer = null;
 let exportToastTimer = null;
@@ -1067,6 +1073,136 @@ function logField(message, status = 'recording strange botany') {
   logStatusEl.textContent = status;
 }
 
+function loadHerbariumEntries() {
+  try {
+    const raw = window.localStorage.getItem(HERBARIUM_STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null;
+
+        const name = String(entry.name ?? '').trim();
+        const weather = String(entry.weather ?? '').trim();
+        const label = String(entry.label ?? '').trim();
+        const at = Number(entry.at);
+        const weatherId = String(entry.weatherId ?? '').trim();
+        const accentIndex = Number(entry.accentIndex);
+
+        return {
+          name: name || 'unnamed bloom',
+          weather: weather || currentWeatherPreset.label,
+          label: label || 'noted',
+          at: Number.isFinite(at) ? at : Date.now(),
+          weatherId: weatherId || currentWeatherPreset.id,
+          accentIndex: Number.isFinite(accentIndex) ? accentIndex : 0,
+        };
+      })
+      .filter(Boolean)
+      .slice(0, HERBARIUM_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function saveHerbariumEntries() {
+  try {
+    window.localStorage.setItem(HERBARIUM_STORAGE_KEY, JSON.stringify(herbariumEntries.slice(0, HERBARIUM_LIMIT)));
+  } catch {
+    // Browser-local only: if storage is unavailable, the herbarium simply forgets itself.
+  }
+}
+
+function herbariumStamp(at) {
+  return new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderHerbarium() {
+  if (!herbariumListEl) return;
+
+  if (!herbariumEntries.length) {
+    herbariumListEl.innerHTML = '<li class="herbarium-empty">No blooms pressed yet. The jar is still waiting to learn your handwriting.</li>';
+    if (herbariumStatusEl) {
+      herbariumStatusEl.textContent = 'awaiting first specimen';
+    }
+    if (copyHerbariumBtn) {
+      copyHerbariumBtn.disabled = true;
+    }
+    return;
+  }
+
+  const entries = herbariumEntries.slice(0, HERBARIUM_LIMIT);
+  herbariumListEl.innerHTML = entries.map((entry, index) => {
+    const preset = getWeatherPresetById(entry.weatherId ?? currentWeatherPreset.id);
+    const swatch = getAccentColor(entry.accentIndex ?? 0, preset);
+
+    return `
+      <li class="herbarium-entry">
+        <span class="herbarium-swatch" aria-hidden="true" style="--swatch: ${swatch};"></span>
+        <span class="herbarium-copy">
+          <strong class="herbarium-title">${escapeXml(entry.name)}</strong>
+          <span class="herbarium-meta">${escapeXml(entry.label)} • ${escapeXml(herbariumStamp(entry.at))}</span>
+          <span class="herbarium-note">${escapeXml(entry.weather)}</span>
+        </span>
+        <button class="copy-button" data-action="copy-entry" data-index="${index}" type="button">copy</button>
+      </li>
+    `;
+  }).join('');
+
+  if (herbariumStatusEl) {
+    herbariumStatusEl.textContent = `${entries.length} of ${HERBARIUM_LIMIT} blooms pressed into the jar`;
+  }
+  if (copyHerbariumBtn) {
+    copyHerbariumBtn.disabled = false;
+  }
+}
+
+function recordHerbariumEntry({
+  name,
+  weather = currentWeatherPreset.label,
+  label = 'planted',
+  weatherId = currentWeatherPreset.id,
+  accentIndex = 0,
+  at = Date.now(),
+} = {}) {
+  const entry = {
+    name: String(name ?? 'unnamed bloom').trim() || 'unnamed bloom',
+    weather: String(weather ?? currentWeatherPreset.label).trim() || currentWeatherPreset.label,
+    label: String(label ?? 'planted').trim() || 'planted',
+    weatherId: String(weatherId ?? currentWeatherPreset.id).trim() || currentWeatherPreset.id,
+    accentIndex: Number.isFinite(Number(accentIndex)) ? Number(accentIndex) : 0,
+    at,
+  };
+
+  herbariumEntries = [entry, ...herbariumEntries].slice(0, HERBARIUM_LIMIT);
+  saveHerbariumEntries();
+  renderHerbarium();
+  return entry;
+}
+
+function herbariumPlainText(entries = herbariumEntries.slice(0, HERBARIUM_LIMIT)) {
+  const lines = entries.map((entry, index) => `${String(index + 1).padStart(2, '0')}. ${entry.name} | ${entry.weather} | ${entry.label}`);
+  const body = lines.length ? lines : ['(no blooms pressed yet)'];
+  return ['Herbarium', ...body].join('\n');
+}
+
+async function copyHerbarium() {
+  const copied = await copyTextToClipboard(herbariumPlainText(), 'Copy this Signal Garden herbarium:');
+
+  if (copied) {
+    if (copyHerbariumBtn) {
+      flashButtonCopyState(copyHerbariumBtn, 'herbarium copied', 'copy herbarium');
+    }
+    logField('Herbarium copied. The bloom index can migrate without losing its pollen.', 'herbarium copied');
+    return;
+  }
+
+  logField('Herbarium copy fell back to the prompt. The archive stays browser-local and mildly defiant.', 'manual copy required');
+}
+
 function choosePlantTransmission(name, hadLink, x, y) {
   const crowding = getLiveBloomElements().filter((bloom) => {
     const bloomX = parseFloat(bloom.style.left);
@@ -1128,6 +1264,9 @@ function syncControls() {
   copyLinkBtn.disabled = disabled;
   sharePostcardBtn.disabled = disabled;
   exportPngBtn.disabled = disabled;
+  if (copyHerbariumBtn) {
+    copyHerbariumBtn.disabled = herbariumEntries.length === 0;
+  }
 
   if (disabled) stage.setAttribute('data-empty', 'true');
   else stage.removeAttribute('data-empty');
@@ -1648,7 +1787,13 @@ function recordAfterimageCursorPoint(x, y, accentIndex = 0, { stampGhost = false
 }
 
 function renderBloom(spec, options = {}) {
-  const { logPlant = true, syncUrl = true, animateLink = true } = options;
+  const {
+    logPlant = true,
+    syncUrl = true,
+    animateLink = true,
+    herbariumLabel = 'planted',
+    herbariumName = null,
+  } = options;
   const node = template.content.firstElementChild.cloneNode(true);
   const name = makeNameFromIndexes(spec.adjectiveIndex, spec.nounIndex);
   const hadLink = Boolean(previousBloomPoint);
@@ -1694,6 +1839,13 @@ function renderBloom(spec, options = {}) {
     logField('Archive limit reached. The oldest signal was quietly retired to keep the field breathable.', 'rolling archive active');
   }
 
+  recordHerbariumEntry({
+    name: herbariumName ?? name,
+    weather: currentWeatherPreset.label,
+    label: herbariumLabel,
+    weatherId: currentWeatherPreset.id,
+    accentIndex: spec.accentIndex,
+  });
   syncControls();
   syncArchiveStatus();
   updateCritterUi();
@@ -1940,6 +2092,12 @@ function undoLastBloom() {
   }
 
   logField(pick(transmissions.undo).replace('{name}', removedName), bloomCount === 0 ? 'field standing by' : `tracking ${bloomCount} bloom${bloomCount === 1 ? '' : 's'}`);
+  recordHerbariumEntry({
+    name: removedName,
+    weather: currentWeatherPreset.label,
+    label: 'undone',
+    weatherId: currentWeatherPreset.id,
+  });
   syncControls();
   syncArchiveStatus();
   updateCritterUi();
@@ -2725,6 +2883,12 @@ function replayGarden(sequence = bloomHistory, options = {}) {
   setFieldSource(sourceMode, sourceMode === 'broadcast' ? broadcastKey : null);
   resetField({ keepLogs: false, syncUrl: false, mood: false });
   logField(pick(transmissions.replay), `replaying ${blooms.length} blooms`);
+  recordHerbariumEntry({
+    name: `replay of ${blooms.length} blooms`,
+    weather: currentWeatherPreset.label,
+    label: 'replayed',
+    weatherId: currentWeatherPreset.id,
+  });
 
   blooms.forEach((spec, index) => {
     const timer = window.setTimeout(() => {
@@ -2732,6 +2896,7 @@ function replayGarden(sequence = bloomHistory, options = {}) {
         logPlant: false,
         syncUrl: false,
         animateLink: index !== 0,
+        herbariumLabel: 'replayed',
       });
 
       if (index === blooms.length - 1) {
@@ -2785,6 +2950,7 @@ function applySharedSequence(sequence, {
       logPlant: false,
       syncUrl: false,
       animateLink: index !== 0,
+      herbariumLabel: sourceMode === 'broadcast' ? 'loaded daily' : 'loaded shared',
     });
   });
   setConstellationWeave(weaveEnabled, { syncUrl: false });
@@ -2792,6 +2958,12 @@ function applySharedSequence(sequence, {
   setAfterimageEnabled(afterimageModeEnabled, { syncUrl: false });
   setSignalChorusEnabled(chorusEnabled, { syncUrl: false });
   logField(logMessage, status ?? `${sourceMode === 'broadcast' ? 'daily signal tuned' : 'shared garden loaded'}: ${blooms.length} blooms • ${currentWeatherPreset.label}`);
+  recordHerbariumEntry({
+    name: sourceMode === 'broadcast' ? `daily signal ${broadcastKey ?? currentBroadcastKey ?? 'tuned'}` : 'shared garden',
+    weather: currentWeatherPreset.label,
+    label: sourceMode === 'broadcast' ? 'loaded daily' : 'loaded shared',
+    weatherId: currentWeatherPreset.id,
+  });
   suppressHashSync = false;
   syncShareState();
   return true;
@@ -3009,10 +3181,42 @@ archiveGridEl?.addEventListener('click', (event) => {
   }
 });
 
+herbariumListEl?.addEventListener('click', async (event) => {
+  const button = event.target.closest('button[data-action="copy-entry"][data-index]');
+  if (!(button instanceof HTMLButtonElement)) return;
+
+  const index = Number(button.dataset.index);
+  if (!Number.isInteger(index)) return;
+
+  const entry = herbariumEntries[index];
+  if (!entry) return;
+
+  const copied = await copyTextToClipboard(
+    herbariumPlainText([entry]),
+    'Copy this Signal Garden herbarium note:'
+  );
+
+  if (copied) {
+    flashButtonCopyState(button, 'copied', 'copy');
+    logField(`Pressed note copied for ${entry.name}. The herbarium is now pocket-sized.`, 'herbarium note copied');
+    return;
+  }
+
+  logField(`Pressed note opened in a prompt for ${entry.name}. Clipboard spirits were unavailable.`, 'manual copy required');
+});
+
 clearBtn.addEventListener('click', () => {
   suppressHashSync = false;
+  const clearedSpec = bloomHistory[bloomHistory.length - 1];
+  const clearedName = clearedSpec ? makeNameFromIndexes(clearedSpec.adjectiveIndex, clearedSpec.nounIndex) : 'the whole field';
   setOpenFieldMode();
   resetField({ logMessage: pick(transmissions.clear), status: 'awaiting first contact' });
+  recordHerbariumEntry({
+    name: clearedName,
+    weather: currentWeatherPreset.label,
+    label: 'cleared field',
+    weatherId: currentWeatherPreset.id,
+  });
 });
 
 undoBtn.addEventListener('click', () => {
@@ -3020,6 +3224,7 @@ undoBtn.addEventListener('click', () => {
   undoLastBloom();
 });
 copyLinkBtn.addEventListener('click', copyShareLink);
+copyHerbariumBtn?.addEventListener('click', copyHerbarium);
 sharePostcardBtn.addEventListener('click', shareGardenPostcard);
 exportPngBtn.addEventListener('click', exportGardenPng);
 replayBtn.addEventListener('click', () => replayGarden());
@@ -3105,6 +3310,8 @@ window.addEventListener('load', () => {
   syncControls();
   renderHighlights();
   renderArchive();
+  herbariumEntries = loadHerbariumEntries();
+  renderHerbarium();
   logField('Signal Garden online. The soil is listening.', 'awaiting first contact');
   if (!loadGardenFromHash()) {
     copyLinkBtn.textContent = 'copy share link';

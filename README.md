@@ -30,6 +30,7 @@ Because not every repo should be a dashboard, a wrapper, or a productivity vitam
 - click-to-plant glowing blooms
 - procedural names, ring shapes, stem heights, color accents, and deterministic sky moods
 - reactive field log with atmospheric session notes and milestone transmissions
+- browser-local herbarium bloom index for session memory
 - quick cluster generator
 - curated gallery picks with hand-tuned starter fields across all four weather presets
 - a browsable archive/gallery of the latest UTC daily broadcasts, each with its own mini preview card
