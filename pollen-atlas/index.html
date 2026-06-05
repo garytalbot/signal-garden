@@ -8,9 +8,14 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg: #071018;
-      --bg-2: #0d1623;
-      --panel: rgba(11, 18, 29, 0.84);
+      --ambient-a: 122 184 255;
+      --ambient-b: 255 146 214;
+      --ambient-c: 149 255 203;
+      --ambient-panel: 11 18 29;
+      --ambient-panel-2: 9 12 20;
+      --ambient-grid: 0.12;
+      --ambient-glow: 0.12;
+      --ambient-veil: 0.12;
       --panel-soft: rgba(255, 255, 255, 0.04);
       --line: rgba(174, 214, 255, 0.15);
       --line-strong: rgba(174, 214, 255, 0.24);
@@ -29,9 +34,9 @@
       width: 100%;
       min-height: 100%;
       background:
-        radial-gradient(circle at 15% 18%, rgba(122, 184, 255, 0.12), transparent 30%),
-        radial-gradient(circle at 85% 15%, rgba(255, 146, 214, 0.11), transparent 28%),
-        radial-gradient(circle at 50% 88%, rgba(149, 255, 203, 0.09), transparent 30%),
+        radial-gradient(circle at 15% 18%, rgb(var(--ambient-a) / 0.12), transparent 30%),
+        radial-gradient(circle at 85% 15%, rgb(var(--ambient-b) / 0.11), transparent 28%),
+        radial-gradient(circle at 50% 88%, rgb(var(--ambient-c) / 0.09), transparent 30%),
         linear-gradient(180deg, #050a11 0%, #07111b 46%, #050810 100%);
       color: var(--text);
       font: 400 16px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -44,10 +49,10 @@
       inset: 0;
       pointer-events: none;
       background:
-        linear-gradient(rgba(255,255,255,0.03), rgba(255,255,255,0.01) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01) 1px, transparent 1px);
+        linear-gradient(rgba(255,255,255,var(--ambient-veil)), rgba(255,255,255,0.01) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,calc(var(--ambient-veil) * 0.8)), rgba(255,255,255,0.01) 1px, transparent 1px);
       background-size: 100% 3px, 3px 100%;
-      opacity: 0.12;
+      opacity: var(--ambient-grid);
       mix-blend-mode: screen;
     }
 
@@ -75,7 +80,7 @@
       pointer-events: auto;
       border: 1px solid var(--line);
       border-radius: 26px;
-      background: linear-gradient(180deg, rgba(11, 18, 29, 0.88), rgba(9, 12, 20, 0.74));
+      background: linear-gradient(180deg, rgb(var(--ambient-panel) / 0.88), rgb(var(--ambient-panel-2) / 0.74));
       box-shadow:
         0 22px 70px var(--shadow),
         inset 0 1px 0 rgba(255,255,255,0.07);
@@ -194,6 +199,12 @@
       padding: 11px 14px;
     }
 
+    .mini {
+      color: var(--muted);
+      font-size: 13px;
+      min-height: 1.4em;
+    }
+
     .studio {
       display: flex;
       flex-direction: column;
@@ -206,9 +217,9 @@
       border-radius: 24px;
       border: 1px solid rgba(255,255,255,0.11);
       background:
-        radial-gradient(circle at 30% 22%, rgba(149,255,203,0.12), transparent 24%),
-        radial-gradient(circle at 74% 24%, rgba(122,184,255,0.12), transparent 22%),
-        radial-gradient(circle at 50% 70%, rgba(255,146,214,0.09), transparent 30%),
+        radial-gradient(circle at 30% 22%, rgb(var(--ambient-c) / var(--ambient-glow)), transparent 24%),
+        radial-gradient(circle at 74% 24%, rgb(var(--ambient-a) / var(--ambient-glow)), transparent 22%),
+        radial-gradient(circle at 50% 70%, rgb(var(--ambient-b) / calc(var(--ambient-glow) * 0.75)), transparent 30%),
         linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
       padding: 18px;
       display: flex;
@@ -223,7 +234,7 @@
       position: absolute;
       inset: 0;
       background:
-        linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.07) 24%, transparent 36%),
+        linear-gradient(115deg, transparent 0%, rgb(255 255 255 / calc(var(--ambient-veil) * 0.58)) 24%, transparent 36%),
         linear-gradient(180deg, rgba(255,255,255,0.04), transparent 28%, rgba(0,0,0,0.12));
       mix-blend-mode: screen;
       pointer-events: none;
@@ -373,9 +384,12 @@
         <button id="shuffleBtn" type="button">shuffle drift</button>
         <button id="quietBtn" type="button">quiet the glass</button>
         <button id="clearBtn" type="button">clear selection</button>
+        <button id="copyBtn" type="button">copy atlas card</button>
+        <button id="exportBtn" type="button">export postcard</button>
       </div>
 
       <p class="status" id="status">The cabinet is listening.</p>
+      <p class="mini" id="shareStatus">A card can be copied or exported from the tray.</p>
     </section>
 
     <section class="panel studio" aria-labelledby="studioTitle">
@@ -410,6 +424,7 @@
     const currentGrain = document.getElementById('currentGrain');
     const driftLabel = document.getElementById('driftLabel');
     const statusEl = document.getElementById('status');
+    const shareStatus = document.getElementById('shareStatus');
     const studioTitle = document.getElementById('studioTitle');
     const studioCaption = document.getElementById('studioCaption');
     const familyLabel = document.getElementById('familyLabel');
@@ -420,6 +435,8 @@
     const shuffleBtn = document.getElementById('shuffleBtn');
     const quietBtn = document.getElementById('quietBtn');
     const clearBtn = document.getElementById('clearBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const exportBtn = document.getElementById('exportBtn');
 
     const STORAGE_KEY = 'signal-garden:pollen-atlas:last';
     const specimens = [
@@ -599,6 +616,127 @@
       localStorage.removeItem(STORAGE_KEY);
       selectSpecimen(0, false);
       statusEl.textContent = 'Selection cleared. The first specimen is back in the tray.';
+      shareStatus.textContent = 'The atlas card now points at the first grain again.';
+    }
+
+    function sanitize(text) {
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function currentCardLines() {
+      const specimen = specimens[selectedIndex];
+      return [
+        'Signal Garden / Pollen Atlas',
+        `specimen: ${specimen.name}`,
+        `family: ${specimen.family}`,
+        `season: ${specimen.season}`,
+        `color: ${specimen.color}`,
+        `memory: ${specimen.memory}`,
+        `caption: ${specimen.caption}`,
+        `drift: ${driftModes[modeIndex].label}`,
+        `quiet glass: ${quiet ? 'yes' : 'no'}`
+      ];
+    }
+
+    function atlasCardText() {
+      return currentCardLines().join('\n');
+    }
+
+    function atlasCardSvg() {
+      const specimen = specimens[selectedIndex];
+      const lines = currentCardLines();
+      const width = 960;
+      const height = 1240;
+      const titleY = 130;
+      const lineStart = 300;
+      const lineGap = 64;
+      const accent = `hsl(${specimen.hue}, 86%, 68%)`;
+      const softAccent = `hsla(${specimen.hue}, 86%, 68%, 0.16)`;
+      const dust = Array.from({ length: 12 }, (_, index) => {
+        const x = 110 + ((index * 67 + specimen.hue * 3) % 720);
+        const y = 220 + ((index * 53 + specimen.hue * 5) % 740);
+        const r = 4 + (index % 4) * 2;
+        const glow = 0.16 + (index % 5) * 0.04;
+        return `<circle cx="${x}" cy="${y}" r="${r}" fill="hsla(${(specimen.hue + index * 9) % 360}, 90%, 72%, ${glow})" />`;
+      }).join('');
+
+      return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title desc">
+  <title id="title">Signal Garden Pollen Atlas card</title>
+  <desc id="desc">A browser-local postcard of the current pollen specimen view.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#071018" />
+      <stop offset="100%" stop-color="#050810" />
+    </linearGradient>
+    <radialGradient id="halo" cx="68%" cy="28%" r="58%">
+      <stop offset="0%" stop-color="${accent}" stop-opacity="0.35" />
+      <stop offset="55%" stop-color="${accent}" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="${accent}" stop-opacity="0" />
+    </radialGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" />
+    </filter>
+  </defs>
+  <rect width="100%" height="100%" rx="42" fill="url(#bg)" />
+  <rect x="42" y="42" width="876" height="1156" rx="32" fill="rgba(255,255,255,0.035)" stroke="rgba(255,255,255,0.12)" />
+  <rect x="88" y="88" width="784" height="1040" rx="26" fill="rgba(255,255,255,0.018)" stroke="rgba(255,255,255,0.08)" />
+  <ellipse cx="686" cy="316" rx="232" ry="210" fill="url(#halo)" filter="url(#soft)" />
+  ${dust}
+  <text x="110" y="140" fill="#95ffcb" font-family="system-ui, sans-serif" font-size="26" letter-spacing="5">SIGNAL GARDEN / POLLEN ATLAS</text>
+  <text x="110" y="${titleY}" fill="#eef6ff" font-family="system-ui, sans-serif" font-size="78" font-weight="700" letter-spacing="-3">${sanitize(specimen.name)}</text>
+  <text x="110" y="214" fill="#9fb5ce" font-family="system-ui, sans-serif" font-size="30">${sanitize(specimen.caption)}</text>
+  <text x="110" y="302" fill="#95ffcb" font-family="system-ui, sans-serif" font-size="20" letter-spacing="4">CURRENT VIEW</text>
+  ${lines.slice(1).map((line, index) => {
+        const y = lineStart + index * lineGap;
+        const [label, value] = line.split(': ');
+        return `<text x="110" y="${y}" fill="#9fb5ce" font-family="system-ui, sans-serif" font-size="24" letter-spacing="1">${sanitize(label)}:</text>
+  <text x="300" y="${y}" fill="#eef6ff" font-family="system-ui, sans-serif" font-size="24">${sanitize(value || '')}</text>`;
+      }).join('\n  ')}
+  <rect x="110" y="995" width="742" height="2" fill="${softAccent}" />
+  <text x="110" y="1068" fill="#9fb5ce" font-family="system-ui, sans-serif" font-size="20" letter-spacing="4">BROWSER-LOCAL MEMORY</text>
+  <text x="110" y="1112" fill="#eef6ff" font-family="system-ui, sans-serif" font-size="26">${sanitize(specimen.note)}</text>
+  <text x="110" y="1170" fill="#9fb5ce" font-family="system-ui, sans-serif" font-size="18">quiet glass: ${quiet ? 'yes' : 'no'} · drift: ${driftModes[modeIndex].label}</text>
+</svg>`;
+    }
+
+    async function copyAtlasCard() {
+      const text = atlasCardText();
+      try {
+        await navigator.clipboard.writeText(text);
+        shareStatus.textContent = 'Atlas card copied to clipboard.';
+      } catch (error) {
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.setAttribute('readonly', '');
+        area.style.position = 'fixed';
+        area.style.left = '-9999px';
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand('copy');
+        area.remove();
+        shareStatus.textContent = 'Atlas card copied with a fallback selection.';
+      }
+    }
+
+    function exportAtlasCard() {
+      const svg = atlasCardSvg();
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const specimen = specimens[selectedIndex];
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, '-');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pollen-atlas-${specimen.id}-${stamp}.svg`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      shareStatus.textContent = 'Atlas postcard exported as an SVG.';
     }
 
     function draw() {
@@ -677,6 +815,8 @@
     shuffleBtn.addEventListener('click', shuffleDrift);
     quietBtn.addEventListener('click', toggleQuiet);
     clearBtn.addEventListener('click', clearSelection);
+    copyBtn.addEventListener('click', copyAtlasCard);
+    exportBtn.addEventListener('click', exportAtlasCard);
 
     resize();
     restore();
