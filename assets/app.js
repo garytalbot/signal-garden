@@ -32,6 +32,7 @@ const logStatusEl = document.getElementById('logStatus');
 const herbariumListEl = document.getElementById('herbariumList');
 const herbariumStatusEl = document.getElementById('herbariumStatus');
 const copyHerbariumBtn = document.getElementById('copyHerbarium');
+const exportHerbariumBtn = document.getElementById('exportHerbarium');
 const archiveGridEl = document.getElementById('archiveGrid');
 const archiveStatusEl = document.getElementById('archiveStatus');
 const highlightsGridEl = document.getElementById('highlightsGrid');
@@ -1130,6 +1131,7 @@ function renderHerbarium() {
     }
     if (copyHerbariumBtn) {
       copyHerbariumBtn.disabled = true;
+      if (exportHerbariumBtn) exportHerbariumBtn.disabled = true;
     }
     return;
   }
@@ -1158,6 +1160,9 @@ function renderHerbarium() {
   if (copyHerbariumBtn) {
     copyHerbariumBtn.disabled = false;
   }
+  if (exportHerbariumBtn) {
+    exportHerbariumBtn.disabled = false;
+  }
 }
 
 function recordHerbariumEntry({
@@ -1183,10 +1188,78 @@ function recordHerbariumEntry({
   return entry;
 }
 
-function herbariumPlainText(entries = herbariumEntries.slice(0, HERBARIUM_LIMIT)) {
-  const lines = entries.map((entry, index) => `${String(index + 1).padStart(2, '0')}. ${entry.name} | ${entry.weather} | ${entry.label}`);
-  const body = lines.length ? lines : ['(no blooms pressed yet)'];
-  return ['Herbarium', ...body].join('\n');
+function buildHerbariumPostcardSvg() {
+  const width = 1200;
+  const height = 1600;
+  const entries = herbariumEntries.slice(0, HERBARIUM_LIMIT);
+  const title = 'Signal Garden Herbarium';
+  const subtitle = entries.length
+    ? `A browser-local bloom index of ${entries.length} pressed specimen${entries.length === 1 ? '' : 's'}.`
+    : 'A browser-local bloom index waiting to be pressed into existence.';
+  const currentWeather = escapeXml(currentWeatherPreset.label);
+  const countLabel = `${entries.length}/${HERBARIUM_LIMIT}`;
+  const rowStart = 250;
+  const rowGap = 124;
+
+  const rows = (entries.length ? entries : [{ name: 'No blooms yet', weather: currentWeatherPreset.label, label: 'awaiting first contact', at: Date.now(), accentIndex: 0, weatherId: currentWeatherPreset.id }]).map((entry, index) => {
+    const preset = getWeatherPresetById(entry.weatherId ?? currentWeatherPreset.id);
+    const accent = getAccentColor(entry.accentIndex ?? 0, preset);
+    const y = rowStart + index * rowGap;
+    const stamp = herbariumStamp(entry.at);
+    return `
+      <g transform="translate(72 ${y})">
+        <rect width="1056" height="96" rx="22" fill="rgba(10, 18, 30, 0.78)" stroke="rgba(141, 220, 255, 0.18)"/>
+        <circle cx="36" cy="48" r="18" fill="${accent}" opacity="0.92"/>
+        <circle cx="36" cy="48" r="30" fill="${accent}" opacity="0.14"/>
+        <text x="82" y="36" fill="#ebf5ff" font-size="24" font-family="Inter, system-ui, sans-serif">${escapeXml(entry.name)}</text>
+        <text x="82" y="61" fill="#95abc0" font-size="16" font-family="Inter, system-ui, sans-serif">${escapeXml(entry.label)} • ${escapeXml(stamp)}</text>
+        <text x="82" y="83" fill="#8ddcff" font-size="14" letter-spacing="2" font-family="Inter, system-ui, sans-serif">${escapeXml(entry.weather)}</text>
+        <text x="1008" y="38" text-anchor="end" fill="#8ddcff" font-size="13" letter-spacing="2" font-family="Inter, system-ui, sans-serif">${String(index + 1).padStart(2, '0')}</text>
+        <text x="1008" y="69" text-anchor="end" fill="#ebf5ff" font-size="18" font-family="Inter, system-ui, sans-serif">${escapeXml(preset.label)}</text>
+      </g>
+    `;
+  }).join('');
+
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#07111a"/>
+          <stop offset="100%" stop-color="#050a10"/>
+        </linearGradient>
+        <radialGradient id="glowA" cx="24%" cy="14%" r="36%">
+          <stop offset="0%" stop-color="rgba(124, 255, 143, 0.28)"/>
+          <stop offset="100%" stop-color="rgba(124, 255, 143, 0)"/>
+        </radialGradient>
+        <radialGradient id="glowB" cx="82%" cy="18%" r="30%">
+          <stop offset="0%" stop-color="rgba(85, 230, 255, 0.2)"/>
+          <stop offset="100%" stop-color="rgba(85, 230, 255, 0)"/>
+        </radialGradient>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#bg)"/>
+      <rect width="100%" height="100%" fill="url(#glowA)"/>
+      <rect width="100%" height="100%" fill="url(#glowB)"/>
+      <text x="72" y="110" fill="#8ddcff" font-size="18" letter-spacing="6" font-family="Inter, system-ui, sans-serif">HERBARIUM</text>
+      <text x="72" y="162" fill="#ebf5ff" font-size="64" font-weight="700" font-family="Inter, system-ui, sans-serif">${title}</text>
+      <text x="72" y="202" fill="#95abc0" font-size="24" font-family="Inter, system-ui, sans-serif">${subtitle}</text>
+      <text x="1128" y="114" text-anchor="end" fill="#8ddcff" font-size="18" letter-spacing="4" font-family="Inter, system-ui, sans-serif">${currentWeather}</text>
+      <text x="1128" y="158" text-anchor="end" fill="#ebf5ff" font-size="36" font-family="Inter, system-ui, sans-serif">${countLabel}</text>
+      <text x="72" y="234" fill="#95abc0" font-size="14" letter-spacing="3" font-family="Inter, system-ui, sans-serif">BROWSER-LOCAL MEMORY, PRETENDING TO BE BOTANY</text>
+      ${rows}
+      <text x="72" y="1530" fill="#95abc0" font-size="16" font-family="Inter, system-ui, sans-serif">Captured from Signal Garden on ${escapeXml(new Date().toLocaleString())}</text>
+    </svg>
+  `;
+}
+
+function makeHerbariumFilename() {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return `signal-garden-herbarium-${timestamp}.svg`;
+}
+
+function exportHerbariumPostcard() {
+  const svg = buildHerbariumPostcardSvg();
+  downloadBlob(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }), makeHerbariumFilename());
+  logField('Herbarium postcard exported. The pressed blooms have a passport now.', 'herbarium postcard ready');
 }
 
 async function copyHerbarium() {
@@ -1266,6 +1339,9 @@ function syncControls() {
   exportPngBtn.disabled = disabled;
   if (copyHerbariumBtn) {
     copyHerbariumBtn.disabled = herbariumEntries.length === 0;
+  }
+  if (exportHerbariumBtn) {
+    exportHerbariumBtn.disabled = herbariumEntries.length === 0;
   }
 
   if (disabled) stage.setAttribute('data-empty', 'true');
@@ -3225,6 +3301,7 @@ undoBtn.addEventListener('click', () => {
 });
 copyLinkBtn.addEventListener('click', copyShareLink);
 copyHerbariumBtn?.addEventListener('click', copyHerbarium);
+exportHerbariumBtn?.addEventListener('click', exportHerbariumPostcard);
 sharePostcardBtn.addEventListener('click', shareGardenPostcard);
 exportPngBtn.addEventListener('click', exportGardenPng);
 replayBtn.addEventListener('click', () => replayGarden());

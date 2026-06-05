@@ -1568,6 +1568,7 @@ button[aria-pressed="true"] {
 .herbarium-list .copy-button,
 .bloom-index-list .copy-button,
 .herbarium-shell button[data-action="copy"],
+.herbarium-shell button[data-action="export"],
 .bloom-index-shell button[data-action="copy"] {
   align-self: start;
   padding: 10px 14px;
@@ -1751,6 +1752,7 @@ button[aria-pressed="true"] {
   .herbarium-list .copy-button,
   .bloom-index-list .copy-button,
   .herbarium-shell button[data-action="copy"],
+  .herbarium-shell button[data-action="export"],
   .bloom-index-shell button[data-action="copy"] {
     width: 100%;
   }
