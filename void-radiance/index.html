@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Void Radiance</title>
+  <meta
+    name="description"
+    content="Void Radiance is a strange interactive ritual where particles orbit ghost attractors and slowly erase themselves into noise."
+  />
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      --ink: #eef0ff;
+      --muted: #9ca2ff;
+      --panel: #130d26;
+      --bg: #090412;
+      --line: #7f63ff;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      background: radial-gradient(circle at 20% 15%, #28134f, #090412 70%);
+      color: var(--ink);
+      overflow: hidden;
+    }
+
+    .stage {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: radial-gradient(circle at 60% 8%, #2e1560 0%, #070512 48%, #05020e 100%);
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .hud {
+      position: fixed;
+      left: 0.75rem;
+      right: 0.75rem;
+      top: 0.75rem;
+      z-index: 1;
+      display: grid;
+      gap: 0.6rem;
+      pointer-events: none;
+    }
+
+    .panel {
+      pointer-events: auto;
+      border: 1px solid #33255f;
+      background: color-mix(in oklab, var(--panel), #000 18%);
+      border-radius: 0.85rem;
+      padding: 0.58rem 0.72rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 10px 30px #00000088;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    button,
+    .link {
+      border: 1px solid #5b45a2;
+      border-radius: 999px;
+      padding: 0.4rem 0.72rem;
+      background: #1a1340;
+      color: #dfe1ff;
+      text-decoration: none;
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    button:hover,
+    .link:hover {
+      border-color: #a48fff;
+      color: #ffffff;
+    }
+
+    label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      color: #cfccff;
+      text-transform: uppercase;
+    }
+
+    input[type='range'] {
+      width: 150px;
+    }
+
+    .status {
+      font-size: 0.76rem;
+      color: #c8b5ff;
+      max-width: 52ch;
+      line-height: 1.35;
+    }
+
+    .status strong {
+      color: #ffcffb;
+    }
+
+    .return {
+      position: fixed;
+      right: 0.75rem;
+      bottom: 0.75rem;
+      z-index: 1;
+      pointer-events: auto;
+      background: #151037;
+      border: 1px solid #4d3f90;
+      border-radius: 999px;
+      padding: 0.42rem 0.72rem;
+      color: #d6ccff;
+      text-decoration: none;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .return:hover {
+      color: #fff;
+      border-color: #b2a2ff;
+    }
+
+    @media (max-width: 720px) {
+      .panel {
+        gap: 0.45rem;
+      }
+      .status {
+        max-width: 100%;
+      }
+      input[type='range'] {
+        width: 140px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <canvas id="radianceCanvas" aria-label="Void Radiance canvas"></canvas>
+  </div>
+
+  <div class="hud" aria-label="control panel">
+    <div class="panel" id="controlPanel">
+      <div class="row">
+        <button id="pauseBtn">pause: off</button>
+        <button id="reseedBtn">reseed</button>
+        <button id="spawnBtn">spawn knot</button>
+        <button id="trailBtn">trail: on</button>
+        <button id="clearBtn">clear</button>
+      </div>
+      <div class="row">
+        <label>
+          chaos
+          <input id="chaosRange" type="range" min="0" max="100" step="1" value="45" />
+          <span id="chaosValue">45</span>
+        </label>
+      </div>
+    </div>
+    <div class="panel status" id="status" aria-live="polite"></div>
+  </div>
+
+  <a class="return" href="../">return home</a>
+
+  <script>
+    const canvas = document.getElementById('radianceCanvas');
+    const ctx = canvas.getContext('2d');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const reseedBtn = document.getElementById('reseedBtn');
+    const spawnBtn = document.getElementById('spawnBtn');
+    const trailBtn = document.getElementById('trailBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const chaosRange = document.getElementById('chaosRange');
+    const chaosValue = document.getElementById('chaosValue');
+    const status = document.getElementById('status');
+
+    const params = new URLSearchParams(location.search);
+    let seed = params.has('seed') ? Number.parseInt(params.get('seed'), 16) || 0x9efac0 : (Date.now() & 0xffffffff);
+    let running = true;
+    let pointer = {x: window.innerWidth / 2, y: window.innerHeight / 2, active: false};
+    let trail = true;
+    let chaos = 0.45;
+    const attractors = [];
+    const emitters = [];
+
+    const state = {
+      t: 0,
+      particles: [],
+      count: 0,
+    };
+
+    const palette = ['#94f2ff', '#cab1ff', '#ff87dc', '#fef07a', '#a6ffc8', '#ffb38f', '#ffffff'];
+
+    function resize() {
+      const ratio = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.floor(window.innerWidth * ratio);
+      canvas.height = Math.floor(window.innerHeight * ratio);
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    }
+
+    function lcg() {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    }
+
+    function colorFrom(i) {
+      return palette[i % palette.length];
+    }
+
+    function spawnAt(x, y, burst = 18) {
+      const now = state.t;
+      for (let i = 0; i < burst; i++) {
+        const angle = lcg() * Math.PI * 2;
+        const speed = 0.4 + lcg() * 1.8;
+        state.particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 240 + Math.floor(lcg() * 220),
+          age: 0,
+          radius: 0.8 + lcg() * 2.2,
+          hue: Math.floor(lcg() * 360),
+          seed: lcg() * 200,
+          trace: [],
+          born: now,
+        });
+      }
+      state.count += burst;
+    }
+
+    function reseed() {
+      state.particles.length = 0;
+      emitters.length = 0;
+      attractors.length = 0;
+      state.t = 0;
+      state.count = 0;
+      seed = (Date.now() ^ 0xabc123) >>> 0;
+      for (let i = 0; i < 4; i++) {
+        attractors.push({
+          x: lcg() * window.innerWidth,
+          y: lcg() * window.innerHeight,
+          strength: 0.42 + lcg() * 0.9,
+          phase: lcg() * Math.PI * 2,
+        });
+      }
+      for (let i = 0; i < 3; i++) {
+        spawnAt(lcg() * window.innerWidth, lcg() * window.innerHeight, 24);
+      }
+      historyPush(`reseeded seed: ${seed.toString(16).slice(0, 8)}; attractors: ${attractors.length}`);
+    }
+
+    const statusBits = [];
+    function historyPush(text) {
+      const when = new Date().toLocaleTimeString();
+      statusBits.unshift(`<strong>${when}</strong> ${text}`);
+      if (statusBits.length > 3) statusBits.length = 3;
+    }
+
+    function step() {
+      if (!running) {
+        requestAnimationFrame(step);
+        return;
+      }
+
+      state.t += 0.016;
+      if (!trail) {
+        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      } else {
+        ctx.fillStyle = 'rgba(9,4,18,0.08)';
+        ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+      }
+
+      const cx = attractors.length
+        ? attractors.reduce((a, b) => a + b.x / attractors.length, 0)
+        : window.innerWidth * 0.5;
+      const cy = attractors.length
+        ? attractors.reduce((a, b) => a + b.y / attractors.length, 0)
+        : window.innerHeight * 0.5;
+
+      for (let i = attractors.length - 1; i >= 0; i -= 1) {
+        const a = attractors[i];
+        a.phase += 0.0028 + lcg() * 0.004;
+        a.strength = 0.35 + Math.sin(a.phase + state.t * 0.7) * 0.33;
+        a.x += Math.sin(state.t * 0.2 + i) * 0.3;
+        a.y += Math.cos(state.t * 0.17 + i * 1.7) * 0.3;
+      }
+
+      const next = [];
+      for (const p of state.particles) {
+        const fx = pointer.active ? (pointer.x - p.x) * 0.0018 : 0;
+        const fy = pointer.active ? (pointer.y - p.y) * 0.0018 : 0;
+
+        let ax = 0;
+        let ay = 0;
+        for (const a of attractors) {
+          const dx = a.x - p.x;
+          const dy = a.y - p.y;
+          const d2 = dx * dx + dy * dy + 0.5;
+          const pull = (a.strength * (1 / d2) * 2200) * chaos;
+          ax += dx * pull;
+          ay += dy * pull;
+        }
+
+        const swirl = Math.sin(p.hue + p.seed + state.t * 0.6);
+        ax += Math.cos(swirl) * 0.012;
+        ay += Math.sin(swirl) * 0.012;
+
+        p.vx = p.vx * 0.97 + ax * 0.08 + fx * 0.45;
+        p.vy = p.vy * 0.97 + ay * 0.08 + fy * 0.45;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.age += 1;
+
+        p.trace.push({x: p.x, y: p.y});
+        if (p.trace.length > 12) p.trace.shift();
+
+        const wobble = Math.sin(state.t * 5 + p.seed) * 1.1 * chaos;
+        p.trace.forEach((point, idx) => {
+          const a = (idx / p.trace.length) * 0.7;
+          ctx.fillStyle = `color-mix(in oklab, ${colorFrom(p.seed * 12)} ${30 + a * 70}%, transparent)`;
+          ctx.fillRect(point.x + Math.sin(point.y * 0.01 + idx) * wobble, point.y + Math.cos(point.x * 0.01 - idx) * wobble, 1.4, 1.4);
+        });
+
+        const c = colorFrom(p.hue + p.age * 0.25);
+        ctx.strokeStyle = c;
+        ctx.lineWidth = 1.0;
+        if (p.trace.length > 1) {
+          const t0 = p.trace[0];
+          const t1 = p.trace[p.trace.length - 1];
+          ctx.beginPath();
+          ctx.moveTo(t0.x, t0.y);
+          ctx.lineTo(t1.x, t1.y);
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = c;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        p.vx += (cx - p.x) * 0.000008 * chaos;
+        p.vy += (cy - p.y) * 0.000008 * chaos;
+
+        if (p.age < p.life && p.x > -120 && p.x < window.innerWidth + 120 && p.y > -120 && p.y < window.innerHeight + 120) {
+          next.push(p);
+        }
+      }
+
+      state.particles = next;
+      if (state.particles.length < 700 && state.t % 0.2 < 0.015) {
+        const jitter = 20;
+        spawnAt(cx + (lcg() - 0.5) * jitter, cy + (lcg() - 0.5) * jitter, 1);
+      }
+
+      status.innerHTML =
+        `<strong>particles:</strong> ${state.particles.length} &nbsp;·&nbsp; ` +
+        `<strong>attractors:</strong> ${attractors.length} &nbsp;·&nbsp; ` +
+        `<strong>seed:</strong> ${seed.toString(16).slice(0, 8)} &nbsp;·&nbsp; ` +
+        `<strong>frame:</strong> ${Math.floor(state.t * 60)}<br>${statusBits.join('  ·  ')}`;
+
+      requestAnimationFrame(step);
+    }
+
+    function addAttractor(x, y) {
+      attractors.push({
+        x,
+        y,
+        strength: 0.6 + lcg() * 0.8,
+        phase: lcg() * Math.PI * 2,
+      });
+      if (attractors.length > 6) attractors.shift();
+      historyPush(`added attractor (${Math.round(x)}, ${Math.round(y)})`);
+    }
+
+    canvas.addEventListener('mousemove', (ev) => {
+      pointer.active = true;
+      pointer.x = ev.clientX;
+      pointer.y = ev.clientY;
+    });
+
+    canvas.addEventListener('touchmove', (ev) => {
+      const t = ev.touches[0];
+      if (!t) return;
+      pointer.active = true;
+      pointer.x = t.clientX;
+      pointer.y = t.clientY;
+    }, {passive: true});
+
+    canvas.addEventListener('pointerleave', () => {
+      pointer.active = false;
+    });
+
+    canvas.addEventListener('click', (ev) => {
+      addAttractor(ev.clientX, ev.clientY);
+      spawnAt(ev.clientX, ev.clientY, 24);
+      historyPush('spawned on click');
+    });
+
+    pauseBtn.addEventListener('click', () => {
+      running = !running;
+      pauseBtn.textContent = `pause: ${running ? 'off' : 'on'}`;
+      if (running) {
+        requestAnimationFrame(step);
+      }
+      historyPush(`pause ${running ? 'disabled' : 'enabled'}`);
+    });
+
+    reseedBtn.addEventListener('click', reseed);
+
+    spawnBtn.addEventListener('click', () => {
+      spawnAt(pointer.x || window.innerWidth / 2, pointer.y || window.innerHeight / 2, 32);
+      historyPush('manual spawn');
+    });
+
+    trailBtn.addEventListener('click', () => {
+      trail = !trail;
+      trailBtn.textContent = `trail: ${trail ? 'on' : 'off'}`;
+      if (!trail) ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      historyPush(`trail ${trail ? 'on' : 'off'}`);
+    });
+
+    clearBtn.addEventListener('click', () => {
+      state.particles.length = 0;
+      attractors.length = 0;
+      reseed();
+      historyPush('cleared and reseeded');
+    });
+
+    chaosRange.addEventListener('input', (ev) => {
+      chaos = Number(ev.target.value) / 100;
+      chaosValue.textContent = Math.round(chaos * 100);
+      historyPush(`chaos ${Math.round(chaos * 100)}`);
+    });
+
+    window.addEventListener('resize', resize);
+    window.addEventListener('keydown', (ev) => {
+      if (ev.code === 'Space') {
+        ev.preventDefault();
+        reseed();
+      }
+      if (ev.code === 'KeyT') trail = !trail, trailBtn.textContent = `trail: ${trail ? 'on' : 'off'}`;
+      if (ev.code === 'KeyC') {
+        running = false;
+        pauseBtn.textContent = 'pause: on';
+        historyPush('captured frame');
+        const url = location.pathname + '?seed=' + seed.toString(16);
+        navigator.clipboard && navigator.clipboard.writeText(`${location.origin}/signal-garden/void-radiance/?seed=${seed.toString(16)}`).catch(() => {});
+      }
+      if (ev.code === 'KeyP') {
+        running = !running;
+        pauseBtn.textContent = `pause: ${running ? 'off' : 'on'}`;
+      }
+    });
+
+    resize();
+    ctx.fillStyle = '#090412';
+    ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+    chaos = chaosRange.value / 100;
+    chaosValue.textContent = chaosRange.value;
+    reseed();
+    requestAnimationFrame(step);
+  </script>
+</body>
+</html>
