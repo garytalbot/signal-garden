@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Signal Garden — Echo Current</title>
+  <meta name="description" content="A tiny strange sketch where drifted particles flow through a click-born current and slowly rewrite their own ghosted path." />
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      --ink: #f2eafe;
+      --bg: #120b24;
+      --panel: #1a1338;
+      --line: #b39aff;
+      --glow: #79ddff;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      color: var(--ink);
+      background: radial-gradient(circle at 20% 20%, #261e43 0%, var(--bg) 55%, #0b0718 100%);
+    }
+
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 1rem;
+      display: grid;
+      gap: 0.9rem;
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      margin: 0;
+      letter-spacing: 0.02em;
+      font-size: clamp(1.3rem, 3vw, 2rem);
+    }
+
+    .eyebrow {
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      opacity: 0.75;
+      font-size: 0.75rem;
+    }
+
+    .note {
+      margin: 0;
+      max-width: 720px;
+      line-height: 1.45;
+      color: #d6ccf3;
+      font-size: 0.95rem;
+    }
+
+    .controls {
+      display: flex;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 1px solid #7b67d6;
+      color: var(--ink);
+      background: rgba(127, 108, 226, 0.15);
+      border-radius: 999px;
+      padding: 0.45rem 0.95rem;
+      cursor: pointer;
+    }
+
+    button.active {
+      background: rgba(180, 153, 255, 0.35);
+      box-shadow: 0 0 0 2px rgba(176, 156, 255, 0.2) inset;
+    }
+
+    .stage-wrap {
+      position: relative;
+      border-radius: 1rem;
+      border: 1px solid rgba(166, 145, 255, 0.45);
+      background: linear-gradient(140deg, #150e2d, #1e1546 65%, #130c2b);
+      box-shadow: 0 12px 38px rgba(8, 4, 22, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04);
+      overflow: hidden;
+    }
+
+    canvas {
+      width: 100%;
+      height: min(68vh, 700px);
+      display: block;
+      cursor: crosshair;
+    }
+
+    .hud {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.6rem 0.75rem;
+      border-top: 1px solid rgba(180, 150, 255, 0.25);
+      background: color-mix(in oklab, var(--panel), #000 18%);
+      font-size: 0.9rem;
+      color: #d3c9ff;
+    }
+
+    .hud strong {
+      color: #a8f0ff;
+    }
+
+    .return {
+      color: #d4c9ff;
+      text-decoration: none;
+      border-bottom: 1px dashed transparent;
+    }
+
+    .return:hover { border-color: #d4c9ff; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="top">
+      <div>
+        <p class="eyebrow">Signal Garden side-current</p>
+        <h1>Echo Current</h1>
+        <p class="note">Click anywhere to seed a current knot. Each knot drags particles toward it, then they spiral outward and rewrite their own trail. Nothing here stays; everything keeps remembering in negative time.</p>
+      </div>
+      <div class="controls" aria-label="Controls">
+        <button id="reseedBtn" class="active">reseed flow</button>
+        <button id="pauseBtn">pause</button>
+        <button id="clearBtn">clear knots</button>
+        <button id="chaosBtn">chaos</button>
+      </div>
+    </header>
+
+    <section class="stage-wrap">
+      <canvas id="echoCanvas" width="1200" height="720" aria-label="Echo current field"></canvas>
+      <div class="hud">
+        <span>knots: <strong id="knotCount">0</strong></span>
+        <span>threads: <strong id="threadCount">0</strong></span>
+        <span>pulse: <strong id="pulseLabel">running</strong></span>
+        <span>drift: <strong id="driftLabel">0.00</strong></span>
+      </div>
+    </section>
+
+    <a class="return" href="../">Return to Signal Garden home</a>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('echoCanvas');
+    const ctx = canvas.getContext('2d');
+    const width = () => canvas.clientWidth;
+    const height = () => canvas.clientHeight;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const fitCanvas = () => {
+      canvas.width = Math.max(1, Math.floor(width() * dpr));
+      canvas.height = Math.max(1, Math.floor(height() * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    fitCanvas();
+    window.addEventListener('resize', fitCanvas);
+
+    const knotCountEl = document.getElementById('knotCount');
+    const threadCountEl = document.getElementById('threadCount');
+    const pulseLabel = document.getElementById('pulseLabel');
+    const driftLabel = document.getElementById('driftLabel');
+
+    const knobs = {
+      chaos: 0.62,
+      seed: 0.73,
+      running: true,
+      frame: 0,
+      threads: []
+    };
+
+    let knots = [];
+
+    class Thread {
+      constructor(x, y, phase) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 0.6;
+        this.vy = (Math.random() - 0.5) * 0.6;
+        this.phase = phase;
+        this.hue = 245 + Math.random() * 70;
+        this.history = [];
+      }
+
+      step() {
+        let fx = 0;
+        let fy = 0;
+        for (const k of knots) {
+          const dx = k.x - this.x;
+          const dy = k.y - this.y;
+          const dist = Math.hypot(dx, dy) + 20;
+          const pull = 2500 / (dist * dist);
+          fx += dx * pull;
+          fy += dy * pull;
+        }
+
+        const swirl = Math.sin((knots.length + 1) * 0.08 + this.phase + knobs.frame * 0.013) * 0.9;
+        const drift = Math.cos((this.phase + knobs.frame * 0.009)) * knobs.chaos;
+        this.vx += fx * 0.0008 + Math.cos(swirl) * 0.003 + drift * 0.004;
+        this.vy += fy * 0.0008 + Math.sin(swirl) * 0.003 + drift * 0.004;
+
+        this.vx *= 0.98;
+        this.vy *= 0.98;
+        this.x += this.vx;
+        this.y += this.vy;
+
+        if (this.x < -30) this.x = width() + 30;
+        if (this.x > width() + 30) this.x = -30;
+        if (this.y < -30) this.y = height() + 30;
+        if (this.y > height() + 30) this.y = -30;
+
+        this.history.push([this.x, this.y]);
+        if (this.history.length > 18) this.history.shift();
+      }
+
+      draw() {
+        if (this.history.length < 2) return;
+        const hue = this.hue + Math.sin(this.phase + knobs.frame * 0.01) * 20;
+        ctx.strokeStyle = `hsla(${hue.toFixed(0)}, 88%, ${58 + this.history.length * 0.4}%, ${0.15 + this.history.length * 0.02})`;
+        ctx.lineWidth = 1.1 + this.history.length * 0.04;
+        ctx.beginPath();
+        for (let i = 0; i < this.history.length; i++) {
+          const [x, y] = this.history[i];
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.fillStyle = `hsla(${hue.toFixed(0)}, 95%, 80%, 0.8)`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 1.5 + (this.vx * this.vx + this.vy * this.vy), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function spawnThread(x, y, count = 26) {
+      for (let i = 0; i < count; i++) {
+        knobs.threads.push(new Thread(x, y, Math.random() * 999));
+      }
+    }
+
+    function seedKnot(x, y) {
+      knots.push({x, y, age: 0});
+      spawnThread(x, y, 10);
+      updateHud();
+    }
+
+    function reseed() {
+      knots = [];
+      knobs.threads = [];
+      knobs.frame = 0;
+      knobs.seed = (Math.sin(knobs.seed * 10000 + performance.now() / 1000) + 1) / 2;
+      for (let i = 0; i < 6; i++) {
+        knots.push({
+          x: Math.random() * width(),
+          y: Math.random() * height(),
+          age: 0
+        });
+      }
+      for (const k of knots) {
+        spawnThread(k.x, k.y, 8);
+      }
+      updateHud();
+    }
+
+    function togglePause() {
+      knobs.running = !knobs.running;
+      document.getElementById('pauseBtn').textContent = knobs.running ? 'pause' : 'resume';
+      pulseLabel.textContent = knobs.running ? 'running' : 'paused';
+      if (knobs.running) requestAnimationFrame(tick);
+    }
+
+    function clearKnots() {
+      knots = [];
+      knobs.threads = [];
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      updateHud();
+    }
+
+    function toggleChaos() {
+      knobs.chaos = knobs.chaos > 0.9 ? 0.35 : knobs.chaos + 0.21;
+      if (knobs.chaos > 1.1) knobs.chaos = 0.35;
+      const btn = document.getElementById('chaosBtn');
+      btn.classList.toggle('active', knobs.chaos >= 0.82);
+      btn.textContent = `chaos: ${knobs.chaos.toFixed(2)}`;
+    }
+
+    function updateHud() {
+      knotCountEl.textContent = knots.length;
+      threadCountEl.textContent = knobs.threads.length;
+      driftLabel.textContent = knobs.threads.length ? ((knots.length * knobs.chaos) / 4).toFixed(2) : '0.00';
+    }
+
+    function drawGhostGrid() {
+      const step = 50;
+      ctx.strokeStyle = 'rgba(130, 95, 220, 0.06)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < width(); x += step) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height());
+        ctx.stroke();
+      }
+      for (let y = 0; y < height(); y += step) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width(), y);
+        ctx.stroke();
+      }
+    }
+
+    function drawKnots() {
+      for (const k of knots) {
+        k.age += 1;
+        const alpha = Math.max(0.15, 1 - k.age / 800);
+        if (alpha <= 0.0) continue;
+        const t = (Math.sin((k.age + knobs.frame) * 0.02) + 1) * 0.5;
+        ctx.fillStyle = `rgba(170, 220, 255, ${0.18 + alpha * 0.4})`;
+        ctx.beginPath();
+        ctx.arc(k.x, k.y, 3 + t * 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = `rgba(255, 230, 255, ${0.35 * alpha})`;
+        ctx.beginPath();
+        ctx.arc(k.x, k.y, 8 + t * 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      knots = knots.filter(k => k.age < 1200);
+    }
+
+    function tick() {
+      if (!knobs.running) return;
+      knobs.frame += 1;
+      ctx.clearRect(0, 0, width(), height());
+      drawGhostGrid();
+
+      ctx.globalCompositeOperation = 'lighter';
+      for (const thread of knobs.threads) {
+        thread.step();
+        thread.draw();
+      }
+      knobs.threads = knobs.threads.filter(t => t.history.length > 1);
+      ctx.globalCompositeOperation = 'source-over';
+      drawKnots();
+      updateHud();
+      requestAnimationFrame(tick);
+    }
+
+    function pointerFromEvent(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top
+      };
+    }
+
+    canvas.addEventListener('pointerdown', (event) => {
+      const {x, y} = pointerFromEvent(event);
+      if (knots.length > 24) {
+        knots = knots.slice(-21);
+      }
+      seedKnot(x, y);
+      if (!knobs.running) tick();
+    });
+
+    document.getElementById('reseedBtn').addEventListener('click', reseed);
+    document.getElementById('pauseBtn').addEventListener('click', togglePause);
+    document.getElementById('clearBtn').addEventListener('click', clearKnots);
+    document.getElementById('chaosBtn').addEventListener('click', toggleChaos);
+
+    reseed();
+    updateHud();
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>
