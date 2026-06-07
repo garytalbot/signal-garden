@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Void Liturgy</title>
+  <meta
+    name="description"
+    content="Void Liturgy is a live cursor-ritual that draws drifting glyphs into a glowing chamber."
+  />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #06060e;
+      --panel: #0d1120cc;
+      --ink: #d2fbff;
+      --muted: #9ab8ff;
+      --accent: #8d6bff;
+      --danger: #ff8dd6;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      background: radial-gradient(circle at 50% 15%, #131934 0%, var(--bg) 60%, #03040a 100%);
+      color: var(--ink);
+      font-family: "IBM Plex Mono", "Courier New", Courier, monospace;
+      overflow: hidden;
+    }
+
+    body {
+      position: relative;
+    }
+
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      image-rendering: optimizeSpeed;
+    }
+
+    .hud {
+      position: fixed;
+      top: 0.7rem;
+      left: 0.7rem;
+      right: 0.7rem;
+      z-index: 2;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(160deg, #0f1322dd, #070a13cc);
+      border: 1px solid #25306f;
+      padding: 0.5rem 0.7rem;
+      backdrop-filter: blur(2px);
+    }
+
+    .brand { font-weight: 700; letter-spacing: 0.08em; }
+
+    .meta { color: var(--muted); font-size: 0.82rem; }
+
+    .controls { display: flex; gap: 0.45rem; }
+
+    button,
+    .home {
+      border: 1px solid #3f4682;
+      background: #10162f;
+      color: var(--ink);
+      padding: 0.35rem 0.58rem;
+      text-decoration: none;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      cursor: pointer;
+    }
+
+    button:hover,
+    .home:hover { color: var(--danger); border-color: var(--danger); }
+
+    .status {
+      margin-left: auto;
+      max-width: 56ch;
+      color: #c8e2ff;
+      font-size: 0.76rem;
+    }
+
+    .status strong { color: var(--accent); }
+
+    .note {
+      position: fixed;
+      bottom: 0.7rem;
+      left: 0.7rem;
+      right: 0.7rem;
+      font-size: 0.75rem;
+      color: #b6d1ff;
+      background: #0e1734cc;
+      border: 1px solid #25306f;
+      padding: 0.45rem 0.6rem;
+      z-index: 2;
+    }
+
+    .status-dot {
+      color: var(--danger);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="void"></canvas>
+
+  <div class="hud" role="region" aria-label="control panel">
+    <span class="brand">void liturgy</span>
+    <span class="meta">deterministic + chaotic glyph drift ritual</span>
+    <div class="controls">
+      <button id="spawnBtn" type="button">add storm</button>
+      <button id="muteBtn" type="button">trails: on</button>
+      <button id="reseedBtn" type="button">reseed</button>
+      <button id="clearBtn" type="button">clear chamber</button>
+      <a class="home" href="../" aria-label="Back to Signal Garden">back home</a>
+    </div>
+    <span id="status" class="status" aria-live="polite"></span>
+  </div>
+
+  <p class="note" id="note">Move the pointer, press <strong>space</strong>, or click <strong>add storm</strong> to summon ghost glyphs.</p>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById('void');
+      const status = document.getElementById('status');
+      const spawnBtn = document.getElementById('spawnBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const reseedBtn = document.getElementById('reseedBtn');
+      const muteBtn = document.getElementById('muteBtn');
+      const note = document.getElementById('note');
+
+      const ctx = canvas.getContext('2d');
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+
+      const glyphs = ['◌', '◉', '◎', '◍', '✦', '⋆', '✷', '◊', '✤', '◐', '◑', '◈', '⌬'];
+      const particles = [];
+      const trails = [];
+      const state = {
+        paused: false,
+        seed: Math.floor(Math.random() * 1e9),
+        wave: 0,
+        trailMode: true,
+        pointer: null,
+      };
+
+      const params = {
+        spawnRate: 9,
+        drift: 0.16,
+        decay: 0.985,
+      };
+
+      function resize() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+        canvas.style.width = `${w}px`;
+        canvas.style.height = `${h}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      function pseudo(seed) {
+        const x = Math.sin(seed * 12.9898) * 43758.5453;
+        return x - Math.floor(x);
+      }
+
+      function seedFromText(value) {
+        const n = value.split('').reduce((acc, char, i) => {
+          return (acc * 31 + char.charCodeAt(0) + i * 17) % 2147483647;
+        }, 7);
+        state.seed = (n + 13) % 2147483647;
+      }
+
+      function spawnBurst(x = Math.random() * canvas.clientWidth, y = Math.random() * canvas.clientHeight) {
+        const count = 34 + Math.floor(pseudo(state.seed++) * 28);
+        const hue = Math.floor(pseudo(state.seed++) * 100 + 150);
+        for (let i = 0; i < count; i++) {
+          const a = pseudo(state.seed++) * Math.PI * 2;
+          const v = 0.1 + pseudo(state.seed++) * 0.8;
+          particles.push({
+            x,
+            y,
+            vx: Math.cos(a) * v,
+            vy: Math.sin(a) * v,
+            life: 260 + Math.floor(pseudo(state.seed++) * 180),
+            size: 8 + pseudo(state.seed++) * 14,
+            glyph: glyphs[Math.floor(pseudo(state.seed++) * glyphs.length)],
+            hue: (hue + i * 7 + state.seed) % 360,
+            phase: pseudo(state.seed++) * 140,
+          });
+        }
+      }
+
+      function draw() {
+        if (!ctx) return;
+        if (!state.paused) {
+          const g = ctx.createLinearGradient(0, 0, 0, canvas.clientHeight);
+          g.addColorStop(0, 'rgba(4,6,18,0.24)');
+          g.addColorStop(1, 'rgba(4,6,18,0.16)');
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+          if (state.trailMode) {
+            ctx.fillStyle = 'rgba(4,6,18,0.06)';
+            ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+          } else {
+            ctx.fillStyle = 'rgba(4,6,18,0.2)';
+            ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+          }
+
+          state.wave += 0.008;
+          const cx = canvas.clientWidth / 2;
+          const cy = canvas.clientHeight / 2;
+
+          trails.push({
+            x: cx + Math.cos(state.wave * 1.2) * 120 + Math.sin(state.wave * 3) * 70,
+            y: cy + Math.sin(state.wave * 1.1) * 80 + Math.cos(state.wave * 2.4) * 60,
+            r: 220 + Math.sin(state.wave * 5) * 80,
+            a: 0.25,
+            age: 0,
+          });
+
+          // draw ring pulses
+          for (let i = trails.length - 1; i >= 0; i--) {
+            const t = trails[i];
+            if (t.age++ > 360) trails.splice(i, 1);
+            ctx.strokeStyle = `rgba(143, 130, 255, ${t.a * (1 - t.age / 360)})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, t.r + Math.sin(t.age * 0.04) * 30, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
+          // pointer gravity
+          if (state.pointer) {
+            const pull = 0.0018;
+            for (let i = 0; i < particles.length; i++) {
+              const p = particles[i];
+              const dx = state.pointer.x - p.x;
+              const dy = state.pointer.y - p.y;
+              const dist = Math.hypot(dx, dy) + 1;
+              p.vx += (dx / dist) * pull;
+              p.vy += (dy / dist) * pull;
+            }
+          }
+
+          // emit from pointer every frame when moved
+          if (state.pointer && Math.random() < 0.25) {
+            particles.push({
+              x: state.pointer.x + (pseudo(state.seed++) - 0.5) * 50,
+              y: state.pointer.y + (pseudo(state.seed++) - 0.5) * 50,
+              vx: (pseudo(state.seed++) - 0.5) * params.drift,
+              vy: (pseudo(state.seed++) - 0.5) * params.drift,
+              life: 90 + Math.floor(pseudo(state.seed++) * 110),
+              size: 12 + pseudo(state.seed++) * 24,
+              glyph: glyphs[Math.floor(pseudo(state.seed++) * glyphs.length)],
+              hue: 180 + Math.floor(pseudo(state.seed++) * 120),
+              phase: pseudo(state.seed++) * 90,
+            });
+          }
+
+          // particle march
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.life -= 1;
+            p.vx *= params.decay;
+            p.vy *= params.decay;
+            p.x += p.vx * (2 + Math.sin(p.phase * 0.01));
+            p.y += p.vy * (2 + Math.cos(p.phase * 0.01));
+            p.phase += 1;
+
+            if (p.x < -20 || p.x > canvas.clientWidth + 20 || p.y < -20 || p.y > canvas.clientHeight + 20 || p.life <= 0) {
+              particles.splice(i, 1);
+              continue;
+            }
+
+            const pulse = Math.sin((p.phase + p.x * 0.02) * 0.12);
+            const alpha = Math.max(0, (p.life / 220) * (1 - p.life / 600));
+            const x = Math.floor(p.x);
+            const y = Math.floor(p.y);
+            const size = Math.max(8, p.size * (0.45 + alpha));
+
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = `hsla(${p.hue}, 100%, 80%, ${alpha * 0.94})`;
+            ctx.font = `${size}px "IBM Plex Mono", "Courier New", monospace`;
+            ctx.textAlign = 'center';
+            ctx.shadowColor = `hsla(${p.hue}, 100%, 70%, ${alpha})`;
+            ctx.shadowBlur = 12;
+            ctx.translate(Math.sin(p.phase * 0.02) * 1.5, Math.cos(p.phase * 0.017) * 1.8);
+            ctx.fillText(p.glyph, pulse, 0);
+            ctx.restore();
+          }
+
+          status.innerHTML = `
+            <strong>${particles.length}</strong> glyphs alive ·
+            seed <strong>${state.seed}</strong> ·
+            trail <strong class="status-dot">${state.trailMode ? 'active' : 'off'}</strong>
+          `;
+        }
+
+        requestAnimationFrame(draw);
+      }
+
+      const handlePointer = (x, y) => {
+        state.pointer = { x, y };
+        if (Math.random() < 0.5) spawnBurst(x, y);
+      };
+
+      window.addEventListener('pointermove', (event) => {
+        handlePointer(event.clientX, event.clientY);
+      });
+
+      canvas.addEventListener('click', (event) => {
+        handlePointer(event.clientX, event.clientY);
+      });
+
+      document.body.addEventListener('touchmove', (event) => {
+        event.preventDefault();
+        const touch = event.touches[0];
+        if (!touch) return;
+        handlePointer(touch.clientX, touch.clientY);
+      }, { passive: false });
+
+      spawnBtn.addEventListener('click', () => {
+        const x = Math.random() * canvas.clientWidth;
+        const y = Math.random() * canvas.clientHeight;
+        spawnBurst(x, y);
+        note.textContent = 'A new storm blooms at a random coordinate.';
+      });
+
+      reseedBtn.addEventListener('click', () => {
+        const next = (Date.now() * 1234567) ^ Math.floor(Math.random() * 999999);
+        seedFromText(String(next));
+        particles.length = 0;
+        trails.length = 0;
+        state.pointer = null;
+        note.textContent = `Seed reset to ${state.seed}. The choir shifts.`;
+      });
+
+      clearBtn.addEventListener('click', () => {
+        particles.length = 0;
+        trails.length = 0;
+        note.textContent = 'Chamber cleared. Quiet returned.';
+      });
+
+      muteBtn.addEventListener('click', () => {
+        state.trailMode = !state.trailMode;
+        muteBtn.textContent = `trails: ${state.trailMode ? 'on' : 'off'}`;
+        note.textContent = `Trail paint is now ${state.trailMode ? 'enabled' : 'disabled'}.`;
+      });
+
+      window.addEventListener('keydown', (event) => {
+        if (event.code === 'Space') {
+          event.preventDefault();
+          if (particles.length === 0) {
+            spawnBurst(Math.random() * canvas.clientWidth, Math.random() * canvas.clientHeight);
+          } else {
+            particles.length = 0;
+          }
+        }
+        if (event.key.toLowerCase() === 's') {
+          spawnBurst(Math.random() * canvas.clientWidth, Math.random() * canvas.clientHeight);
+        }
+        if (event.key.toLowerCase() === 't') {
+          muteBtn.click();
+        }
+      });
+
+      // seed from the current URL hash if present
+      const hash = window.location.hash.slice(1);
+      if (hash) {
+        seedFromText(hash);
+      }
+      spawnBurst(canvas.clientWidth / 2, canvas.clientHeight / 2);
+      draw();
+    })();
+  </script>
+</body>
+</html>
