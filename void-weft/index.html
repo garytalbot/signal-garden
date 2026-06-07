@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Void Weft</title>
+  <meta
+    name="description"
+    content="Void Weft is a tiny interactive ritual where drifting threads weave themselves between invisible anchors, each click birthing a new knot in a living, haunted lattice."
+  />
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #ecdcff;
+      --muted: #8ea3ff;
+      --line: #8d74ff;
+      --halo: #7c5dff;
+      --panel: #120e2b;
+      --panel-2: #0c0820;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      background: radial-gradient(circle at 25% 20%, #22143d, var(--panel-2));
+      color: var(--ink);
+      overflow: hidden;
+    }
+
+    body {
+      position: relative;
+    }
+
+    canvas {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      background: radial-gradient(circle at 60% 10%, #30155daa, #0d0824 56%, #070510 100%);
+    }
+
+    .hud {
+      position: absolute;
+      inset: 0.75rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .panel {
+      pointer-events: auto;
+      border: 1px solid #332266;
+      background: color-mix(in oklab, var(--panel), #000 24%);
+      border-radius: 0.75rem;
+      padding: 0.52rem 0.72rem;
+      backdrop-filter: blur(2px);
+      box-shadow: 0 0 0 1px #4f2d9a44 inset, 0 10px 30px #00000080;
+      display: grid;
+      gap: 0.45rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.42rem;
+    }
+
+    button,
+    a {
+      border: 1px solid #5f45a2;
+      border-radius: 999px;
+      padding: 0.44rem 0.75rem;
+      background: #1f1842;
+      color: #e6ddff;
+      text-decoration: none;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 0.73rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button:hover,
+    a:hover {
+      border-color: #ad90ff;
+      color: #ffffff;
+    }
+
+    .status {
+      color: #bbadf0;
+      max-width: 44ch;
+      line-height: 1.35;
+      font-size: 0.78rem;
+    }
+
+    .status strong { color: #f2dcff; }
+    .label {
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 0.73rem;
+    }
+
+    .right {
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .home {
+      align-self: start;
+    }
+
+    .weave-note {
+      position: fixed;
+      inset-inline: 0.75rem;
+      bottom: 0.75rem;
+      z-index: 1;
+      background: #130d30cc;
+      border: 1px dashed #4f3c87;
+      border-radius: 0.7rem;
+      padding: 0.5rem 0.72rem;
+      color: #c8c1ff;
+      font-size: 0.77rem;
+      line-height: 1.35;
+      max-width: 68ch;
+      pointer-events: none;
+    }
+
+    .weave-note strong { color: #ffcaf7; }
+    .on { color: #8dffc1; }
+    .off { color: #ff7dc2; }
+
+    @media (max-width: 720px) {
+      .hud { gap: 0.4rem; }
+      .panel { width: calc(100% - 1rem); }
+      .left { order: 1; }
+      .right { order: 2; width: 100%; justify-content: flex-start; }
+      .weave-note { font-size: 0.72rem; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="weft" aria-label="Void Weft particle lattice"></canvas>
+
+  <div class="hud" aria-label="void weft control panel">
+    <div class="panel left" style="width: 430px;">
+      <span class="label">void weft</span>
+      <div class="controls">
+        <button id="spawn">spawn knot</button>
+        <button id="burst">storm burst</button>
+        <button id="reseed">reseed</button>
+        <button id="toggleTrails">trails: on</button>
+        <button id="clear">clear field</button>
+      </div>
+      <div class="status" id="status" aria-live="polite"></div>
+    </div>
+
+    <div class="panel right">
+      <div class="controls" style="justify-content:flex-end;">
+        <button id="pause">pause: off</button>
+        <a class="home" href="../">return home</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="weave-note">
+    <strong>How to feed it:</strong> move your mouse (or touch) to attract the weave,
+    click for a knot, press <strong>space</strong> for storm burst, <strong>R</strong> for reseed,
+    <strong>C</strong> to clear. It keeps no memory; each visit is a fresh, unstable ritual.
+  </div>
+
+  <script>
+    const canvas = document.getElementById('weft');
+    const ctx = canvas.getContext('2d');
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const particles = [];
+    const links = new Map();
+    const state = {
+      paused: false,
+      pointer: null,
+      allowTrails: true,
+      frame: 0,
+      seed: 0x1f2e3d,
+      knotCount: 0,
+      burstCount: 0,
+    };
+
+    const spawnBtn = document.getElementById('spawn');
+    const burstBtn = document.getElementById('burst');
+    const reseedBtn = document.getElementById('reseed');
+    const trailsBtn = document.getElementById('toggleTrails');
+    const clearBtn = document.getElementById('clear');
+    const pauseBtn = document.getElementById('pause');
+    const status = document.getElementById('status');
+
+    const colors = ['#8e76ff', '#d9b0ff', '#95e0ff', '#ff9bd6', '#8df2e5', '#ffc67c', '#c4ff87'];
+
+    function resize() {
+      const w = Math.floor(window.innerWidth * dpr);
+      const h = Math.floor(window.innerHeight * dpr);
+      canvas.width = w;
+      canvas.height = h;
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function lcg() {
+      state.seed = (state.seed * 1664525 + 1013904223) >>> 0;
+      return state.seed / 0x100000000;
+    }
+
+    function clamp(v, a, b) {
+      return Math.max(a, Math.min(b, v));
+    }
+
+    function makeParticle(x, y) {
+      const angle = lcg() * Math.PI * 2;
+      const speed = 0.15 + lcg() * 0.95;
+      return {
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: 1.8 + lcg() * 3.6,
+        life: 900 + Math.floor(lcg() * 500),
+        age: 0,
+        color: colors[Math.floor(lcg() * colors.length)],
+        phase: lcg() * Math.PI * 8,
+        orbit: 0.25 + lcg() * 0.75,
+        history: [],
+      };
+    }
+
+    function spawnKnot(x, y) {
+      const n = 2 + Math.floor(lcg() * 3);
+      for (let i = 0; i < n; i++) {
+        particles.push(makeParticle(x, y));
+      }
+      state.knotCount += 1;
+      particles.forEach((p, i) => {
+        if (i >= 5) {
+          const prev = particles[i - 5];
+          links.set(p.id || (p.id = `${i}`), prev.id || (prev.id = `${i - 5}`));
+        }
+      });
+      paintStatus();
+    }
+
+    function burst(x, y) {
+      for (let i = 0; i < 22; i++) {
+        spawnKnot(x + (lcg() - 0.5) * 110, y + (lcg() - 0.5) * 110);
+      }
+      state.burstCount += 1;
+      paintStatus();
+    }
+
+    function reseed() {
+      particles.length = 0;
+      links.clear();
+      state.knotCount = 0;
+      state.burstCount = 0;
+      for (let i = 0; i < 90; i++) {
+        spawnKnot(lcg() * innerWidth, lcg() * innerHeight);
+      }
+      paintStatus();
+    }
+
+    function clearField() {
+      particles.length = 0;
+      links.clear();
+      state.knotCount = 0;
+      state.burstCount = 0;
+      paintStatus();
+    }
+
+    function paintStatus() {
+      status.innerHTML = `
+        <strong>${particles.length}</strong> threads •
+        knots: <strong>${state.knotCount}</strong> •
+        storms: <strong>${state.burstCount}</strong> •
+        trails: <span class="${state.allowTrails ? 'on' : 'off'}"><strong>${state.allowTrails ? 'on' : 'off'}</strong></span>
+      `;
+    }
+
+    function drawTrail(p) {
+      if (p.history.length < 2) return;
+      ctx.beginPath();
+      for (let i = 1; i < p.history.length; i++) {
+        const a = p.history[i - 1];
+        const b = p.history[i];
+        const alpha = i / p.history.length;
+        ctx.strokeStyle = `${p.color}${Math.round(alpha * 120).toString(16).padStart(2, '0')}`;
+        ctx.lineWidth = 0.25 + p.size * 0.2;
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+      }
+      ctx.stroke();
+    }
+
+    function drawWeft() {
+      if (state.paused) return;
+      state.frame += 1;
+
+      if (state.allowTrails) {
+        ctx.fillStyle = 'rgba(13, 10, 30, 0.18)';
+      } else {
+        ctx.clearRect(0, 0, innerWidth, innerHeight);
+        ctx.fillStyle = '#0f0c20';
+        ctx.fillRect(0, 0, innerWidth, innerHeight);
+      }
+
+      if (state.allowTrails) {
+        ctx.fillStyle = 'rgba(10, 8, 20, 0.22)';
+        ctx.fillRect(0, 0, innerWidth, innerHeight);
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        const nx = (i * 0.012) + p.phase;
+
+        p.vx += (Math.sin(nx + state.frame * 0.008 + p.age * 0.002) * 0.022) * p.orbit;
+        p.vy += (Math.cos(nx + state.frame * 0.006 + p.phase) * 0.018) * p.orbit;
+
+        if (state.pointer) {
+          const dx = state.pointer.x - p.x;
+          const dy = state.pointer.y - p.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
+          const pull = 1800 / (dist * dist + 180);
+          p.vx += (dx / dist) * pull * 0.0012;
+          p.vy += (dy / dist) * pull * 0.0012;
+        }
+
+        p.vx *= 0.992;
+        p.vy *= 0.992;
+
+        p.x += p.vx;
+        p.y += p.vy;
+
+        p.history.push({ x: p.x, y: p.y });
+        if (p.history.length > 16) p.history.shift();
+
+        if (p.x < -20 || p.x > innerWidth + 20 || p.y < -20 || p.y > innerHeight + 20) {
+          p.x = (p.x + innerWidth) % innerWidth;
+          p.y = (p.y + innerHeight) % innerHeight;
+          p.history.length = 0;
+        }
+
+        p.age += 1;
+        p.life -= 1;
+
+        if (p.age % 4 === 0) {
+          const cx = p.x + Math.cos(p.phase + state.frame * 0.009) * 4;
+          const cy = p.y + Math.sin(p.phase + state.frame * 0.012) * 4;
+          ctx.beginPath();
+          ctx.fillStyle = `${p.color}`;
+          ctx.arc(cx, cy, p.size * 0.8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        drawTrail(p);
+
+        if (p.age > p.life) {
+          particles.splice(i, 1);
+        }
+      }
+
+      // Sparse weave connections keeps the field from becoming an unreadable blob.
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        for (let j = i + 1; j < Math.min(particles.length, i + 4); j++) {
+          const q = particles[j];
+          const dx = q.x - p.x;
+          const dy = q.y - p.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 140) {
+            const alpha = 1 - dist / 140;
+            ctx.strokeStyle = `rgba(154, 126, 255, ${0.17 * alpha})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(q.x, q.y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      const pulse = (Math.sin(state.frame * 0.02) + 1) * 0.06;
+      ctx.fillStyle = `rgba(255, 255, 255, ${state.allowTrails ? 0.09 + pulse : 0.07})`;
+      ctx.font = '12px monospace';
+      ctx.fillText('void weft', 10, 16);
+      requestAnimationFrame(drawWeft);
+    }
+
+    function randomizeSeed() {
+      state.seed = Math.floor(lcg() * 0x7fffffff);
+      paintStatus();
+    }
+
+    canvas.addEventListener('pointermove', (e) => {
+      state.pointer = {
+        x: e.clientX,
+        y: e.clientY,
+      };
+    });
+
+    canvas.addEventListener('pointerleave', () => {
+      state.pointer = null;
+    });
+
+    canvas.addEventListener('click', (e) => {
+      if (e.target !== canvas) return;
+      spawnKnot(e.clientX, e.clientY);
+    });
+
+    spawnBtn.addEventListener('click', () => {
+      const x = (lcg() * 0.9 + 0.05) * innerWidth;
+      const y = (lcg() * 0.9 + 0.05) * innerHeight;
+      spawnKnot(x, y);
+    });
+
+    burstBtn.addEventListener('click', () => {
+      burst(innerWidth * 0.5, innerHeight * 0.5);
+    });
+
+    reseedBtn.addEventListener('click', reseed);
+
+    clearBtn.addEventListener('click', clearField);
+
+    trailsBtn.addEventListener('click', () => {
+      state.allowTrails = !state.allowTrails;
+      trailsBtn.textContent = `trails: ${state.allowTrails ? 'on' : 'off'}`;
+      paintStatus();
+    });
+
+    pauseBtn.addEventListener('click', () => {
+      state.paused = !state.paused;
+      pauseBtn.textContent = `pause: ${state.paused ? 'on' : 'off'}`;
+      if (!state.paused) requestAnimationFrame(drawWeft);
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === ' ') {
+        e.preventDefault();
+        burst(innerWidth * 0.5, innerHeight * 0.5);
+      }
+      if (e.key.toLowerCase() === 'r') {
+        reseed();
+      }
+      if (e.key.toLowerCase() === 'c') {
+        clearField();
+      }
+      if (e.key.toLowerCase() === 'p') {
+        state.paused = !state.paused;
+        pauseBtn.textContent = `pause: ${state.paused ? 'on' : 'off'}`;
+        if (!state.paused) requestAnimationFrame(drawWeft);
+      }
+      if (e.key.toLowerCase() === 't') {
+        state.allowTrails = !state.allowTrails;
+        trailsBtn.textContent = `trails: ${state.allowTrails ? 'on' : 'off'}`;
+        paintStatus();
+      }
+    });
+
+    resize();
+    reseed();
+    paintStatus();
+    randomizeSeed();
+    requestAnimationFrame(drawWeft);
+
+    window.addEventListener('resize', resize);
+  </script>
+</body>
+</html>
