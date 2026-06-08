@@ -100,6 +100,7 @@ There is also a dedicated sharing guide in [`docs/share-guide.md`](docs/share-gu
 - Spectral Drift: `spectral-drift/`
 - Glyph Chamber: `glyph-chamber/`
 - Echo Lattice: `echo-lattice/`
+- Void Sigil: `void-sigil/`
 
 ## Local run
 
