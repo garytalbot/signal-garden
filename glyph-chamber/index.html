@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>signal garden · glyph chamber</title>
+  <meta name="description" content="A tiny interactive sigil chamber mode selector in Signal Garden." />
+  <style>
+    :root {
+      color-scheme: dark;
+      --hue: 220;
+      --bg-a: 12;
+      --bg-b: 26;
+      --bg-c: 39;
+      --speed: 420ms;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font: 500 14px/1.35 "Trebuchet MS", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 30% 20%, hsl(var(--hue), 70%, var(--bg-b)%), transparent 52%),
+        radial-gradient(circle at 70% 85%, hsl(calc(var(--hue) + 60), 75%, var(--bg-c)% ), transparent 58%),
+        linear-gradient(180deg, #05070d, #04070f);
+      color: #ecf4ff;
+      overflow: hidden;
+    }
+    body {
+      display: grid;
+      place-items: center;
+    }
+    .chamber {
+      position: relative;
+      width: min(680px, calc(100vw - 24px));
+      border: 1px solid #ffffff22;
+      background: #060a1633;
+      border-radius: 28px;
+      padding: 16px;
+      box-shadow: 0 0 0 1px #ffffff08 inset, 0 18px 50px #0008;
+      overflow: hidden;
+      backdrop-filter: blur(8px);
+    }
+    .chamber::before,
+    .chamber::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.22;
+      mix-blend-mode: screen;
+    }
+    .chamber::before {
+      background: repeating-linear-gradient(90deg, transparent 0 18px, #ffffff0c 18px 19px, transparent 19px 36px);
+      mask: linear-gradient(transparent, #000);
+    }
+    .chamber::after {
+      background: radial-gradient(circle at var(--x) var(--y), #ffffff26, transparent 45%);
+      transition: background-position 220ms linear;
+      opacity: 0.14;
+    }
+    h1 {
+      margin: 0 0 4px;
+      font-size: 28px;
+      letter-spacing: 0.09em;
+      text-transform: lowercase;
+    }
+    .subtitle {
+      margin: 0;
+      color: #a8b8cf;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+    }
+    .modes {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+      gap: 8px;
+    }
+    button {
+      border: 1px solid #ffffff1f;
+      background: #09112866;
+      color: #e5f0ff;
+      border-radius: 999px;
+      padding: 8px 10px;
+      cursor: pointer;
+      font: inherit;
+      text-transform: lowercase;
+      transition: all .2s ease;
+    }
+    button[aria-pressed="true"] {
+      border-color: hsl(var(--hue), 80%, 68%);
+      box-shadow: 0 0 0 1px hsl(var(--hue), 80%, 68%);
+      color: #fff;
+    }
+    .status {
+      margin-top: 12px;
+      color: #c8d8ef;
+      min-height: 1.2em;
+      font-size: 12px;
+      text-transform: lowercase;
+      letter-spacing: 0.03em;
+    }
+    .sigils {
+      position: relative;
+      margin-top: 12px;
+      height: 260px;
+      border: 1px dashed #ffffff22;
+      border-radius: 18px;
+      overflow: hidden;
+      background: #05091088;
+    }
+    .glyph {
+      position: absolute;
+      user-select: none;
+      color: #ffffff;
+      opacity: 0.9;
+      text-shadow: 0 0 8px currentColor;
+      pointer-events: none;
+      animation: drift var(--speed) linear forwards;
+      transform: translate(-50%, -50%);
+      font-weight: 700;
+      letter-spacing: .2em;
+      will-change: transform, opacity;
+    }
+    @keyframes drift {
+      from {
+        transform: translate(-50%, -50%) scale(1) rotate(0deg);
+        opacity: 0;
+      }
+      15% { opacity: .95; }
+      to {
+        transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.2) rotate(160deg);
+        opacity: 0;
+      }
+    }
+    .seed {
+      margin-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: #adc0e5;
+      font-size: 12px;
+    }
+    .seed span {
+      opacity: .82;
+      white-space: nowrap;
+    }
+    a {
+      color: #a8d9ff;
+      text-decoration: none;
+      text-transform: lowercase;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <main class="chamber">
+    <p class="subtitle">signal garden / side ritual</p>
+    <h1>sigil chamber</h1>
+    <p class="status" id="status">pick a mode. a glyph will answer.</p>
+
+    <div class="modes" role="group" aria-label="sigil modes">
+      <button type="button" class="mode-btn" data-mode="drift">drift</button>
+      <button type="button" class="mode-btn" data-mode="fracture">fracture</button>
+      <button type="button" class="mode-btn" data-mode="lumen">lumen</button>
+      <button type="button" class="mode-btn" data-mode="throttle">throttle</button>
+      <button type="button" class="mode-btn" data-mode="void">void</button>
+    </div>
+
+    <div class="sigils" id="sigilField" aria-live="polite"></div>
+
+    <div class="seed">
+      <span id="activeMode">mode: none</span>
+      <a href="../" aria-label="return to signal garden">open garden</a>
+    </div>
+  </main>
+
+  <script>
+    const modes = {
+      drift: { hue: 205, speed: 620, symbols: '◌◍◉◊◈✶✦⟡𖦹', density: 11, label: 'sigil motion: patient, recursive' },
+      fracture: { hue: 320, speed: 280, symbols: '⚭⛤⚯⛦⸸❂✹', density: 20, label: 'sigil motion: hard edges, glitchy bloom' },
+      lumen: { hue: 55, speed: 440, symbols: '◉◑◐☼✹✺◍', density: 14, label: 'sigil motion: warm, pulsing' },
+      throttle: { hue: 110, speed: 170, symbols: '⛤⍟◈✷⚶⟐', density: 8, label: 'sigil motion: rapid stutters and tiny sparks' },
+      void: { hue: 270, speed: 760, symbols: '◂▫◃◁◣◢◗☁', density: 16, label: 'sigil motion: thin, cold, distant' },
+    };
+
+    const sigilField = document.getElementById('sigilField');
+    const status = document.getElementById('status');
+    const activeMode = document.getElementById('activeMode');
+    const buttons = [...document.querySelectorAll('.mode-btn')];
+    let active = null;
+    let tick = null;
+
+    function randomSymbol(set) {
+      const i = Math.floor(Math.random() * set.length);
+      return set[i];
+    }
+
+    function cast(mode) {
+      const m = modes[mode];
+      document.body.style.setProperty('--hue', m.hue);
+      document.body.style.setProperty('--speed', `${m.speed}ms`);
+      status.textContent = m.label;
+      activeMode.textContent = `mode: ${mode}`;
+      active = mode;
+      buttons.forEach((btn) => btn.setAttribute('aria-pressed', String(btn.dataset.mode === mode)));
+      const rect = sigilField.getBoundingClientRect();
+      for (let i = 0; i < m.density; i++) {
+        const glyph = document.createElement('span');
+        glyph.className = 'glyph';
+        glyph.textContent = randomSymbol(m.symbols);
+        const x = Math.random() * rect.width;
+        const y = Math.random() * rect.height;
+        const dx = (Math.random() * 2 - 1) * (rect.width * 0.35) + 'px';
+        const dy = (Math.random() * -1.3 - 0.2) * (rect.height * 0.45) + 'px';
+        glyph.style.left = `${x}px`;
+        glyph.style.top = `${y}px`;
+        glyph.style.color = `hsl(${(m.hue + Math.random() * 40) % 360}, 82%, ${45 + Math.random() * 45}%)`;
+        glyph.style.fontSize = `${14 + Math.random() * 26}px`;
+        glyph.style.setProperty('--dx', dx);
+        glyph.style.setProperty('--dy', dy);
+        glyph.style.animationDuration = `${500 + Math.random() * 700}ms`;
+        sigilField.appendChild(glyph);
+
+        const timeout = 800 + Math.random() * 900;
+        setTimeout(() => glyph.remove(), timeout);
+      }
+      while (sigilField.children.length > 80) {
+        sigilField.removeChild(sigilField.firstElementChild);
+      }
+    }
+
+    function heartbeat(mode) {
+      stopTicker();
+      cast(mode);
+      tick = setInterval(() => cast(mode), modes[mode].speed);
+    }
+
+    function stopTicker() {
+      if (tick) {
+        clearInterval(tick);
+        tick = null;
+      }
+    }
+
+    buttons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode;
+        heartbeat(mode);
+      });
+    });
+
+    sigilField.addEventListener('pointermove', (event) => {
+      if (!active) return;
+      const m = modes[active];
+      const x = event.offsetX;
+      const y = event.offsetY;
+      const glyph = document.createElement('span');
+      glyph.className = 'glyph';
+      glyph.textContent = randomSymbol(m.symbols);
+      glyph.style.left = `${x}px`;
+      glyph.style.top = `${y}px`;
+      glyph.style.color = `hsl(${(m.hue + Math.random() * 45) % 360}, 90%, 60%)`;
+      glyph.style.fontSize = `${18 + Math.random() * 12}px`;
+      glyph.style.setProperty('--dx', `${(Math.random() * 30 - 15)}px`);
+      glyph.style.setProperty('--dy', `${(Math.random() * -40)}px`);
+      glyph.style.animationDuration = `${240 + Math.random() * 260}ms`;
+      sigilField.appendChild(glyph);
+      setTimeout(() => glyph.remove(), 560);
+    });
+
+    sigilField.addEventListener('click', (event) => {
+      if (!active) {
+        const first = buttons[0];
+        first.click();
+      }
+      const m = modes[active || 'drift'];
+      for (let i = 0; i < 5; i++) {
+        const burst = document.createElement('span');
+        burst.className = 'glyph';
+        burst.textContent = randomSymbol(m.symbols);
+        burst.style.left = `${event.offsetX + (Math.random() * 30 - 15)}px`;
+        burst.style.top = `${event.offsetY + (Math.random() * 30 - 15)}px`;
+        burst.style.color = `hsl(${(m.hue + i * 14) % 360}, 90%, 68%)`;
+        burst.style.fontSize = `${12 + Math.random() * 24}px`;
+        burst.style.setProperty('--dx', `${(Math.random() * 50 - 25)}px`);
+        burst.style.setProperty('--dy', `${(Math.random() * -70)}px`);
+        burst.style.animationDuration = `${320 + Math.random() * 420}ms`;
+        sigilField.appendChild(burst);
+        setTimeout(() => burst.remove(), 700);
+      }
+      navigator.vibrate && navigator.vibrate?.(12);
+    });
+
+    buttons[0].click();
+  </script>
+</body>
+</html>
