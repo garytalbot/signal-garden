@@ -8,10 +8,12 @@ A tiny constellation-era browser garden where every UTC day gets a shared glowin
 
 - Live garden: <https://garytalbot.github.io/signal-garden/>
 - Afterimage study: <https://garytalbot.github.io/signal-garden/afterimage/>
+- Residue lane: open <https://garytalbot.github.io/signal-garden/afterimage/>, press the residue into <https://garytalbot.github.io/signal-garden/pollen-atlas/>, or use `export postcard` from the chamber when you want the pressed trail to travel as a residue postcard.
+- Share capsule: use `copy field card` for a ready-to-post field card of the current field, with weather, bloom count, field source, and mode stack spelled out.
 - Repo: <https://github.com/garytalbot/signal-garden>
 - Curated demo garden: <https://garytalbot.github.io/signal-garden/#garden=qe.24e.2.2.5.2e.1q.30.78~1e0.1jk.3.0.0.22.1m.34.g4~1xg.2cq.0.8.4.2k.1u.3e.4g~2p8.1b8.6.4.2.1y.1i.38.eg~3bg.24e.9.9.1.2c.1o.3a.8c~47e.1mc.8.2.3.24.1k.32.go~4s8.2bc.7.7.5.2o.1w.3g.64~5aa.1e0.5.5.0.20.1g.30.dc>
 - Use the in-app `today's signal` button for the current shared UTC field.
-- Browse the latest 12 broadcasts in the archive strip on the page.
+- Browse the latest 12 broadcasts in the archive strip.
 
 ## Why it exists
 
@@ -24,14 +26,19 @@ Because not every repo should be a dashboard, a wrapper, or a productivity vitam
 - **The archive strip** turns the latest broadcasts into a lightweight on-page gallery, which makes the project feel alive even before someone plants their own blooms.
 - **Exact-garden permalinks** recreate a specific composition from the URL hash, so a field can travel intact.
 - **PNG export** gives image-first communities a clean artifact without asking them to read the code first.
+- **Residue lane** makes the afterimage chamber discoverable from the public front door and gives pressed ghost trails a direct residue-postcard path into the Pollen Atlas or out of the chamber.
+- **Share capsule** gives the field a single visible summary card, so a reader can see the exact field-card payload: weather, bloom count, field source, and mode stack.
 
 ## Features
 
 - click-to-plant glowing blooms
 - procedural names, ring shapes, stem heights, color accents, and deterministic sky moods
 - reactive field log with atmospheric session notes and milestone transmissions
-- browser-local herbarium bloom index for session memory, with a postcard export for the pressed notes
+- browser-local herbarium bloom index for session memory, with a residue postcard export for the pressed notes
 - standalone `pollen-atlas/` side chamber for drifting pollen relics and seed dust
+- glyph chamber for sigil mode drift and pointer-borne glyph rituals
+- echo lattice for node drift, pointer resonance, and seeded pulse echoes
+- afterimage sessions can be pressed into the Pollen Atlas as browser-local residue cards, with `export postcard` available from the chamber for a direct handoff into a residue postcard
 - quick cluster generator
 - curated gallery picks with hand-tuned starter fields across all four weather presets
 - a browsable archive/gallery of the latest UTC daily broadcasts, each with its own mini preview card
@@ -54,6 +61,8 @@ Use the right surface for the right kind of post:
 - **Same-day shared field:** use a short daily-broadcast hash shaped like `#broadcast=YYYY-MM-DD`
 - **Specific custom composition:** use `copy share link` to generate an exact `#garden=...` permalink
 - **Image-first feeds or replies:** attach a fresh in-app PNG export, `assets/launch/demo-ui.png`, or `assets/launch/community-poster.png`
+- **Field summary card:** use `copy field card` when you want a compact field-card share payload with the current weather, bloom count, field source, and mode stack
+- **Ghost-trail follow-up:** capture an afterimage session, click `open atlas`, `copy residue link`, `share postcard`, or `export postcard` to land on or package the pressed residue card from the afterimage chamber, then use the atlas `share residue card`, `copy residue link`, or `export residue postcard` actions when you want it to travel farther as a residue postcard
 
 There is also a dedicated sharing guide in [`docs/share-guide.md`](docs/share-guide.md).
 
@@ -80,12 +89,17 @@ There is also a dedicated sharing guide in [`docs/share-guide.md`](docs/share-gu
 
 <https://garytalbot.github.io/signal-garden/>
 
-## More from Gary
+- More from Gary
 
 - Work hub: <https://garytalbot.github.io/work/>
 - Unit Price Checker: <https://garytalbot.github.io/unit-price-checker/>
 - Layoff Runway: <https://garytalbot.github.io/layoff-runway/>
 - Pollen Atlas: `pollen-atlas/`
+- Echo Hush: `echo-hush/`
+- Void Weft: `void-weft/`
+- Spectral Drift: `spectral-drift/`
+- Glyph Chamber: `glyph-chamber/`
+- Echo Lattice: `echo-lattice/`
 
 ## Local run
 
@@ -94,6 +108,16 @@ python3 -m http.server 8080
 ```
 
 Then open <http://localhost:8080>.
+
+## Smoke test
+
+Run the residue-link smoke check locally with:
+
+```bash
+npm test
+```
+
+`npm test` is the shortest path and maps to the residue smoke harness. If Chrome is not on your PATH as `google-chrome-stable`, set `CHROME_BIN` before running the script. You can also run `npm run smoke`, `npm run smoke:residue`, or `node scripts/residue-smoke.mjs` directly if you prefer.
 
 ## Next ideas
 
