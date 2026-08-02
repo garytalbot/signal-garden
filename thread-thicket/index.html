@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Signal Garden — Thread Thicket</title>
+  <meta
+    name="description"
+    content="A generative pointer-driven chamber where drifting threads branch into a thicket, pointer motion is the seed, and the whole scene is shareable via URL state plus PNG export."
+  />
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #06050f;
+      --panel: #191037;
+      --ink: #f1edff;
+      --line: #77dfff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 18% 10%, #20124f 0%, var(--bg) 55%, #04050b 100%);
+      color: var(--ink);
+      font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    .hud {
+      position: fixed;
+      inset: 0.75rem;
+      z-index: 5;
+      pointer-events: none;
+      display: grid;
+      gap: 0.55rem;
+      max-width: min(1160px, calc(100vw - 1.5rem));
+      margin: 0 auto;
+    }
+
+    .panel {
+      pointer-events: auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.45rem;
+      border: 1px solid #5142a2;
+      border-radius: 0.9rem;
+      background: color-mix(in oklab, var(--panel), #030307 22%);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+      padding: 0.55rem 0.7rem;
+    }
+
+    .label {
+      width: 100%;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      font-size: 0.72rem;
+      margin-bottom: 0.12rem;
+      color: #c6d6ff;
+    }
+
+    button,
+    a,
+    input {
+      border: 1px solid #6b59be;
+      border-radius: 999px;
+      background: #1a0e4a;
+      color: var(--ink);
+      font: inherit;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.72rem;
+      min-height: 30px;
+      padding: 0.34rem 0.7rem;
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    button:hover,
+    a:hover {
+      border-color: #96ffff;
+      color: #ffffff;
+    }
+
+    button[aria-pressed='true'] {
+      border-color: #8bf9db;
+      color: #defff5;
+      box-shadow: inset 0 0 0 1px rgba(139, 249, 219, 0.34);
+    }
+
+    .status {
+      margin-left: auto;
+      color: #d2e4ff;
+      font-size: 0.7rem;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: 0.95;
+    }
+
+    .home {
+      margin-left: auto;
+    }
+
+    .hint {
+      margin: 0;
+      color: #b8c8f6;
+      max-width: min(900px, calc(100vw - 1.5rem));
+      border-radius: 0.75rem;
+      border: 1px dashed #4b4692;
+      background: color-mix(in oklab, #170f35 70%, #05060b);
+      font-size: 0.7rem;
+      line-height: 1.45;
+      padding: 0.44rem 0.6rem;
+    }
+
+    label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      color: #e7f1ff;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 0.68rem;
+    }
+
+    input[type='range'] {
+      width: 130px;
+      accent-color: var(--line);
+    }
+
+    @media (max-width: 760px) {
+      .panel {
+        gap: 0.35rem;
+      }
+
+      .status {
+        margin-left: 0;
+        width: 100%;
+      }
+
+      input[type='range'] {
+        width: 100px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="threadCanvas" aria-label="Thread Thicket canvas"></canvas>
+
+  <div class="hud" aria-live="polite">
+    <div class="panel">
+      <span class="label">thread thicket</span>
+      <button id="reseedBtn" type="button">new seed</button>
+      <button id="sproutBtn" type="button">sprout pulse</button>
+      <button id="pauseBtn" type="button" aria-pressed="false">pause: off</button>
+      <button id="copyBtn" type="button">copy share link</button>
+      <button id="exportBtn" type="button">export PNG</button>
+      <button id="clearBtn" type="button">clear</button>
+      <label for="densityRange">density <span id="densityValue">150</span></label>
+      <input id="densityRange" name="densityRange" type="range" min="80" max="280" step="10" value="150" />
+      <label for="chaosRange">chaos <span id="chaosValue">1.05</span></label>
+      <input id="chaosRange" name="chaosRange" type="range" min="0.35" max="2.0" step="0.05" value="1.05" />
+      <label for="branchRange">branch <span id="branchValue">0.52</span></label>
+      <input id="branchRange" name="branchRange" type="range" min="0.12" max="1.0" step="0.04" value="0.52" />
+      <a class="home" href="../" aria-label="Return to Signal Garden home">return home</a>
+      <span class="status" id="status">ready</span>
+    </div>
+    <p id="hint" class="hint">Move, press, and drag. Pointer position edits thread flow, and every scene is reproducible from URL hash or query state. PNG snapshots stay current at any moment.</p>
+  </div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById('threadCanvas');
+      const ctx = canvas.getContext('2d');
+      const reseedBtn = document.getElementById('reseedBtn');
+      const sproutBtn = document.getElementById('sproutBtn');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const copyBtn = document.getElementById('copyBtn');
+      const exportBtn = document.getElementById('exportBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const densityRange = document.getElementById('densityRange');
+      const densityValue = document.getElementById('densityValue');
+      const chaosRange = document.getElementById('chaosRange');
+      const chaosValue = document.getElementById('chaosValue');
+      const branchRange = document.getElementById('branchRange');
+      const branchValue = document.getElementById('branchValue');
+      const status = document.getElementById('status');
+      const hint = document.getElementById('hint');
+
+      const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+      const maxNodes = 320;
+      const palette = [18, 172, 205, 280, 312, 336, 24];
+
+      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+      const toHex = (value) => (value >>> 0).toString(16).padStart(8, '0');
+
+      let width = 0;
+      let height = 0;
+      let rngState = 0;
+      let frame = 0;
+      let paused = false;
+      let hashSyncQueued = false;
+      let lastSpawn = 0;
+
+      let threads = [];
+      const settings = {
+        seed: 0,
+        density: 150,
+        chaos: 1.05,
+        branch: 0.52,
+      };
+
+      let pointer = {
+        down: false,
+        x: -1,
+        y: -1,
+      };
+
+      const randomFromSeed = () => {
+        rngState = (rngState * 1664525 + 1013904223) >>> 0;
+        return rngState / 0x100000000;
+      };
+
+      const randomSeed = () => {
+        if (window.crypto && window.crypto.getRandomValues) {
+          const values = new Uint32Array(1);
+          window.crypto.getRandomValues(values);
+          return values[0] >>> 0;
+        }
+        return (Date.now() * 1664525 + 1013904223) >>> 0;
+      };
+
+      const seedColor = (value) => `hsla(${Math.floor(value)}, 92%, ${value ? 68 : 68}%,`;
+
+      const normalizeHash = (raw) => {
+        if (!raw) return null;
+        try {
+          const cleaned = String(raw).trim();
+          const decoded = decodeURIComponent(atob(cleaned));
+          return JSON.parse(decoded);
+        } catch (_error) {
+          return null;
+        }
+      };
+
+      const decodeQueryState = () => {
+        const params = new URLSearchParams(location.search);
+        const raw = params.get('state');
+        if (!raw) return null;
+        return normalizeHash(raw);
+      };
+
+      const loadFromPayload = (payload) => {
+        if (!payload || payload.v !== 1) return false;
+        const seed = Number.parseInt(payload.seed, 10);
+        const density = Number.parseInt(payload.density, 10);
+        const chaos = Number.parseFloat(payload.chaos);
+        const branch = Number.parseFloat(payload.branch);
+
+        if (!Number.isFinite(seed) || !Number.isFinite(density) || !Number.isFinite(chaos) || !Number.isFinite(branch)) {
+          return false;
+        }
+
+        settings.seed = seed >>> 0;
+        settings.density = clamp(density, 80, maxNodes);
+        settings.chaos = clamp(chaos, 0.35, 2);
+        settings.branch = clamp(branch, 0.1, 1);
+
+        densityRange.value = String(settings.density);
+        densityValue.textContent = String(settings.density);
+        chaosRange.value = String(settings.chaos);
+        chaosValue.textContent = settings.chaos.toFixed(2);
+        branchRange.value = String(settings.branch);
+        branchValue.textContent = settings.branch.toFixed(2);
+
+        rngState = settings.seed;
+        threads = [];
+        if (Array.isArray(payload.nodes)) {
+          for (const node of payload.nodes) {
+            if (!node) continue;
+            const { x, y, vx, vy, a, l, h, s } = node;
+            if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+            if (!Number.isFinite(vx) || !Number.isFinite(vy)) continue;
+            threads.push({
+              x: clamp(x, 0, 1) * width,
+              y: clamp(y, 0, 1) * height,
+              px: clamp(x, 0, 1) * width,
+              py: clamp(y, 0, 1) * height,
+              vx: Number(vx),
+              vy: Number(vy),
+              age: Number.isFinite(a) ? Number(a) : 0,
+              life: Number.isFinite(l) ? Number(l) : 120 + Math.floor(randomFromSeed() * 260),
+              hue: Number.isFinite(h) ? Number(h) : palette[Math.floor(randomFromSeed() * palette.length)],
+              sway: Number.isFinite(s) ? Number(s) : 0.2 + randomFromSeed() * 1.1,
+            });
+          }
+        }
+
+        if (!threads.length) {
+          seedField();
+          return true;
+        }
+        return true;
+      };
+
+      const toPayload = () => {
+        const payload = {
+          v: 1,
+          seed: settings.seed >>> 0,
+          density: settings.density,
+          chaos: +settings.chaos.toFixed(3),
+          branch: +settings.branch.toFixed(3),
+          nodes: threads.map((node) => ({
+            x: +(node.x / width).toFixed(4),
+            y: +(node.y / height).toFixed(4),
+            vx: +node.vx.toFixed(5),
+            vy: +node.vy.toFixed(5),
+            a: +node.age.toFixed(1),
+            l: +node.life,
+            h: +node.hue,
+            s: +node.sway.toFixed(3),
+          })),
+        };
+
+        return btoa(encodeURIComponent(JSON.stringify(payload)));
+      };
+
+      const syncShare = () => {
+        if (hashSyncQueued) return;
+        hashSyncQueued = true;
+        setTimeout(() => {
+          const snapshot = toPayload();
+          history.replaceState(null, '', `${location.pathname}#${snapshot}`);
+          status.textContent = `seed ${toHex(settings.seed)} · nodes ${threads.length}/${settings.density} · ${paused ? 'paused' : 'running'}`;
+          hashSyncQueued = false;
+        }, 150);
+      };
+
+      const applySettings = () => {
+        settings.density = clamp(Number.parseInt(densityRange.value, 10), 80, maxNodes);
+        settings.chaos = clamp(Number.parseFloat(chaosRange.value), 0.35, 2);
+        settings.branch = clamp(Number.parseFloat(branchRange.value), 0.1, 1);
+        densityValue.textContent = String(settings.density);
+        chaosValue.textContent = settings.chaos.toFixed(2);
+        branchValue.textContent = settings.branch.toFixed(2);
+        if (threads.length > settings.density) {
+          threads.splice(0, threads.length - settings.density);
+        }
+        syncShare();
+      };
+
+      const resize = () => {
+        width = Math.max(320, Math.floor(window.innerWidth));
+        height = Math.max(180, Math.floor(window.innerHeight));
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      };
+
+      const seedNode = (x, y, opts = {}) => {
+        const jitter = opts.jitter || 8;
+        const burst = opts.count || 4;
+        const parentAngle = Number.isFinite(opts.angle) ? opts.angle : randomFromSeed() * Math.PI * 2;
+
+        for (let i = 0; i < burst; i++) {
+          const angle = parentAngle + (randomFromSeed() - 0.5) * 0.95;
+          const speed = 0.55 + randomFromSeed() * 1.25;
+          threads.push({
+            x: x + (randomFromSeed() - 0.5) * jitter,
+            y: y + (randomFromSeed() - 0.5) * jitter,
+            px: x,
+            py: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            age: 0,
+            life: 130 + Math.floor(randomFromSeed() * 300),
+            hue: palette[Math.floor(randomFromSeed() * palette.length)],
+            sway: 0.25 + randomFromSeed() * 1.25,
+          });
+        }
+
+        if (threads.length > settings.density + 24) {
+          threads.splice(0, threads.length - (settings.density + 24));
+        }
+      };
+
+      const seedField = () => {
+        threads = [];
+        const total = Math.min(settings.density, 120);
+        for (let i = 0; i < total; i++) {
+          const seedX = randomFromSeed() * width;
+          const seedY = randomFromSeed() * height;
+          seedNode(seedX, seedY, {
+            count: 1,
+            jitter: 0,
+            angle: randomFromSeed() * Math.PI * 2,
+          });
+        }
+        syncShare();
+        hint.textContent = 'Field seeded. Drag on canvas to pull threads and call for new growth.';
+      };
+
+      const branchFromNode = (source) => {
+        const direction = randomFromSeed() * Math.PI * 2;
+        const branch = {
+          x: source.x + Math.cos(direction) * 1.5,
+          y: source.y + Math.sin(direction) * 1.5,
+          px: source.x,
+          py: source.y,
+          vx: source.vx * 0.65 + Math.cos(direction) * (0.25 + randomFromSeed() * 0.85),
+          vy: source.vy * 0.65 + Math.sin(direction) * (0.25 + randomFromSeed() * 0.85),
+          age: 0,
+          life: Math.max(55, Math.floor(source.life * 0.8 + randomFromSeed() * 160)),
+          hue: palette[(palette.indexOf(source.hue) + 1) % palette.length],
+          sway: source.sway + (randomFromSeed() - 0.5) * 0.5,
+        };
+        threads.push(branch);
+      };
+
+      const draw = () => {
+        frame += 1;
+
+        ctx.fillStyle = 'rgba(4, 7, 15, 0.26)';
+        ctx.fillRect(0, 0, width, height);
+
+        for (let i = threads.length - 1; i >= 0; i--) {
+          const node = threads[i];
+          const noise = Math.sin(frame * 0.0015 + i) * settings.chaos;
+          const drift = Math.cos((i + 1) * 0.11 + frame * 0.0009) * settings.chaos * 0.08;
+
+          node.age += 1;
+          node.px = node.x;
+          node.py = node.y;
+
+          node.vx += Math.cos(noise + node.sway) * 0.015 * settings.chaos + drift * (randomFromSeed() - 0.5) * 0.22;
+          node.vy += Math.sin(noise + node.sway) * 0.015 * settings.chaos + drift * (randomFromSeed() - 0.5) * 0.22;
+
+          if (pointer.down) {
+            const dx = pointer.x - node.x;
+            const dy = pointer.y - node.y;
+            const dist = Math.hypot(dx, dy) + 0.0001;
+            const pull = clamp(0.16 / dist, 0, 0.012) * settings.chaos;
+            node.vx += dx * pull;
+            node.vy += dy * pull;
+          }
+
+          node.vx += (width * 0.5 - node.x) * 0.000004;
+          node.vy += (height * 0.5 - node.y) * 0.000004;
+
+          node.vx *= 0.992;
+          node.vy *= 0.992;
+
+          node.x += node.vx;
+          node.y += node.vy;
+
+          if (node.x < 0) node.x += width;
+          if (node.x > width) node.x -= width;
+          if (node.y < 0) node.y += height;
+          if (node.y > height) node.y -= height;
+
+          const fade = 1 - node.age / node.life;
+          const alpha = clamp(fade, 0, 1);
+          if (alpha <= 0) {
+            threads.splice(i, 1);
+            continue;
+          }
+
+          const bright = 40 + alpha * 55;
+          ctx.beginPath();
+          ctx.moveTo(node.px, node.py);
+          ctx.lineTo(node.x, node.y);
+          ctx.strokeStyle = `hsla(${node.hue}, 92%, ${bright.toFixed(0)}%, ${0.22 + alpha * 0.55})`;
+          ctx.lineWidth = 0.7 + alpha * 1.4 + node.sway;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.fillStyle = `hsla(${node.hue}, 92%, ${bright.toFixed(0)}%, ${0.35 + alpha * 0.45})`;
+          const radius = 1.3 + alpha * 2.2;
+          ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
+          ctx.fill();
+
+          if (node.age > 20 && threads.length < settings.density * 1.05 && randomFromSeed() < settings.branch * 0.0065) {
+            branchFromNode(node);
+          }
+
+          if (node.age > node.life) {
+            threads.splice(i, 1);
+          }
+        }
+
+        if (paused) {
+          status.textContent = `paused · seed ${toHex(settings.seed)} · nodes ${threads.length}/${settings.density}`;
+          return;
+        }
+
+        if (frame % 7 === 0) {
+          hint.textContent = `threads ${threads.length} · seed ${toHex(settings.seed)} · ${pointer.down ? 'following pointer' : 'autonomous drift'}`;
+          status.textContent = `seed ${toHex(settings.seed)} · threads ${threads.length}/${settings.density} · branch ${settings.branch.toFixed(2)}`;
+          syncShare();
+        }
+
+        if (frame % 10 === 0 && pointer.down && frame - lastSpawn > 4) {
+          seedNode(pointer.x, pointer.y, { count: 2, jitter: 10, angle: randomFromSeed() * Math.PI * 2 });
+          lastSpawn = frame;
+        }
+
+        if (frame % 45 === 0 && !pointer.down && threads.length < settings.density - 16) {
+          const centerX = (Math.cos(frame * 0.0025) * 0.5 + 0.5) * width;
+          const centerY = (Math.sin(frame * 0.0019) * 0.5 + 0.5) * height;
+          seedNode(centerX, centerY, { count: 1, jitter: 2, angle: randomFromSeed() * Math.PI * 2 });
+        }
+
+        requestAnimationFrame(renderLoop);
+      };
+
+      const renderLoop = () => {
+        if (paused) {
+          requestAnimationFrame(renderLoop);
+          return;
+        }
+        draw();
+      };
+
+      const pointerDown = (event) => {
+        const rect = canvas.getBoundingClientRect();
+        pointer.down = true;
+        pointer.x = event.clientX - rect.left;
+        pointer.y = event.clientY - rect.top;
+        canvas.setPointerCapture(event.pointerId);
+        seedNode(pointer.x, pointer.y, { count: 5, jitter: 16, angle: randomFromSeed() * Math.PI * 2 });
+        syncShare();
+      };
+
+      const pointerMove = (event) => {
+        const rect = canvas.getBoundingClientRect();
+        pointer.x = event.clientX - rect.left;
+        pointer.y = event.clientY - rect.top;
+      };
+
+      const pointerUp = () => {
+        pointer.down = false;
+        hint.textContent = 'Drag stopped. The thicket keeps drifting from the last state.';
+      };
+
+      const loadFromLocation = () => {
+        const hashPayload = normalizeHash(location.hash.replace(/^#/, ''));
+        if (hashPayload && loadFromPayload(hashPayload)) {
+          hint.textContent = 'Replayed from shared hash state.';
+          return true;
+        }
+
+        const queryPayload = decodeQueryState();
+        if (queryPayload && loadFromPayload(queryPayload)) {
+          hint.textContent = 'Replayed from shared query state.';
+          return true;
+        }
+
+        return false;
+      };
+
+      const copyLink = () => {
+        const url = `${location.origin}${location.pathname}#${toPayload()}`;
+        navigator.clipboard
+          .writeText(url)
+          .then(() => {
+            status.textContent = 'thread link copied';
+            hint.textContent = 'URL copied. Share this exact thicket layout from the hash state.';
+          })
+          .catch(() => {
+            window.prompt('Copy this thread link:', url);
+          });
+      };
+
+      const exportPNG = () => {
+        const link = document.createElement('a');
+        link.download = `thread-thicket-${toHex(settings.seed)}-${Date.now().toString(36)}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        status.textContent = 'png exported';
+      };
+
+      const reseed = () => {
+        settings.seed = randomSeed();
+        rngState = settings.seed;
+        seedField();
+      };
+
+      const sprout = () => {
+        const angle = randomFromSeed() * Math.PI * 2;
+        seedNode(width * 0.5, height * 0.5, { count: 22, jitter: 38, angle });
+        syncShare();
+      };
+
+      const clearCanvas = () => {
+        threads = [];
+        status.textContent = 'field cleared';
+        hint.textContent = 'Field cleared; click again to grow a fresh thicket.';
+        syncShare();
+      };
+
+      const init = () => {
+        resize();
+        applySettings();
+
+        const loaded = loadFromLocation();
+        if (!loaded) {
+          settings.seed = randomSeed();
+          rngState = settings.seed;
+          seedField();
+          hint.textContent = 'No shared state found. New thread seed created.';
+        } else {
+          if (threads.length === 0) {
+            seedField();
+          } else {
+            syncShare();
+          }
+        }
+
+        requestAnimationFrame(renderLoop);
+
+        window.addEventListener('resize', resize);
+        window.addEventListener('hashchange', () => {
+          loadFromLocation();
+        });
+
+        canvas.addEventListener('pointerdown', pointerDown);
+        canvas.addEventListener('pointermove', pointerMove);
+        window.addEventListener('pointerup', pointerUp);
+        window.addEventListener('pointerleave', pointerUp);
+
+        reseedBtn.addEventListener('click', reseed);
+        sproutBtn.addEventListener('click', sprout);
+        clearBtn.addEventListener('click', clearCanvas);
+        copyBtn.addEventListener('click', copyLink);
+        exportBtn.addEventListener('click', exportPNG);
+
+        pauseBtn.addEventListener('click', () => {
+          paused = !paused;
+          pauseBtn.setAttribute('aria-pressed', String(paused));
+          pauseBtn.textContent = `pause: ${paused ? 'on' : 'off'}`;
+          if (!paused) {
+            requestAnimationFrame(renderLoop);
+          }
+        });
+
+        densityRange.addEventListener('input', applySettings);
+        chaosRange.addEventListener('input', applySettings);
+        branchRange.addEventListener('input', applySettings);
+      };
+
+      init();
+    })();
+  </script>
+</body>
+</html>
