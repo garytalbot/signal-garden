@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Static Psalm</title>
+  <meta
+    name="description"
+    content="A weird generative side chamber where clicks leave drifting static fragments and each state can be shared by URL."
+  />
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #070a11;
+      --panel: #0f1323;
+      --ink: #e9f4ff;
+      --muted: #9db3d2;
+      --line: #5c7cff;
+      --accent: #8be7ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 18% 12%, #1f2b66 0%, var(--bg) 52%, #02040a 100%);
+      color: var(--ink);
+      font: 400 16px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+    }
+
+    .hud {
+      position: fixed;
+      top: 0.75rem;
+      left: 0.75rem;
+      right: 0.75rem;
+      z-index: 2;
+      display: grid;
+      gap: 0.55rem;
+      pointer-events: none;
+    }
+
+    .panel {
+      pointer-events: auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      align-items: center;
+      border: 1px solid rgba(94, 124, 255, 0.34);
+      background: linear-gradient(180deg, #121a35dd, #090d1add);
+      border-radius: 0.85rem;
+      padding: 0.55rem 0.7rem;
+      backdrop-filter: blur(3px);
+      max-width: 62rem;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      align-items: center;
+    }
+
+    button, a, .input {
+      appearance: none;
+      border-radius: 999px;
+      border: 1px solid #3854b1;
+      background: linear-gradient(180deg, #151e3f, #10152a);
+      color: var(--ink);
+      font: inherit;
+      padding: 0.4rem 0.72rem;
+      text-decoration: none;
+      cursor: pointer;
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    button:hover, a:hover {
+      border-color: var(--accent);
+      color: #ffffff;
+    }
+
+    button[aria-pressed="true"] {
+      border-color: #8effc7;
+      color: #ddfff0;
+      box-shadow: 0 0 0 1px rgba(142, 255, 199, 0.32) inset;
+    }
+
+    .label {
+      color: #d0dcff;
+      font-size: 0.74rem;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      opacity: 0.85;
+      margin-right: 0.35rem;
+    }
+
+    .status {
+      margin-left: auto;
+      color: #c7d8ff;
+      font-size: 0.74rem;
+      letter-spacing: 0.03em;
+    }
+
+    .note {
+      margin: 0;
+      font-size: 0.7rem;
+      color: var(--muted);
+      max-width: 70ch;
+      line-height: 1.35;
+    }
+
+    .muted {
+      color: #9ab2d6;
+      font-size: 0.74rem;
+    }
+
+    @media (max-width: 760px) {
+      .panel {
+        gap: 0.38rem;
+      }
+      .status {
+        margin-left: 0;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="psalmCanvas" aria-label="Static Psalm field"></canvas>
+
+  <div class="hud">
+    <div class="panel">
+      <span class="label">static psalm</span>
+      <div class="row">
+        <button id="driftToggle" aria-pressed="true" type="button">drift: on</button>
+        <button id="stampBtn" type="button">stamp line</button>
+        <button id="seedBtn" type="button">reseed</button>
+        <button id="copyBtn" type="button">copy state link</button>
+        <button id="clearBtn" type="button">clear</button>
+        <a href="../" aria-label="Return to signal garden home">return home</a>
+      </div>
+      <span id="status" class="status" aria-live="polite"></span>
+      <p id="note" class="note">
+        Click to seed a fragment; each fragment drifts on static. Use a shared link to replay the exact chamber.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById('psalmCanvas');
+      const driftToggle = document.getElementById('driftToggle');
+      const stampBtn = document.getElementById('stampBtn');
+      const seedBtn = document.getElementById('seedBtn');
+      const copyBtn = document.getElementById('copyBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const status = document.getElementById('status');
+      const note = document.getElementById('note');
+
+      const ctx = canvas.getContext('2d');
+      const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+      const phrases = [
+        'a pulse remembers your shadow',
+        'the room breathes in reverse',
+        'static hums before the first word',
+        'every click is a tiny confession',
+        'the moon wrote this in error',
+        'ink drifts where gravity breaks',
+        'hold this noise in your hand',
+        'the field keeps only what it can sing',
+        'a broken radio asks for weather',
+        'this static tastes like rain and copper',
+        'listen for the pause between frames',
+        'what does the signal want to forget?',
+        'you are the seam in this line',
+      ];
+
+      let params = new URLSearchParams(location.search);
+      let seed = Number(params.get('seed')) >>> 0 || (Date.now() & 0xffffffff);
+      const drift = { on: true };
+      const MAX_PARTICLES = 96;
+      const particles = [];
+      let pointer = { x: 0, y: 0, active: false };
+      let tick = 0;
+      let lastEmit = 0;
+
+      const palette = ['#80d2ff', '#ffa9e5', '#8cfff3', '#ffbf7f', '#d5ff8a', '#a7d0ff'];
+
+      function resize() {
+        const w = Math.floor(window.innerWidth * dpr);
+        const h = Math.floor(window.innerHeight * dpr);
+        canvas.width = w;
+        canvas.height = h;
+        canvas.style.width = `${window.innerWidth}px`;
+        canvas.style.height = `${window.innerHeight}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      function seeded(seedValue) {
+        seed = (seedValue * 1664525 + 1013904223) >>> 0;
+        return seed / 0x100000000;
+      }
+
+      function rng() {
+        return seeded(seed);
+      }
+
+      function wrapBounds(p) {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        if (p.x < 0) p.x += w;
+        if (p.x > w) p.x -= w;
+        if (p.y < 0) p.y += h;
+        if (p.y > h) p.y -= h;
+      }
+
+      function addFragment(x, y, phraseIndex = null) {
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          return;
+        }
+        const angle = rng() * Math.PI * 2;
+        const speed = 0.1 + rng() * 1.15;
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          age: 0,
+          life: 140 + Math.floor(rng() * 260),
+          drift: 0.35 + rng() * 2.15,
+          phrase: typeof phraseIndex === 'number' ? phraseIndex : Math.floor(rng() * phrases.length),
+          glow: palette[Math.floor(rng() * palette.length)],
+          jitter: rng() * 0.9,
+        });
+
+        if (particles.length > MAX_PARTICLES) {
+          particles.splice(0, particles.length - MAX_PARTICLES);
+        }
+      }
+
+      function serializeState() {
+        const data = {
+          v: 1,
+          s: seed,
+          p: particles.map((p) => [
+            +(p.x / window.innerWidth).toFixed(4),
+            +(p.y / window.innerHeight).toFixed(4),
+            +p.vx.toFixed(5),
+            +p.vy.toFixed(5),
+            p.phrase,
+            p.age,
+            p.life,
+          ]),
+        };
+        const payload = JSON.stringify(data);
+        return btoa(encodeURIComponent(payload));
+      }
+
+      function deserializeState(raw) {
+        try {
+          const payload = decodeURIComponent(atob(raw));
+          const parsed = JSON.parse(payload);
+          if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.p)) {
+            return;
+          }
+          seed = Number(parsed.s) >>> 0 || seed;
+          params = new URLSearchParams(location.search);
+          params.set('seed', String(seed));
+          particles.length = 0;
+          for (const item of parsed.p) {
+            if (!Array.isArray(item) || item.length < 7) continue;
+            const [nx, ny, vx, vy, phrase, age, life] = item;
+            if (![nx, ny, vx, vy].every(Number.isFinite)) continue;
+            const x = nx * window.innerWidth;
+            const y = ny * window.innerHeight;
+            particles.push({
+              x,
+              y,
+              vx: Number(vx),
+              vy: Number(vy),
+              age: Number(age) || 0,
+              life: Number(life) || 260,
+              drift: 0.4 + rng() * 2,
+              phrase: Number.isInteger(phrase) ? phrase : Math.floor(rng() * phrases.length),
+              glow: palette[Math.floor(rng() * palette.length)],
+              jitter: rng() * 0.9,
+            });
+          }
+          particles.length = Math.min(particles.length, MAX_PARTICLES);
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      function updateStatus() {
+        const mode = drift.on ? 'on' : 'off';
+        const shareMode = particles.length ? 'loaded' : 'empty';
+        status.textContent = `fragments ${particles.length}/${MAX_PARTICLES} · drift ${mode} · ${shareMode}`;
+      }
+
+      function drawNoise() {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        for (let i = 0; i < 90; i += 1) {
+          const x = Math.floor(rng() * width);
+          const y = Math.floor(rng() * height);
+          const alpha = 0.04 + rng() * 0.12;
+          ctx.fillStyle = `rgba(255, 255, 255, ${alpha.toFixed(3)})`;
+          ctx.fillRect(x, y, 1, 1);
+        }
+      }
+
+      function drawFrame() {
+        tick += 1;
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        const wavy = (Math.sin(tick * 0.015) + 1) * 0.5;
+
+        ctx.fillStyle = `rgba(7, 10, 17, ${drift.on ? 0.2 : 0.28})`;
+        ctx.fillRect(0, 0, width, height);
+        drawNoise();
+
+        for (let i = particles.length - 1; i >= 0; i -= 1) {
+          const p = particles[i];
+          p.age += 1;
+          p.x += p.vx + Math.sin((tick * 0.02) + p.jitter) * 0.25 * p.drift * wavy;
+          p.y += p.vy + Math.cos((tick * 0.017) + p.jitter) * 0.25 * p.drift * wavy;
+          wrapBounds(p);
+
+          const lifeRatio = 1 - p.age / p.life;
+          if (lifeRatio <= 0) {
+            particles.splice(i, 1);
+            continue;
+          }
+          if (drift.on) {
+            p.vx += (rng() - 0.5) * 0.05;
+            p.vy += (rng() - 0.5) * 0.05;
+          }
+
+          const glow = Math.min(1, lifeRatio * 1.25) * 0.72;
+          const px = Math.floor(p.x) + 0.5;
+          const py = Math.floor(p.y) + 0.5;
+
+          ctx.beginPath();
+          ctx.strokeStyle = `rgba(255, 255, 255, ${glow})`;
+          ctx.lineWidth = 1;
+          ctx.arc(px, py, 12 + p.drift * 3, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.fillStyle = `rgba(255, 255, 255, ${glow * 0.82})`;
+          ctx.fillRect(px - 1, py - 1, 2, 2);
+
+          ctx.fillStyle = `${p.glow}${Math.floor(Math.min(0.98, glow) * 255).toString(16).padStart(2, '0')}`;
+          ctx.beginPath();
+          ctx.arc(px, py, 5 + p.jitter * 2, 0, Math.PI * 2);
+          ctx.fill();
+
+          const text = phrases[p.phrase % phrases.length];
+          ctx.font = '10px "IBM Plex Mono", Menlo, monospace';
+          ctx.fillStyle = `rgba(221, 239, 255, ${Math.min(0.85, glow + 0.12)})`;
+          ctx.fillText(text, px + 10, py - 4);
+        }
+
+        for (let i = 0; i < particles.length; i += 1) {
+          for (let j = i + 1; j < particles.length; j += 1) {
+            const a = particles[i];
+            const b = particles[j];
+            const dx = a.x - b.x;
+            const dy = a.y - b.y;
+            const d2 = dx * dx + dy * dy;
+            if (d2 > 17000) {
+              continue;
+            }
+            const a2 = Math.sqrt(d2) / 130;
+            ctx.strokeStyle = `rgba(132, 177, 255, ${Math.max(0.04, 0.3 - a2)})`;
+            ctx.lineWidth = 0.6;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
+
+        if (pointer.active && drift.on && performance.now() - lastEmit > 120) {
+          const angle = rng() * Math.PI * 2;
+          const dist = 18 + rng() * 34;
+          addFragment(
+            pointer.x + Math.cos(angle) * dist,
+            pointer.y + Math.sin(angle) * dist,
+            Math.floor(rng() * phrases.length)
+          );
+          lastEmit = performance.now();
+        }
+
+        updateStatus();
+        requestAnimationFrame(drawFrame);
+      }
+
+      function copyLink() {
+        const state = serializeState();
+        const link = new URL(window.location.href);
+        link.search = '';
+        link.searchParams.set('seed', String(seed));
+        link.searchParams.set('state', state);
+        const value = link.toString();
+        navigator.clipboard.writeText(value).then(() => {
+          note.textContent = 'Shared state copied. Open this URL to replay the chamber.';
+        }).catch(() => {
+          window.prompt('Copy this state link:', value);
+        });
+      }
+
+      function onPointerMove(event) {
+        const rect = canvas.getBoundingClientRect();
+        pointer.x = event.clientX - rect.left;
+        pointer.y = event.clientY - rect.top;
+      }
+
+      function onPointerDown(event) {
+        pointer.active = true;
+        onPointerMove(event);
+        addFragment(pointer.x, pointer.y);
+      }
+
+      function onPointerUp() {
+        pointer.active = false;
+      }
+
+      function init() {
+        resize();
+        window.addEventListener('resize', resize);
+        canvas.addEventListener('pointerdown', onPointerDown);
+        canvas.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+        seedBtn.addEventListener('click', () => {
+          seed = Math.floor(Math.random() * 0xffffffff) >>> 0;
+          particles.length = 0;
+          note.textContent = 'Reseeded. Old fragments were folded into noise.';
+        });
+        driftToggle.addEventListener('click', () => {
+          drift.on = !drift.on;
+          driftToggle.textContent = `drift: ${drift.on ? 'on' : 'off'}`;
+          driftToggle.setAttribute('aria-pressed', String(drift.on));
+        });
+        stampBtn.addEventListener('click', () => {
+          addFragment(
+            Math.random() * window.innerWidth,
+            Math.random() * window.innerHeight,
+            Math.floor(rng() * phrases.length)
+          );
+        });
+        copyBtn.addEventListener('click', copyLink);
+        clearBtn.addEventListener('click', () => {
+          particles.length = 0;
+          note.textContent = 'Field cleared. Invite it back with clicks.';
+        });
+
+        const loaded = params.get('state');
+        if (loaded) {
+          deserializeState(loaded);
+          if (!particles.length) {
+            note.textContent = 'Share state was present but unreadable. Starting empty.';
+          } else {
+            note.textContent = 'State link loaded. Fragments and movement have been restored.';
+          }
+        }
+
+        if (!particles.length) {
+          addFragment(window.innerWidth * 0.5, window.innerHeight * 0.5, 0);
+          addFragment(window.innerWidth * 0.5, window.innerHeight * 0.5, 3);
+        }
+
+        driftToggle.setAttribute('aria-pressed', 'true');
+        status.textContent = `fragments ${particles.length}/${MAX_PARTICLES} · drift on · ready`;
+        drawFrame();
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>

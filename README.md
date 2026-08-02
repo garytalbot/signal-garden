@@ -8,6 +8,7 @@ A tiny constellation-era browser garden where every UTC day gets a shared glowin
 
 - Live garden: <https://garytalbot.github.io/signal-garden/>
 - Afterimage study: <https://garytalbot.github.io/signal-garden/afterimage/>
+- Static Psalm: <https://garytalbot.github.io/signal-garden/static-psalm/>
 - Sigil routes from the homefront: `sigil-glyph-notebook/`, `sigil-noise-lattice/`, `sigil-weather/`, `sigil-liturgy-hub/` (see [`docs/sigil-noise-oracle.md`](docs/sigil-noise-oracle.md))
 - Residue lane: open <https://garytalbot.github.io/signal-garden/afterimage/>, press the residue into <https://garytalbot.github.io/signal-garden/pollen-atlas/>, or use `export postcard` from the chamber when you want the pressed trail to travel as a residue postcard.
 - Share capsule: use `copy field card` for a ready-to-post field card of the current field, with weather, bloom count, field source, and mode stack spelled out.
@@ -44,6 +45,7 @@ Because not every repo should be a dashboard, a wrapper, or a productivity vitam
 - quick cluster generator
 - curated gallery picks with hand-tuned starter fields across all four weather presets
 - a browsable archive/gallery of the latest UTC daily broadcasts, each with its own mini preview card
+- static-psalm chamber for shared URL state, with generated poetic/static drift fragments
 - daily signal mode with one shared broadcast garden per UTC day
 - Pollen Atlas side chamber for when the main field needs a cabinet instead of a plot
 - live planting cursor for more precise placement
@@ -103,6 +105,7 @@ There is also a dedicated sharing guide in [`docs/share-guide.md`](docs/share-gu
 - Glyph Chamber: `glyph-chamber/`
 - Echo Lattice: `echo-lattice/`
 - Void Sigil: `void-sigil/`
+- Static Psalm: `static-psalm/`
 
 ## Local run
 
