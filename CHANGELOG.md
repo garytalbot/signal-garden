@@ -9,3 +9,4 @@
 - Added a reproducible headless residue smoke test script so the shared-link path can be verified locally without the gateway.
 - Added an afterimage-side residue postcard export so pressed ghost trails can be packaged directly from the chamber before or after they travel into the atlas.
 - Added the `static-psalm/` side chamber as a small generative lane with shareable URL state and included it in mirror-route maintenance.
+- Added `grave-ink/` as a tiny generative mark chamber with seeded hash-state sharing and PNG export, mirrored to both public trees.

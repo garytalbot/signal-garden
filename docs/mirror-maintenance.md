@@ -12,11 +12,16 @@ MIR="${2:-/root/.openclaw/workspace/garytalbot.github.io/signal-garden}"
 # Routes/chambers that must stay identical across source and mirror
 ROUTES=(
   afterimage
+  corridor-liturgy
+  drift-litany
+  grave-ink
   echo-current
   echo-hush
   echo-lattice
   glyph-chamber
+  moth-chorus
   pollen-atlas
+  rumination-hall
   sigil-glyph-notebook
   sigil-liturgy-hub
   sigil-noise-lattice
@@ -25,6 +30,8 @@ ROUTES=(
   static-psalm
   hush-stitch
   spectral-drift
+  void-cathedral
+  void-echo
   void-loom
   void-chorale
   void-liturgy
