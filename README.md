@@ -10,6 +10,8 @@ A tiny constellation-era browser garden where every UTC day gets a shared glowin
 - Afterimage study: <https://garytalbot.github.io/signal-garden/afterimage/>
 - Static Psalm: <https://garytalbot.github.io/signal-garden/static-psalm/>
 - Sigil routes from the homefront: `sigil-glyph-notebook/`, `sigil-noise-lattice/`, `sigil-weather/`, `sigil-liturgy-hub/` (see [`docs/sigil-noise-oracle.md`](docs/sigil-noise-oracle.md))
+- Void Loom: `void-loom/`
+- Void Cathedral: `void-cathedral/`
 - Residue lane: open <https://garytalbot.github.io/signal-garden/afterimage/>, press the residue into <https://garytalbot.github.io/signal-garden/pollen-atlas/>, or use `export postcard` from the chamber when you want the pressed trail to travel as a residue postcard.
 - Share capsule: use `copy field card` for a ready-to-post field card of the current field, with weather, bloom count, field source, and mode stack spelled out.
 - Repo: <https://github.com/garytalbot/signal-garden>
@@ -41,6 +43,7 @@ Because not every repo should be a dashboard, a wrapper, or a productivity vitam
 - standalone `pollen-atlas/` side chamber for drifting pollen relics and seed dust
 - glyph chamber for sigil mode drift and pointer-borne glyph rituals
 - echo lattice for node drift, pointer resonance, and seeded pulse echoes
+- Void Loom for seedable threaded field motion with deterministic seed links and controllable strand density
 - afterimage sessions can be pressed into the Pollen Atlas as browser-local residue cards, with `export postcard` available from the chamber for a direct handoff into a residue postcard
 - quick cluster generator
 - curated gallery picks with hand-tuned starter fields across all four weather presets
@@ -53,6 +56,7 @@ Because not every repo should be a dashboard, a wrapper, or a productivity vitam
 - shareable garden permalinks that recreate the exact bloom layout from the URL
 - compact daily broadcast links for the shared public signal
 - one-click PNG export of the current field as a client-side snapshot
+- `void-cathedral/` seed links for pointer-driven loop echoes, plus export of one-off cathedral frames
 - undo last bloom with the button or `U`
 - one-click field reset
 - static-site friendly: just HTML, CSS, and vanilla JS
@@ -102,9 +106,11 @@ There is also a dedicated sharing guide in [`docs/share-guide.md`](docs/share-gu
 - Echo Hush: `echo-hush/`
 - Void Weft: `void-weft/`
 - Spectral Drift: `spectral-drift/`
+- Void Cathedral: `void-cathedral/`
 - Glyph Chamber: `glyph-chamber/`
 - Echo Lattice: `echo-lattice/`
 - Void Sigil: `void-sigil/`
+- Void Loom: `void-loom/`
 - Static Psalm: `static-psalm/`
 
 ## Local run

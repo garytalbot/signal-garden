@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Void Loom is a seed-driven strand chamber where each seed rewires luminous threads into a deterministic, drifting signal-map." />
+  <title>Signal Garden — Void Loom</title>
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      --ink: #f4f0ff;
+      --muted: #af9eff;
+      --bg: #060412;
+      --panel: #120f2f;
+      --line: #8befff;
+      --line-soft: #765ad9;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 20% 12%, #2a1762 0%, #120b2f 34%, transparent 58%),
+        radial-gradient(circle at 82% 8%, #0f2554 0%, transparent 45%),
+        linear-gradient(165deg, #050510 0%, #080719 56%, #070514 100%);
+      color: var(--ink);
+      overflow: hidden;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    .hud {
+      position: fixed;
+      top: 0.7rem;
+      left: 0.7rem;
+      right: 0.7rem;
+      z-index: 2;
+      pointer-events: none;
+      display: grid;
+      gap: 0.6rem;
+      max-width: min(1080px, calc(100vw - 1.4rem));
+      margin: 0 auto;
+    }
+
+    .panel {
+      pointer-events: auto;
+      border: 1px solid #4f49a3;
+      background: color-mix(in oklab, var(--panel), #000 24%);
+      border-radius: 0.9rem;
+      padding: 0.55rem 0.7rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      align-items: center;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+      max-width: min(1080px, 100%);
+    }
+
+    .label {
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      font-size: 0.7rem;
+      color: var(--muted);
+      width: 100%;
+      margin-bottom: 0.2rem;
+    }
+
+    button,
+    a,
+    input[type='range'] {
+      border: 1px solid #5950a8;
+      border-radius: 999px;
+      background: #19143a;
+      color: var(--ink);
+      padding: 0.42rem 0.72rem;
+      font: inherit;
+      font-size: 0.73rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    button:hover,
+    a:hover,
+    input[type='range']:hover {
+      border-color: #81f0ff;
+      color: #fff;
+    }
+
+    button[aria-pressed='true'] {
+      border-color: #81f0ff;
+      color: #dbfff8;
+      box-shadow: 0 0 0 1px rgba(129, 240, 255, 0.3) inset;
+    }
+
+    .status {
+      margin-left: auto;
+      color: #d7d5ff;
+      font-size: 0.72rem;
+      letter-spacing: 0.03em;
+      opacity: 0.95;
+      min-width: 180px;
+      max-width: 330px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .hint {
+      margin: 0;
+      color: #c7b8ff;
+      font-size: 0.72rem;
+      max-width: 66ch;
+      line-height: 1.4;
+    }
+
+    .home {
+      margin-left: auto;
+    }
+
+    .seed-row {
+      display: inline-flex;
+      gap: 0.45rem;
+      align-items: center;
+      width: min(100%, 16rem);
+    }
+
+    label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      color: #d4cff6;
+      font-size: 0.73rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
+    input[type='range'] {
+      width: min(220px, 44vw);
+      accent-color: var(--line);
+      cursor: ew-resize;
+    }
+
+    .poem {
+      position: fixed;
+      left: 0.7rem;
+      right: 0.7rem;
+      bottom: 0.7rem;
+      z-index: 2;
+      pointer-events: none;
+      color: #d7c8ff;
+      opacity: 0.9;
+      border: 1px dashed #4f46b0;
+      background: #130f2dcf;
+      border-radius: 0.75rem;
+      padding: 0.55rem 0.7rem;
+      max-width: min(730px, calc(100vw - 1.4rem));
+      line-height: 1.4;
+      backdrop-filter: blur(4px);
+    }
+
+    .poem strong {
+      color: #fbffff;
+      letter-spacing: 0.05em;
+    }
+
+    @media (max-width: 740px) {
+      .status {
+        margin-left: 0;
+        width: 100%;
+        min-width: 0;
+      }
+
+      .home {
+        margin-left: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="loom" aria-label="Void Loom chamber"></canvas>
+
+  <div class="hud">
+    <div class="panel">
+      <p class="label">Void Loom chamber</p>
+      <button id="reseedBtn" type="button">reseed</button>
+      <button id="pauseBtn" aria-pressed="false" type="button">pause: off</button>
+      <button id="traceBtn" aria-pressed="true" type="button">ghost trace: on</button>
+      <button id="copyBtn" type="button">copy seed link</button>
+      <button id="postcardBtn" type="button">export postcard</button>
+      <label for="density">thread density</label>
+      <input id="density" type="range" min="42" max="220" step="2" value="112" />
+      <span class="seed-row">
+        <a class="home" href="../">return home</a>
+        <span class="status" id="status" aria-live="polite">ready</span>
+      </span>
+    </div>
+    <p class="hint" id="hint">move: pull threads; click: knot a new strand; every reload with the same seed should open the same void map.</p>
+  </div>
+
+  <div class="poem" id="poemLine">The thread map waits for a seed and then remembers every slight pull.</div>
+
+  <script>
+    const canvas = document.getElementById('loom');
+    const ctx = canvas.getContext('2d');
+    const reseedBtn = document.getElementById('reseedBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const traceBtn = document.getElementById('traceBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const postcardBtn = document.getElementById('postcardBtn');
+    const densityRange = document.getElementById('density');
+    const status = document.getElementById('status');
+    const poemLine = document.getElementById('poemLine');
+
+    const url = new URL(location.href);
+    const search = new URLSearchParams(location.search);
+    const densityFromSeed = Number(search.get('d') || search.get('density') || 112);
+
+    const palette = ['#79f6ff', '#d9a5ff', '#8dd7ff', '#ffb7f0', '#aaffba', '#ffd58f', '#d8c8ff'];
+    const TAU = Math.PI * 2;
+    const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+
+    let width = 0;
+    let height = 0;
+    let frame = 0;
+    let paused = false;
+    let trace = true;
+    let seed = readSeed(seedFromUrl());
+    let lines = [];
+
+    const mouse = { x: 0, y: 0, active: false };
+
+    densityRange.value = Math.min(220, Math.max(42, Number.isFinite(densityFromSeed) ? densityFromSeed : 112));
+
+    function seedFromUrl() {
+      return search.get('seed') || null;
+    }
+
+    function readSeed(raw) {
+      if (!raw) {
+        return (Date.now() & 0xffffffff) >>> 0;
+      }
+      const parsed = Number.parseInt(raw, 16);
+      if (!Number.isFinite(parsed)) {
+        return (Date.now() & 0xffffffff) >>> 0;
+      }
+      return parsed >>> 0;
+    }
+
+    let randomState = seed;
+    function lcg() {
+      randomState = (randomState * 1664525 + 1013904223) >>> 0;
+      return randomState / 0x100000000;
+    }
+
+    function resize() {
+      width = Math.floor(window.innerWidth * dpr);
+      height = Math.floor(window.innerHeight * dpr);
+      canvas.width = Math.max(420, width);
+      canvas.height = Math.max(240, height);
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function pickLineCount() {
+      return Number(densityRange.value);
+    }
+
+    function makeLine() {
+      const x = lcg() * (canvas.clientWidth);
+      const y = lcg() * (canvas.clientHeight);
+      const span = 26 + Math.floor(lcg() * 44);
+      return {
+        x,
+        y,
+        phase: lcg() * TAU,
+        spin: 0.0016 + lcg() * 0.0042,
+        radius: 60 + lcg() * 210,
+        noise: 9 + lcg() * 42,
+        drift: 0.5 + lcg() * 1.8,
+        tone: palette[Math.floor(lcg() * palette.length)],
+        len: span,
+        age: 0,
+      };
+    }
+
+    function seedField() {
+      lines = [];
+      randomState = seed;
+      const count = pickLineCount();
+      for (let i = 0; i < count; i += 1) {
+        lines.push(makeLine());
+      }
+      status.textContent = `ready • ${count.toString().padStart(3, '0')} strands • seed ${seed.toString(16).padStart(8, '0')}`;
+      poemLine.innerHTML = '<strong>Seed sealed:</strong> same URL, same strands, same drift lane.';
+    }
+
+    function reseed() {
+      seed = (seed * 1103515245 + 12345) >>> 0;
+      randomState = seed;
+      seedField();
+      drawLink(true);
+      status.textContent = `seed updated • ${seed.toString(16).padStart(8, '0')}`;
+    }
+
+    function drawPostcardOverlay(context, src, targetW, targetH) {
+      context.drawImage(src, 0, 0, targetW, targetH);
+      context.fillStyle = 'rgba(17, 13, 38, 0.88)';
+      context.fillRect(0, targetH - 120, targetW, 120);
+      context.fillStyle = '#f6eeff';
+      context.font = 'bold 40px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+      context.fillText('Signal Garden: Void Loom', 28, targetH - 70);
+      context.font = '20px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+      context.fillStyle = '#d2c8ff';
+      context.fillText(`seed=${seed.toString(16).padStart(8, '0')} • strands=${pickLineCount()}`, 28, targetH - 40);
+    }
+
+    function exportPostcard() {
+      const exportCanvas = document.createElement('canvas');
+      const targetW = 1400;
+      const targetH = Math.max(700, Math.floor((targetW * (canvas.clientHeight / Math.max(1, canvas.clientWidth)))));
+      exportCanvas.width = targetW;
+      exportCanvas.height = targetH;
+      const drawCtx = exportCanvas.getContext('2d');
+      drawPostcardOverlay(drawCtx, canvas, targetW, targetH);
+      const blob = exportCanvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = blob;
+      link.download = `void-loom-postcard-${seed.toString(16)}.png`;
+      link.click();
+      status.textContent = 'postcard export queued';
+    }
+
+    function spliceLink() {
+      const next = new URL(location.href);
+      next.search = '';
+      next.searchParams.set('seed', seed.toString(16).padStart(8, '0'));
+      next.searchParams.set('d', String(pickLineCount()));
+      if (trace) {
+        next.searchParams.set('trace', '1');
+      }
+      if (mouse.active) {
+        next.hash = `x${mouse.x.toFixed(0)}y${mouse.y.toFixed(0)}`;
+      }
+      return next.toString();
+    }
+
+    function drawLink(force = false) {
+      const next = spliceLink();
+      const previous = location.href.split('#')[0];
+      if (force || next !== previous) {
+        history.replaceState({}, '', next);
+      }
+    }
+
+    function frameTone() {
+      const pulse = 0.55 + Math.sin(frame * 0.004) * 0.45;
+      ctx.fillStyle = `rgba(4, 3, 12, ${trace ? 0.11 : 0.28})`;
+      ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+
+      for (const strand of lines) {
+        const pulseRadius = strand.radius + Math.sin(strand.phase + frame * 0.004) * strand.noise;
+        const driftX = (mouse.active ? (mouse.x - canvas.clientWidth / 2) * 0.003 : 0);
+        const driftY = (mouse.active ? (mouse.y - canvas.clientHeight / 2) * 0.003 : 0);
+
+        for (let i = 0; i < strand.len; i += 1) {
+          const t = strand.phase + frame * strand.spin + i * 0.08;
+          const n = Math.sin(t + strand.noise) * 0.45;
+          const x = strand.x + Math.cos(t + n) * (pulseRadius * (1 + i * 0.004)) + Math.sin(t * 1.8) * strand.drift + driftX * (1 + i / strand.len);
+          const y = strand.y + Math.sin(t + n * 0.7) * (pulseRadius * (1 + i * 0.004)) + Math.cos(t * 1.5) * strand.drift + driftY * (1 + i / strand.len);
+          const next = i + 1;
+          const t2 = strand.phase + frame * strand.spin + next * 0.08 + 0.6;
+          const n2 = Math.sin(t2 + strand.noise) * 0.45;
+          const x2 = strand.x + Math.cos(t2 + n2) * (pulseRadius * (1 + next * 0.004)) + Math.sin((t2) * 1.8) * strand.drift + driftX * (1 + next / strand.len);
+          const y2 = strand.y + Math.sin(t2 + n2 * 0.7) * (pulseRadius * (1 + next * 0.004)) + Math.cos((t2) * 1.5) * strand.drift + driftY * (1 + next / strand.len);
+
+          ctx.strokeStyle = strand.tone;
+          ctx.lineWidth = (4 - next / strand.len) * 0.23;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.bezierCurveTo(x + Math.sin(t) * 20, y + Math.cos(t) * 20, x2 + Math.cos(t2) * 16, y2 + Math.sin(t2) * 16, x2, y2);
+          ctx.stroke();
+
+          if (i % 5 === 0) {
+            ctx.fillStyle = `rgba(244, 238, 255, ${0.06 + n * 0.03})`;
+            ctx.fillRect(x, y, 2.4, 2.4);
+          }
+        }
+
+        strand.phase += 0.0025 + i % 3 * 0.0005;
+        strand.age += 1;
+      }
+
+      for (const strand of lines.slice(-4)) {
+        ctx.strokeStyle = `${strand.tone}88`;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(strand.x, strand.y, 2 + Math.sin(frame * 0.008 + strand.phase) * 2, 0, TAU);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+
+      if (frame % 90 === 0) {
+        const score = Math.max(0, Math.min(99, Math.floor(45 + Math.sin(frame * 0.002) * 45)));
+        poemLine.innerHTML = `<strong>Thread drift:</strong> ${score}% ${trace ? 'coherent' : 'silent'}.`;
+      }
+
+      frame += 1;
+    }
+
+    function renderFrame() {
+      if (!paused) {
+        frameTone();
+      }
+      requestAnimationFrame(renderFrame);
+    }
+
+    function spawnAt(x, y) {
+      lines.push({
+        x,
+        y,
+        phase: lcg() * TAU,
+        spin: 0.0015 + lcg() * 0.003,
+        radius: 42 + lcg() * 120,
+        noise: 8 + lcg() * 36,
+        drift: 0.2 + lcg() * 1.6,
+        tone: palette[Math.floor(lcg() * palette.length)],
+        len: 18 + Math.floor(lcg() * 48),
+        age: 0,
+      });
+      if (lines.length > 260) {
+        lines.splice(0, lines.length - 260);
+      }
+      status.textContent = `knotted • ${lines.length} strands`;
+      drawLink();
+    }
+
+    function pointerMove(ev) {
+      const rect = canvas.getBoundingClientRect();
+      mouse.active = true;
+      mouse.x = ev.clientX - rect.left;
+      mouse.y = ev.clientY - rect.top;
+    }
+
+    function pointerOut() {
+      mouse.active = false;
+    }
+
+    function handlePointer(ev) {
+      const rect = canvas.getBoundingClientRect();
+      const x = ev.clientX - rect.left;
+      const y = ev.clientY - rect.top;
+      spawnAt(x, y);
+    }
+
+    function updateFromQuery() {
+      randomState = seed;
+      drawLink(true);
+    }
+
+    reseedBtn.addEventListener('click', reseed);
+    pauseBtn.addEventListener('click', () => {
+      paused = !paused;
+      pauseBtn.setAttribute('aria-pressed', String(paused));
+      pauseBtn.textContent = `pause: ${paused ? 'on' : 'off'}`;
+      status.textContent = paused ? 'paused' : 'running';
+    });
+
+    traceBtn.addEventListener('click', () => {
+      trace = !trace;
+      traceBtn.setAttribute('aria-pressed', String(trace));
+      traceBtn.textContent = `ghost trace: ${trace ? 'on' : 'off'}`;
+      drawLink();
+    });
+
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(spliceLink());
+        status.textContent = 'copied seed link to clipboard';
+      } catch {
+        status.textContent = 'copy failed · tap the address bar link instead';
+      }
+    });
+
+    postcardBtn.addEventListener('click', exportPostcard);
+
+    densityRange.addEventListener('input', () => {
+      const nextCount = pickLineCount();
+      while (lines.length < nextCount) {
+        lines.push(makeLine());
+      }
+      while (lines.length > nextCount) {
+        lines.shift();
+      }
+      status.textContent = `strand density ${nextCount}`;
+      drawLink();
+    });
+
+    canvas.addEventListener('pointermove', pointerMove);
+    canvas.addEventListener('pointerleave', pointerOut);
+    canvas.addEventListener('pointerdown', handlePointer);
+
+    window.addEventListener('resize', () => {
+      resize();
+      seedField();
+    });
+
+    resize();
+    seedField();
+    updateFromQuery();
+    renderFrame();
+  </script>
+</body>
+</html>

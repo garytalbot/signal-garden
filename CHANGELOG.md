@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added `void-loom/` as a seedable side chamber with URL-based seeded state, density control, share-link copy, and postcard export.
 - Added a public-facing changelog file so the repo has a quick, human-readable ship log.
 - Clarified the current share surfaces in the repo docs and launch kit copy.
 - Added residue permalinks to the Pollen Atlas so pressed afterimage cards can travel by URL and rehydrate in another atlas session.

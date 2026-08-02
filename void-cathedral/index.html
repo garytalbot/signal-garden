@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Void Cathedral</title>
+    <meta
+      name="description"
+      content="Void Cathedral is a generative ritual where drifting cathedral arcs answer to your pointer, a seeded hash keeps the whole apparition reproducible, and every frame can be saved as a PNG relic."
+    />
+    <style>
+      :root {
+        --bg: #06050e;
+        --ink: #f7eefe;
+        --panel: color-mix(in oklab, #1a1336 82%, #000);
+        --line: #9ff2ff;
+        --line-soft: #b29dff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        min-height: 100%;
+        background: radial-gradient(circle at 30% 8%, #1a1340 0%, var(--bg) 60%);
+        color: var(--ink);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+        overflow: hidden;
+      }
+
+      canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+        touch-action: none;
+      }
+
+      .altar {
+        position: fixed;
+        inset: 0.75rem;
+        z-index: 5;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        pointer-events: none;
+      }
+
+      .panel {
+        pointer-events: auto;
+        background: color-mix(in oklab, var(--panel), #08080f 35%);
+        border: 1px solid #4733a5;
+        border-radius: 0.85rem;
+        padding: 0.5rem 0.7rem;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+
+      button,
+      .link,
+      .status,
+      input {
+        border: 1px solid #6652c0;
+        border-radius: 999px;
+        color: var(--ink);
+        background: #1b1549;
+        font-size: 0.74rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      button,
+      .link {
+        cursor: pointer;
+        padding: 0.38rem 0.75rem;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .status {
+        max-width: 58ch;
+        padding: 0.38rem 0.75rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      label {
+        font-size: 0.68rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #e2d8ff;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      input {
+        padding: 0.2rem 0.5rem;
+      }
+
+      button:hover,
+      .link:hover {
+        border-color: #a89bff;
+      }
+
+      .home {
+        position: fixed;
+        right: 0.75rem;
+        bottom: 0.75rem;
+        z-index: 5;
+        background: #15103d;
+        text-transform: uppercase;
+      }
+
+      @media (max-width: 800px) {
+        .altar {
+          inset: 0.55rem;
+        }
+
+        .panel {
+          width: 100%;
+        }
+
+        input {
+          width: 92px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="cathedral"></canvas>
+
+    <div class="altar">
+      <div class="panel">
+        <button id="copyBtn" type="button">copy link</button>
+        <button id="exportBtn" type="button">export png</button>
+        <button id="reseedBtn" type="button">reseed</button>
+        <label>
+          density
+          <input id="density" type="range" min="90" max="260" step="10" value="170" />
+        </label>
+        <label>
+          drift
+          <input id="drift" type="range" min="0.45" max="2.8" step="0.05" value="1.2" />
+        </label>
+      </div>
+      <div class="panel">
+        <span class="status" id="status">aligning cathedral mirrors</span>
+      </div>
+    </div>
+
+    <a class="link home" id="returnHome" href="../">return to signal-garden</a>
+
+    <script>
+      const canvas = document.getElementById('cathedral');
+      const ctx = canvas.getContext('2d');
+      const copyBtn = document.getElementById('copyBtn');
+      const exportBtn = document.getElementById('exportBtn');
+      const reseedBtn = document.getElementById('reseedBtn');
+      const densityRange = document.getElementById('density');
+      const driftRange = document.getElementById('drift');
+      const status = document.getElementById('status');
+      const returnHome = document.getElementById('returnHome');
+
+      const palette = ['#7ffcff', '#c7b7ff', '#ff9ff1', '#fff48e', '#8dffd4'];
+      const state = {
+        seed: 0,
+        points: [],
+        pulses: [],
+        time: 0,
+        drift: Number.parseFloat(driftRange.value),
+        density: Number.parseInt(densityRange.value, 10),
+      };
+
+      const rng = () => {
+        state.seed ^= (state.seed << 13) >>> 0;
+        state.seed ^= state.seed >>> 17;
+        state.seed ^= (state.seed << 5) >>> 0;
+        return (state.seed >>> 0) / 4294967296;
+      };
+
+      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+      const toHex = (value) => value.toString(16).padStart(8, '0');
+
+      const parseSeed = (raw) => {
+        if (!raw) return null;
+        const value = Number.parseInt(String(raw).replace(/^0x/i, ''), 16);
+        return Number.isFinite(value) ? value : null;
+      };
+
+      const resolveStateFromLocation = () => {
+        const params = new URLSearchParams(location.search);
+        const seed = parseSeed(params.get('seed')) || (Date.now() & 0xffffffff);
+        state.seed = seed >>> 0;
+        const density = Number.parseInt(params.get('density'), 10);
+        const drift = Number.parseFloat(params.get('drift'));
+        if (Number.isFinite(density)) {
+          state.density = clamp(density, 90, 260);
+          densityRange.value = String(state.density);
+        }
+        if (Number.isFinite(drift)) {
+          state.drift = clamp(drift, 0.45, 2.8);
+          driftRange.value = String(state.drift);
+        }
+      };
+
+      const makeSourceMap = () => {
+        state.points = [];
+        const count = state.density;
+        for (let i = 0; i < count; i += 1) {
+          const phase = rng() * Math.PI * 2;
+          const speed = 0.0018 + rng() * 0.0048;
+          const arm = 2 + Math.floor(rng() * 4);
+          const radius = 1.4 + rng() * 2.1;
+          const hue = Math.floor(rng() * palette.length);
+          state.points.push({
+            x: rng() * canvas.clientWidth,
+            y: rng() * canvas.clientHeight,
+            baseX: 0,
+            baseY: 0,
+            phase,
+            speed,
+            arm,
+            radius,
+            hue,
+            spin: rng() * 12,
+            jitter: rng() * 0.9,
+          });
+        }
+      };
+
+      const resizeCanvas = () => {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.floor(window.innerWidth * dpr);
+        canvas.height = Math.floor(window.innerHeight * dpr);
+        canvas.style.width = `${window.innerWidth}px`;
+        canvas.style.height = `${window.innerHeight}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        if (state.points.length) {
+          makeSourceMap();
+        }
+      };
+
+      const setStatus = (text) => {
+        status.textContent = text;
+      };
+
+      const emitPulse = (x, y) => {
+        state.pulses.push({
+          x,
+          y,
+          age: 0,
+          life: 260,
+          width: 2 + rng() * 2,
+          tone: palette[Math.floor(rng() * palette.length)],
+        });
+      };
+
+      const drawFrame = () => {
+        ctx.fillStyle = 'rgba(6, 5, 14, 0.12)';
+        ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+        state.time += 0.018 * state.drift;
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
+
+        for (let i = 0; i < state.points.length; i += 1) {
+          const point = state.points[i];
+          const heartbeat = Math.sin(state.time * 12 + point.phase) * 40;
+          const orbit = 160 + point.radius * 110;
+          const drift = ((Math.sin(state.time * 0.6 + point.spin) + 1) * 0.5) * 28;
+          const x = ((point.x + Math.sin(point.phase + state.time * 0.9) * orbit + point.jitter * drift) % w + w) % w;
+          const y = ((point.y + Math.cos(point.phase + state.time * 0.67) * orbit + point.jitter * drift) % h + h) % h;
+
+          for (let k = 0; k < point.arm; k += 1) {
+            const span = (Math.PI * 2) / point.arm;
+            const a = point.phase + k * span + state.time * point.speed + heartbeat * 0.001;
+            const r = 36 + Math.sin(state.time * 0.9 + point.phase + k) * 6 + Math.abs(heartbeat) * 0.25;
+            const dpr = window.devicePixelRatio || 1;
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.strokeStyle = `${palette[point.hue]}${(130 + Math.floor(state.drift * 40)).toString(16).padStart(2, '0')}`;
+            ctx.lineWidth = point.width = point.width || 1;
+
+            const wobble = 0.15 + Math.sin(state.time + point.spin) * 0.08;
+            ctx.beginPath();
+            for (let d = 0; d <= 24; d += 1) {
+              const t = (d / 24) * Math.PI * 2;
+              const rr = r + Math.sin(t * 3 + a * 2) * 10 + Math.sin(state.time + k) * 5;
+              const px = x + Math.cos(t + a + wobble) * rr;
+              const py = y + Math.sin(t + a - wobble) * rr;
+              if (d === 0) {
+                ctx.moveTo(px, py);
+              } else {
+                ctx.lineTo(px, py);
+              }
+            }
+            ctx.closePath();
+            ctx.globalAlpha = 0.45;
+            ctx.stroke();
+
+            if (dpr > 1.1) {
+              ctx.lineWidth = 0.8;
+            }
+
+            ctx.beginPath();
+            ctx.arc(x, y, 2 + Math.sin(state.time + point.phase + k) * 1.4, 0, Math.PI * 2);
+            ctx.globalAlpha = 0.22;
+            ctx.fillStyle = palette[(point.hue + 2) % palette.length];
+            ctx.fill();
+          }
+        }
+
+        for (let i = state.pulses.length - 1; i >= 0; i -= 1) {
+          const pulse = state.pulses[i];
+          pulse.age += 1;
+          const spread = pulse.age * 2.4 * state.drift;
+          const alpha = 1 - pulse.age / pulse.life;
+          if (alpha <= 0) {
+            state.pulses.splice(i, 1);
+            continue;
+          }
+
+          for (let ring = 0; ring < 4; ring += 1) {
+            ctx.beginPath();
+            ctx.arc(pulse.x, pulse.y, spread + ring * 10, 0, Math.PI * 2);
+            ctx.strokeStyle = `${pulse.tone}${Math.max(0, Math.floor(alpha * 140)).toString(16).padStart(2, '0')}`;
+            ctx.lineWidth = pulse.width + ring * 0.2;
+            ctx.globalAlpha = alpha * 0.8;
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.stroke();
+          }
+        }
+
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        setStatus(`seed: ${toHex(state.seed)} · density: ${state.density} · drift: ${state.drift.toFixed(2)} · pulses: ${state.pulses.length}`);
+      };
+
+      const tick = () => {
+        requestAnimationFrame(tick);
+        drawFrame();
+      };
+
+      const updateReturnLink = () => {
+        const link = new URL('../', location.href);
+        returnHome.href = link.toString();
+      };
+
+      const copyLink = async () => {
+        const link = new URL(location.href);
+        link.searchParams.set('seed', toHex(state.seed));
+        link.searchParams.set('density', String(state.density));
+        link.searchParams.set('drift', String(state.drift));
+        const target = link.toString();
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          try {
+            await navigator.clipboard.writeText(target);
+            setStatus('copied link to clipboard');
+            return;
+          } catch (error) {
+            console.warn(error);
+          }
+        }
+        window.prompt('Copy this link:', target);
+      };
+
+      const exportPng = () => {
+        const href = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = href;
+        link.download = `void-cathedral-${toHex(state.seed)}.png`;
+        link.click();
+        setStatus('png exported');
+      };
+
+      const reseed = () => {
+        state.seed = (state.seed * 1664525 + 1013904223) >>> 0;
+        makeSourceMap();
+        state.pulses.length = 0;
+        setStatus('reseeded cathedral');
+      };
+
+      densityRange.addEventListener('input', () => {
+        state.density = Number.parseInt(densityRange.value, 10);
+        makeSourceMap();
+      });
+
+      driftRange.addEventListener('input', () => {
+        state.drift = clamp(Number.parseFloat(driftRange.value), 0.45, 2.8);
+      });
+
+      copyBtn.addEventListener('click', copyLink);
+      exportBtn.addEventListener('click', exportPng);
+      reseedBtn.addEventListener('click', reseed);
+
+      canvas.addEventListener('pointerdown', (event) => {
+        emitPulse(event.offsetX, event.offsetY);
+      });
+
+      canvas.addEventListener('pointermove', (event) => {
+        if (!event.buttons) return;
+        emitPulse(event.offsetX + (Math.random() - 0.5) * 14, event.offsetY + (Math.random() - 0.5) * 14);
+      });
+
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'c' || event.key === 'C') {
+          copyLink();
+        }
+        if (event.key === 's' || event.key === 'S') {
+          exportPng();
+        }
+        if (event.key === 'r' || event.key === 'R') {
+          reseed();
+        }
+      });
+
+      window.addEventListener('resize', resizeCanvas);
+
+      resolveStateFromLocation();
+      resizeCanvas();
+      makeSourceMap();
+      updateReturnLink();
+      setStatus('void cathedral opening');
+      tick();
+    </script>
+  </body>
+</html>
