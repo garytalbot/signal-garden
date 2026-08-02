@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="An odd interactive chamber where clicks write drifting glyphs in a mirrored static sky; states are shareable through URL links." />
+  <title>Signal Garden — Odd Orbit</title>
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      --ink: #f2efff;
+      --muted: #b1a4dd;
+      --bg: #090716;
+      --panel: #130f2c;
+      --line: #98f0ff;
+      --line-soft: #4e73ff;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: radial-gradient(circle at 20% 10%, #22144b 0%, var(--bg) 54%, #020206 100%);
+      color: var(--ink);
+      overflow: hidden;
+      font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+    }
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+      touch-action: none;
+    }
+    .hud {
+      position: fixed;
+      top: 0.75rem;
+      left: 0.75rem;
+      right: 0.75rem;
+      z-index: 2;
+      pointer-events: none;
+      display: grid;
+      gap: 0.6rem;
+      max-width: min(1100px, calc(100vw - 1.5rem));
+      margin: 0 auto;
+    }
+    .panel {
+      pointer-events: auto;
+      border: 1px solid #5c4ca7;
+      border-radius: 0.9rem;
+      background: color-mix(in oklab, var(--panel), #000 26%);
+      padding: 0.55rem 0.7rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      align-items: center;
+      box-shadow: 0 12px 28px #000000a8;
+      max-width: min(100%, 68ch);
+    }
+    .label {
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      font-size: 0.7rem;
+      color: var(--muted);
+      width: 100%;
+    }
+    button,
+    a,
+    input[type='range'] {
+      border-radius: 999px;
+      border: 1px solid #4f46a4;
+      padding: 0.4rem 0.7rem;
+      background: #171138;
+      color: var(--ink);
+      font: inherit;
+      font-size: 0.74rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    button:hover,
+    a:hover,
+    input[type='range']::-webkit-slider-thumb:hover {
+      border-color: var(--line);
+      color: #ffffff;
+    }
+    button[aria-pressed='true'] {
+      border-color: #85ffd9;
+      color: #d9fff0;
+      box-shadow: 0 0 0 1px rgba(133, 255, 217, 0.28) inset;
+    }
+    .status {
+      margin-left: auto;
+      color: #c7d0ff;
+      font-size: 0.72rem;
+      letter-spacing: 0.03em;
+      opacity: 0.95;
+      min-width: 200px;
+      max-width: 320px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hint {
+      margin: 0;
+      font-size: 0.72rem;
+      color: var(--muted);
+      max-width: 62ch;
+      line-height: 1.35;
+    }
+    .home {
+      margin-left: auto;
+    }
+    .poem {
+      position: fixed;
+      left: 0.75rem;
+      right: 0.75rem;
+      bottom: 0.75rem;
+      z-index: 2;
+      pointer-events: none;
+      color: #c8beff;
+      opacity: 0.9;
+      font-size: 0.72rem;
+      background: #140e2acc;
+      border: 1px dashed #564ca4;
+      border-radius: 0.7rem;
+      padding: 0.5rem 0.65rem;
+      max-width: min(760px, calc(100vw - 1.5rem));
+      line-height: 1.4;
+      backdrop-filter: blur(4px);
+    }
+    .poem strong {
+      color: #f0e3ff;
+      letter-spacing: 0.05em;
+    }
+    @media (max-width: 760px) {
+      .status {
+        margin-left: 0;
+        width: 100%;
+        min-width: 0;
+      }
+      .home {
+        margin-left: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="orbitCanvas" aria-label="Odd Orbit chamber"></canvas>
+
+  <div class="hud">
+    <div class="panel">
+      <p class="label">odd orbit chamber</p>
+      <button id="seedBtn" type="button">new seed</button>
+      <button id="repackBtn" type="button">randomize ghosts</button>
+      <button id="toggleTrail" aria-pressed="true" type="button">trail: on</button>
+      <button id="copyBtn" type="button">copy state link</button>
+      <button id="clearBtn" type="button">clear field</button>
+      <button id="pauseBtn" aria-pressed="false" type="button">pause: off</button>
+      <a class="home" href="../">return home</a>
+      <span class="status" id="status" aria-live="polite">ready</span>
+    </div>
+    <p class="hint" id="hint">click once to seed a mirror, click again to wake two more shadows. drag in silence and phrases braid themselves into the sky.</p>
+  </div>
+
+  <div class="poem" id="poemLine">The chamber keeps listening for a phrase the cursor forgot.</div>
+
+  <script>
+    const canvas = document.getElementById('orbitCanvas');
+    const ctx = canvas.getContext('2d');
+    const seedBtn = document.getElementById('seedBtn');
+    const repackBtn = document.getElementById('repackBtn');
+    const toggleTrail = document.getElementById('toggleTrail');
+    const copyBtn = document.getElementById('copyBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const status = document.getElementById('status');
+    const poemLine = document.getElementById('poemLine');
+
+    const phrases = [
+      'the moon remembers your fingertips',
+      'a voice passes behind the glass',
+      'nothing enters without a shadow',
+      'the orbit is not a circle but an apology',
+      'static hums where you hesitated',
+      'every third blink creates a room',
+      'the room keeps the sound of your pulse',
+      'a second self is always one click behind',
+      'your path was copied and bent left',
+      'salted light folds into dark water'
+    ];
+
+    const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+    let width = 0;
+    let height = 0;
+    const glyphs = [];
+    let frame = 0;
+    let paused = false;
+    let trailOn = true;
+    let seed = Number(new URLSearchParams(location.search).get('seed') || (Date.now() & 0xffffffff));
+    const stateMax = 140;
+
+    const palette = ['#95f1ff', '#f2a3ff', '#a6ffb4', '#ffd7a2', '#9bd4ff', '#f4ffc5', '#ffb7cc'];
+
+    const ui = { running: 1 };
+
+    function lcg() {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    }
+
+    function randRange(min, max) {
+      return min + lcg() * (max - min);
+    }
+
+    function resize() {
+      width = Math.max(320, Math.floor(window.innerWidth * dpr));
+      height = Math.max(240, Math.floor(window.innerHeight * dpr));
+      canvas.width = width;
+      canvas.height = height;
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      status.textContent = `field ${width / dpr | 0}x${height / dpr | 0} • seed ${seed}`;
+    }
+
+    function seedGlyph(x, y, ageBias = 0) {
+      const angle = lcg() * Math.PI * 2;
+      const orbit = randRange(36, 110);
+      const speed = randRange(0.3, 1.8);
+      glyphs.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        orbit,
+        jitter: randRange(0.3, 2.8),
+        phase: lcg() * Math.PI * 2,
+        age: -ageBias,
+        span: Math.floor(randRange(150, 420)),
+        phrase: phrases[Math.floor(lcg() * phrases.length)],
+        glow: palette[Math.floor(randRange(0, palette.length))],
+      });
+      if (glyphs.length > stateMax) glyphs.shift();
+    }
+
+    function update() {
+      if (paused) {
+        requestAnimationFrame(update);
+        return;
+      }
+      const w = width / dpr;
+      const h = height / dpr;
+
+      if (trailOn) {
+        ctx.fillStyle = 'rgba(9, 7, 22, 0.12)';
+        ctx.fillRect(0, 0, w, h);
+      } else {
+        ctx.clearRect(0, 0, w, h);
+      }
+
+      frame += 1;
+      const wave = Math.sin(frame * 0.0025);
+
+      for (let i = glyphs.length - 1; i >= 0; i--) {
+        const g = glyphs[i];
+        g.age += 1;
+        const t = g.age / (g.span || 1);
+
+        for (let j = i + 1; j < glyphs.length; j++) {
+          const h = glyphs[j];
+          const dx = h.x - g.x;
+          const dy = h.y - g.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          if (dist < 145) {
+            const b = (1 - dist / 145) * 0.7;
+            ctx.strokeStyle = `rgba(130, 185, 255, ${b.toFixed(3)})`;
+            ctx.lineWidth = 0.75 + b * 1.1;
+            ctx.beginPath();
+            ctx.moveTo(g.x, g.y);
+            ctx.lineTo(h.x, h.y);
+            ctx.stroke();
+          }
+        }
+
+        const pull = Math.sin((g.phase + frame * 0.006) * 1.2);
+        g.phase += 0.004 + g.jitter * 0.001;
+        g.x += Math.cos(g.vx * 0.0008 + wave) * g.jitter + Math.cos(pull) * 0.35;
+        g.y += Math.sin(g.vy * 0.0008 - wave) * g.jitter + Math.sin(pull) * 0.35;
+
+        const swirl = (Math.sin(frame * 0.0015 + g.phase) * g.orbit);
+        const mx = (w / 2) + Math.cos((frame * 0.0008) + g.phase) * 40;
+        const my = (h / 2) + Math.sin((frame * 0.0009) - g.phase) * 30;
+        g.x += (mx - g.x) * 0.0008;
+        g.y += (my - g.y) * 0.0008;
+
+        g.x = (g.x + w + swirl * 0.005) % w;
+        g.y = (g.y + h + swirl * 0.005) % h;
+
+        const alpha = Math.max(0, 1 - t);
+        if (alpha <= 0) {
+          glyphs.splice(i, 1);
+          continue;
+        }
+
+        const size = 2.2 + g.jitter * 2.4 + Math.sin(frame * 0.03 + g.phase) * 0.8;
+        const glow = `rgba(190, 240, 255, ${0.08 + alpha * 0.45})`;
+
+        ctx.shadowColor = g.glow;
+        ctx.shadowBlur = 7;
+        ctx.fillStyle = g.glow;
+        ctx.globalAlpha = Math.min(1, alpha + 0.15);
+        ctx.beginPath();
+        ctx.arc(g.x, g.y, size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        const mirrorX = w - g.x;
+        const mirrorY = h - g.y;
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.11})`;
+        ctx.beginPath();
+        ctx.moveTo(g.x, g.y);
+        ctx.lineTo(mirrorX, mirrorY);
+        ctx.stroke();
+
+        if ((frame + i) % 45 === 0) {
+          g.phase += 0.15;
+          ctx.fillStyle = `rgba(220, 208, 255, ${alpha * 0.5})`;
+          ctx.font = '12px "IBM Plex Mono", monospace';
+          if (i % 3 === 0) {
+            ctx.fillText(g.phrase, g.x + 10, g.y - 8);
+          }
+        }
+      }
+
+      if (glyphs[0]) {
+        const leader = glyphs[0];
+        poemLine.innerHTML = `\n          <strong>${leader.phrase}</strong> — orbit ${leader.age.toFixed(0)} • count ${glyphs.length}`;
+      } else {
+        poemLine.textContent = 'The chamber waits for a touch to begin the orbit.';
+      }
+
+      requestAnimationFrame(update);
+    }
+
+    function clearField() {
+      glyphs.length = 0;
+      status.textContent = 'field cleared';
+      poemLine.textContent = 'The chamber waits for a touch to begin the orbit.';
+      if (!trailOn) {
+        const w = width / dpr;
+        const h = height / dpr;
+        ctx.clearRect(0, 0, w, h);
+      }
+    }
+
+    function randomizeSeed() {
+      seed = (Math.random() * 0xffffffff) >>> 0;
+      status.textContent = `new seed ${seed}`;
+      seedGlyph(Math.random() * window.innerWidth, Math.random() * window.innerHeight, 20);
+      seedGlyph(Math.random() * window.innerWidth, Math.random() * window.innerHeight, 20);
+    }
+
+    function repackState() {
+      const n = Math.max(4, Math.floor(10 + lcg() * 24));
+      clearField();
+      for (let i = 0; i < n; i++) {
+        seedGlyph(Math.random() * window.innerWidth, Math.random() * window.innerHeight, i * 6);
+      }
+      status.textContent = `reseeded with ${n} ghosts`;
+    }
+
+    function encodeState() {
+      const encoded = glyphs.map((g) => ({
+        x: Number((g.x / window.innerWidth).toFixed(4)),
+        y: Number((g.y / window.innerHeight).toFixed(4)),
+        v: Number(g.vx.toFixed(3)),
+        w: Number(g.vy.toFixed(3)),
+        a: Number(g.age.toFixed(1)),
+        p: phrases.indexOf(g.phrase)
+      }));
+      const payload = {
+        v: 1,
+        s: seed,
+        g: encoded,
+      };
+      const json = JSON.stringify(payload);
+      if (typeof btoa === 'function') {
+        return btoa(unescape(encodeURIComponent(json)));
+      }
+      return encodeURIComponent(json);
+    }
+
+    function decodeState(raw) {
+      try {
+        const json = decodeURIComponent(Array.from(atob(raw)).map((c) => c).join(''));
+        const parsed = JSON.parse(decodeURIComponent(escape(json)));
+        if (!parsed || !Array.isArray(parsed.g)) return;
+        seed = Number(parsed.s) || seed;
+        parsed.g.forEach((item) => {
+          if (!Number.isFinite(item.x) || !Number.isFinite(item.y)) return;
+          glyphs.push({
+            x: item.x * window.innerWidth,
+            y: item.y * window.innerHeight,
+            vx: item.v || randRange(-1, 1),
+            vy: item.w || randRange(-1, 1),
+            orbit: randRange(36, 110),
+            jitter: randRange(0.3, 2.8),
+            phase: randRange(0, Math.PI * 2),
+            age: Number(item.a) || 0,
+            span: Math.floor(randRange(140, 420)),
+            phrase: phrases[Math.min(phrases.length - 1, Math.max(0, Number(item.p) | 0))] || phrases[0],
+            glow: palette[Math.floor(randRange(0, palette.length))],
+          });
+        });
+      } catch (_e) {
+        status.textContent = 'shared state corrupted, starting fresh';
+      }
+    }
+
+    function setShareURL() {
+      const state = encodeState();
+      const url = `${location.origin}${location.pathname}?seed=${seed}&state=${state}`;
+      copyBtn.textContent = 'copying...';
+      navigator.clipboard
+        .writeText(url)
+        .then(() => {
+          copyBtn.textContent = 'link copied';
+          status.textContent = 'state link copied';
+          setTimeout(() => (copyBtn.textContent = 'copy state link'), 1200);
+        })
+        .catch(() => {
+          copyBtn.textContent = 'copy failed';
+          status.textContent = 'clipboard blocked';
+          window.prompt('Copy this URL', url);
+          setTimeout(() => (copyBtn.textContent = 'copy state link'), 1200);
+        });
+    }
+
+    canvas.addEventListener('click', (event) => {
+      seedGlyph(event.clientX, event.clientY, 0);
+      if (glyphs.length > 1) {
+        seedGlyph(window.innerWidth - event.clientX, window.innerHeight - event.clientY, 4);
+      }
+    });
+
+    canvas.addEventListener('pointermove', (event) => {
+      if (event.buttons === 1) {
+        seedGlyph(event.clientX + Math.sin(frame * 0.005) * 8, event.clientY + Math.cos(frame * 0.004) * 6, 14);
+      }
+    });
+
+    seedBtn.addEventListener('click', randomizeSeed);
+    repackBtn.addEventListener('click', repackState);
+    clearBtn.addEventListener('click', clearField);
+    copyBtn.addEventListener('click', setShareURL);
+
+    toggleTrail.addEventListener('click', () => {
+      trailOn = !trailOn;
+      toggleTrail.setAttribute('aria-pressed', String(trailOn));
+      toggleTrail.textContent = `trail: ${trailOn ? 'on' : 'off'}`;
+      if (!trailOn) {
+        const w = width / dpr;
+        const h = height / dpr;
+        ctx.fillStyle = '#080714';
+        ctx.fillRect(0, 0, w, h);
+      }
+    });
+
+    pauseBtn.addEventListener('click', () => {
+      paused = !paused;
+      pauseBtn.setAttribute('aria-pressed', String(paused));
+      pauseBtn.textContent = `pause: ${paused ? 'on' : 'off'}`;
+    });
+
+    window.addEventListener('resize', () => {
+      resize();
+    });
+
+    resize();
+
+    const urlState = new URLSearchParams(location.search).get('state');
+    if (urlState) {
+      decodeState(urlState);
+      status.textContent = 'restored shared state';
+    } else {
+      seed = Number(new URLSearchParams(location.search).get('seed')) || seed;
+      for (let i = 0; i < 8; i++) {
+        seedGlyph(Math.random() * window.innerWidth, Math.random() * window.innerHeight, i * 8);
+      }
+    }
+
+    status.textContent = `seed ${seed} • glyphs ${glyphs.length}`;
+    requestAnimationFrame(update);
+  </script>
+</body>
+</html>
