@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="route-refresh" content="2026-08-02T09:50:00Z" />
+  <title>Signal Garden — Mud Liturgy</title>
+  <meta
+    name="description"
+    content="Mud Liturgy is a generative pointer ritual with seeded state, hash/query share links, and canvas export so the same mud field can be preserved and replayed anywhere."
+  />
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #08070d;
+      --panel: #1a102b;
+      --ink: #f2ebff;
+      --line: #8d9bff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 20% 8%, #221245 0%, #110d25 43%, var(--bg) 100%);
+      color: var(--ink);
+      font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    .hud {
+      position: fixed;
+      inset: 0.75rem;
+      z-index: 5;
+      pointer-events: none;
+      display: grid;
+      gap: 0.55rem;
+      max-width: min(1180px, calc(100vw - 1.5rem));
+      margin: 0 auto;
+    }
+
+    .panel {
+      pointer-events: auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.42rem;
+      border: 1px solid #5648a8;
+      border-radius: 0.85rem;
+      background: color-mix(in oklab, var(--panel), #050309 24%);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.56);
+      padding: 0.52rem 0.66rem;
+    }
+
+    .label {
+      width: 100%;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: #cdd6ff;
+      font-size: 0.72rem;
+      margin-bottom: 0.12rem;
+    }
+
+    button,
+    a,
+    input {
+      border: 1px solid #6950bb;
+      border-radius: 999px;
+      background: #1d123f;
+      color: var(--ink);
+      font: inherit;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.71rem;
+      min-height: 30px;
+      padding: 0.33rem 0.72rem;
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    button:hover,
+    a:hover {
+      border-color: #8af7ff;
+      color: #ffffff;
+    }
+
+    button[aria-pressed='true'] {
+      border-color: #8ff8db;
+      color: #e2fff5;
+      box-shadow: inset 0 0 0 1px rgba(143, 248, 219, 0.36);
+    }
+
+    .status {
+      margin-left: auto;
+      color: #d0e1ff;
+      font-size: 0.7rem;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: 0.95;
+    }
+
+    .home {
+      margin-left: auto;
+    }
+
+    .hint {
+      margin: 0;
+      color: #bdcbf8;
+      max-width: min(980px, calc(100vw - 1.5rem));
+      border-radius: 0.72rem;
+      border: 1px dashed #4f4591;
+      background: color-mix(in oklab, #17113a 70%, #05070d);
+      line-height: 1.4;
+      font-size: 0.71rem;
+      padding: 0.42rem 0.6rem;
+    }
+
+    label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.34rem;
+      color: #e6f1ff;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 0.68rem;
+    }
+
+    input[type='range'] {
+      width: 132px;
+      accent-color: #80d8ff;
+    }
+
+    @media (max-width: 760px) {
+      .panel {
+        gap: 0.34rem;
+      }
+
+      .status {
+        margin-left: 0;
+        width: 100%;
+      }
+
+      input[type='range'] {
+        width: 102px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="mudCanvas" aria-label="Mud Liturgy canvas"></canvas>
+
+  <div class="hud" aria-live="polite">
+    <div class="panel">
+      <span class="label">mud liturgy</span>
+      <button id="seedBtn" type="button">new seed</button>
+      <label for="clayRange">clay <span id="clayValue">160</span></label>
+      <input id="clayRange" name="clayRange" type="range" min="70" max="280" step="5" value="160" />
+      <label for="sweepRange">sweep <span id="sweepValue">1.15</span></label>
+      <input id="sweepRange" name="sweepRange" type="range" min="0.45" max="2.3" step="0.05" value="1.15" />
+      <label for="viscosityRange">viscosity <span id="viscosityValue">0.62</span></label>
+      <input id="viscosityRange" name="viscosityRange" type="range" min="0.38" max="0.90" step="0.01" value="0.62" />
+      <button id="pauseBtn" type="button" aria-pressed="false">pause: off</button>
+      <button id="copyBtn" type="button">copy state link</button>
+      <button id="exportBtn" type="button">export PNG</button>
+      <button id="clearBtn" type="button">clear</button>
+      <button id="sproutBtn" type="button">sprout</button>
+      <a class="home" href="../" aria-label="Return to Signal Garden home">return home</a>
+      <span class="status" id="status">ready</span>
+    </div>
+    <p id="hint" class="hint">
+      Press and drag to seed bright mud braids. Each pointer change updates URL state so the scene can be shared exactly, and export renders the live canvas as PNG.
+    </p>
+  </div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById('mudCanvas');
+      const ctx = canvas.getContext('2d');
+      const seedBtn = document.getElementById('seedBtn');
+      const clayRange = document.getElementById('clayRange');
+      const clayValue = document.getElementById('clayValue');
+      const sweepRange = document.getElementById('sweepRange');
+      const sweepValue = document.getElementById('sweepValue');
+      const viscosityRange = document.getElementById('viscosityRange');
+      const viscosityValue = document.getElementById('viscosityValue');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const copyBtn = document.getElementById('copyBtn');
+      const exportBtn = document.getElementById('exportBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const sproutBtn = document.getElementById('sproutBtn');
+      const status = document.getElementById('status');
+
+      const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+      const state = {
+        seed: 0,
+        clay: 160,
+        sweep: 1.15,
+        viscosity: 0.62,
+      };
+
+      const drops = [];
+      let width = 0;
+      let height = 0;
+      let rngState = 0;
+      let frame = 0;
+      let paused = false;
+      let shareQueued = false;
+      let rafId = 0;
+      let pointer = {
+        down: false,
+        x: -1,
+        y: -1,
+        lastX: -1,
+        lastY: -1,
+      };
+
+      const basePalette = [190, 240, 270, 315, 50, 16, 340, 70];
+      const maxDrops = 2400;
+      const shareDropLimit = 1200;
+
+      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+      const toHex = (value) => (value >>> 0).toString(16).padStart(8, '0');
+
+      const randomSeed = () => {
+        if (window.crypto && window.crypto.getRandomValues) {
+          const values = new Uint32Array(1);
+          window.crypto.getRandomValues(values);
+          return values[0] >>> 0;
+        }
+        return (Date.now() * 1664525 + 1013904223) >>> 0;
+      };
+
+      const randomFromSeed = () => {
+        rngState = (rngState * 1664525 + 1013904223) >>> 0;
+        return rngState / 0x100000000;
+      };
+
+      const resizeCanvas = () => {
+        width = Math.max(320, Math.floor(window.innerWidth));
+        height = Math.max(180, Math.floor(window.innerHeight));
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      };
+
+      const toScenePayload = () => {
+        return {
+          v: 1,
+          seed: state.seed >>> 0,
+          clay: state.clay,
+          sweep: +state.sweep.toFixed(3),
+          viscosity: +state.viscosity.toFixed(3),
+          paused: paused ? 1 : 0,
+          drops: drops
+            .slice(0, shareDropLimit)
+            .map((drop) => ({
+              x: +(drop.x / width).toFixed(4),
+              y: +(drop.y / height).toFixed(4),
+              vx: +drop.vx.toFixed(5),
+              vy: +drop.vy.toFixed(5),
+              a: +drop.age.toFixed(2),
+              l: +drop.life,
+              h: +drop.hue,
+              r: +drop.radius.toFixed(3),
+            })),
+          frame,
+          frameSeed: rngState >>> 0,
+        };
+      };
+
+      const encodeState = (payload) => {
+        const raw = JSON.stringify(payload);
+        return btoa(unescape(encodeURIComponent(raw)));
+      };
+
+      const decodeState = (raw) => {
+        if (!raw) return null;
+        try {
+          const decoded = decodeURIComponent(escape(atob(raw)));
+          return JSON.parse(decoded);
+        } catch (_error) {
+          return null;
+        }
+      };
+
+      const syncShare = () => {
+        if (shareQueued) return;
+        shareQueued = true;
+        setTimeout(() => {
+          const payload = toScenePayload();
+          const token = encodeState(payload);
+          const url = new URL(window.location.href);
+          url.search = `?state=${encodeURIComponent(token)}`;
+          url.hash = '';
+          history.replaceState(null, '', url.toString());
+          status.textContent = `seed ${toHex(state.seed)} · drops ${drops.length} · ${paused ? 'paused' : 'running'}`;
+          shareQueued = false;
+        }, 140);
+      };
+
+      const setControls = () => {
+        clayValue.textContent = String(state.clay);
+        sweepValue.textContent = Number(state.sweep).toFixed(2);
+        viscosityValue.textContent = Number(state.viscosity).toFixed(2);
+        pauseBtn.textContent = `pause: ${paused ? 'on' : 'off'}`;
+        pauseBtn.setAttribute('aria-pressed', String(paused));
+      };
+
+      const clearField = () => {
+        drops.length = 0;
+        syncShare();
+        status.textContent = 'field cleared';
+      };
+
+      const seedField = (keepCurrentSeed = false) => {
+        if (!keepCurrentSeed) {
+          state.seed = randomSeed();
+          rngState = state.seed;
+        }
+        drops.length = 0;
+        syncShare();
+        const cx = width * 0.5;
+        const cy = height * 0.5;
+        for (let i = 0; i < 20; i += 1) {
+          sproutDrop(cx + (randomFromSeed() - 0.5) * 60, cy + (randomFromSeed() - 0.5) * 60, 0.7);
+        }
+        status.textContent = `seeded ${toHex(state.seed)}`;
+      };
+
+      const sproutDrop = (x, y, force = 1) => {
+        const radius = clamp(1.8 + randomFromSeed() * 2.8, 1.4, 4.2) * (force + 0.25);
+        const speed = (randomFromSeed() * 1.6 + 0.5) * force;
+        const spread = Math.max(2, Math.min(12, state.clay / 16));
+        const count = Math.max(2, Math.floor(spread * 0.2 + force * 2));
+
+        for (let i = 0; i < count; i += 1) {
+          if (drops.length >= maxDrops) {
+            drops.shift();
+          }
+          const angle = randomFromSeed() * Math.PI * 2;
+          const nudge = randomFromSeed() * 0.55;
+          const vx = Math.cos(angle) * speed + (randomFromSeed() - 0.5) * 0.45;
+          const vy = Math.sin(angle) * speed + (randomFromSeed() - 0.5) * 0.45;
+          drops.push({
+            x,
+            y,
+            px: x,
+            py: y,
+            vx,
+            vy,
+            age: randomFromSeed() * 20,
+            life: 120 + Math.floor(randomFromSeed() * 260),
+            hue: basePalette[Math.floor(randomFromSeed() * basePalette.length)],
+            radius: radius * (0.7 + randomFromSeed() * 1.35),
+            swirl: nudge,
+          });
+        }
+      };
+
+      const paintDrop = (drop) => {
+        const fade = (1 - drop.age / drop.life);
+        ctx.strokeStyle = `hsla(${drop.hue + drop.swirl * 18}, 80%, ${clamp(36 + fade * 18, 20, 56)}%, ${clamp(0.15 + fade * 0.9, 0, 1)})`;
+        ctx.shadowColor = `hsla(${drop.hue + drop.swirl * 18}, 90%, 58%, ${clamp(0.45 * fade, 0, 0.55)})`;
+        ctx.lineWidth = Math.max(0.6, drop.radius * 0.75);
+        ctx.beginPath();
+        ctx.moveTo(drop.px, drop.py);
+        ctx.lineTo(drop.x, drop.y);
+        ctx.stroke();
+        ctx.shadowBlur = 8 * fade;
+        ctx.beginPath();
+        ctx.fillStyle = `hsla(${drop.hue}, 90%, ${clamp(60 + fade * 8, 45, 72)}%, ${clamp(0.2 + fade * 0.8, 0, 1)})`;
+        ctx.arc(drop.x, drop.y, Math.max(1.1, drop.radius * 0.24), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      };
+
+      const updateDrop = (drop) => {
+        drop.px = drop.x;
+        drop.py = drop.y;
+
+        const fieldSpeed = 0.00095 * state.sweep;
+        const t = frame * 0.004 * fieldSpeed + drop.life * 0.01;
+        const driftX = Math.cos((drop.hue + t) * 0.4) * 0.45 + Math.sin(t * 0.8 + drop.swirl) * 0.28;
+        const driftY = Math.sin((drop.hue - t) * 0.39) * 0.45 + Math.cos(t * 0.9 - drop.swirl) * 0.28;
+
+        if (pointer.down) {
+          const dx = pointer.x - drop.x;
+          const dy = pointer.y - drop.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const influence = Math.max(0.03, 2 - dist / 180);
+          drop.vx += (dx / dist) * 0.0045 * influence;
+          drop.vy += (dy / dist) * 0.0045 * influence;
+        }
+
+        drop.vx += driftX * 0.08;
+        drop.vy += driftY * 0.08;
+
+        drop.vx *= state.viscosity;
+        drop.vy *= state.viscosity;
+        drop.x += drop.vx + driftX;
+        drop.y += drop.vy + driftY;
+
+        drop.age += 1;
+        drop.life -= 1;
+
+        if (drop.x < -24) drop.x = width + 24;
+        if (drop.y < -24) drop.y = height + 24;
+        if (drop.x > width + 24) drop.x = -24;
+        if (drop.y > height + 24) drop.y = -24;
+      };
+
+      const frameTick = () => {
+        rafId = requestAnimationFrame(frameTick);
+        if (paused) return;
+
+        ctx.fillStyle = 'rgba(8, 7, 16, 0.16)';
+        ctx.fillRect(0, 0, width, height);
+
+        frame += 1;
+
+        if (pointer.down) {
+          const travel = Math.hypot(pointer.x - pointer.lastX, pointer.y - pointer.lastY);
+          if (Number.isFinite(travel) && travel > 0) {
+            sproutDrop(pointer.x, pointer.y, 0.55);
+          }
+          if (frame % 3 === 0) {
+            sproutDrop(pointer.x, pointer.y, 1.0);
+          }
+        }
+
+        for (let i = 0; i < state.clay; i += 1) {
+          if (randomFromSeed() < 0.0018) {
+            const x = randomFromSeed() * width;
+            const y = randomFromSeed() * height;
+            sproutDrop(x, y, 0.5);
+          }
+        }
+
+        const alive = [];
+        for (const drop of drops) {
+          if (drop.life <= 0) continue;
+          updateDrop(drop);
+          paintDrop(drop);
+          if (drop.life > 0) alive.push(drop);
+        }
+        drops.length = 0;
+        drops.push(...alive);
+
+        if (frame % 35 === 0) {
+          syncShare();
+        }
+      };
+
+      const applySettings = () => {
+        state.clay = clamp(Math.trunc(Number.parseInt(clayRange.value, 10)), 70, 280);
+        state.sweep = clamp(Number.parseFloat(sweepRange.value), 0.45, 2.3);
+        state.viscosity = clamp(Number.parseFloat(viscosityRange.value), 0.38, 0.9);
+        setControls();
+        syncShare();
+      };
+
+      const applyPayload = (payload) => {
+        if (!payload || payload.v !== 1) return false;
+        const seed = Number.parseInt(payload.seed, 10);
+        const clay = Number.parseInt(payload.clay, 10);
+        const sweep = Number.parseFloat(payload.sweep);
+        const viscosity = Number.parseFloat(payload.viscosity);
+        const pausedState = Number.parseInt(payload.paused, 10);
+        if (!Number.isFinite(seed) || !Number.isFinite(clay) || !Number.isFinite(sweep) || !Number.isFinite(viscosity)) {
+          return false;
+        }
+
+        state.seed = seed >>> 0;
+        rngState = state.seed;
+        state.clay = clamp(clay, 70, 280);
+        state.sweep = clamp(sweep, 0.45, 2.3);
+        state.viscosity = clamp(viscosity, 0.38, 0.9);
+        paused = pausedState === 1;
+
+        clayRange.value = String(state.clay);
+        sweepRange.value = String(state.sweep);
+        viscosityRange.value = String(state.viscosity);
+
+        drops.length = 0;
+        if (Array.isArray(payload.drops)) {
+          for (const drop of payload.drops) {
+            if (!drop) continue;
+            const x = Number.parseFloat(drop.x);
+            const y = Number.parseFloat(drop.y);
+            const vx = Number.parseFloat(drop.vx);
+            const vy = Number.parseFloat(drop.vy);
+            const age = Number.parseFloat(drop.a);
+            const life = Number.parseFloat(drop.l);
+            const hue = Number.parseFloat(drop.h);
+            const radius = Number.parseFloat(drop.r);
+            if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(vx) || !Number.isFinite(vy)) continue;
+
+            drops.push({
+              x: clamp(x, 0, 1) * width,
+              y: clamp(y, 0, 1) * height,
+              px: clamp(x, 0, 1) * width,
+              py: clamp(y, 0, 1) * height,
+              vx,
+              vy,
+              age: Number.isFinite(age) ? age : 0,
+              life: Number.isFinite(life) ? Math.max(18, Math.trunc(life)) : 180,
+              hue: Number.isFinite(hue) ? hue : 200,
+              radius: Number.isFinite(radius) ? clamp(radius, 1.1, 4.5) : 2,
+              swirl: randomFromSeed(),
+            });
+          }
+        }
+
+        frame = Number.isFinite(payload.frame) ? Number.parseInt(payload.frame, 10) : 0;
+        if (Number.isFinite(payload.frameSeed)) {
+          rngState = payload.frameSeed >>> 0;
+        }
+
+        setControls();
+        syncShare();
+        status.textContent = `loaded ${toHex(state.seed)} · ${drops.length} drops`;
+        return true;
+      };
+
+      const hydrateFromLocation = () => {
+        const query = new URLSearchParams(location.search);
+        const raw = query.get('state') || (location.hash || '').replace(/^#/, '');
+        const payload = decodeState(raw);
+        if (payload) {
+          if (applyPayload(payload)) return;
+        }
+        state.seed = randomSeed();
+        state.clay = Number.parseInt(clayRange.value, 10) || state.clay;
+        state.sweep = Number.parseFloat(sweepRange.value) || state.sweep;
+        state.viscosity = Number.parseFloat(viscosityRange.value) || state.viscosity;
+        rngState = state.seed;
+        setControls();
+      };
+
+      const copyStateLink = async () => {
+        syncShare();
+        const link = new URL(window.location.href);
+        try {
+          await navigator.clipboard.writeText(link.toString());
+          status.textContent = 'copied share link';
+        } catch (_error) {
+          prompt('Copy this state link:', link.toString());
+          status.textContent = 'link ready in prompt';
+        }
+      };
+
+      const exportPng = () => {
+        const link = document.createElement('a');
+        const filename = `mud-liturgy-${toHex(state.seed)}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.download = filename;
+        link.click();
+        status.textContent = `exported ${filename}`;
+      };
+
+      const onPointerDown = (event) => {
+        if (!event.isPrimary && event.pointerId !== 1) return;
+        pointer.down = true;
+        pointer.lastX = pointer.x;
+        pointer.lastY = pointer.y;
+        pointer.x = event.clientX;
+        pointer.y = event.clientY;
+        sproutDrop(pointer.x, pointer.y, 1.2);
+      };
+
+      const onPointerMove = (event) => {
+        if (!pointer.down) return;
+        pointer.lastX = pointer.x;
+        pointer.lastY = pointer.y;
+        pointer.x = event.clientX;
+        pointer.y = event.clientY;
+      };
+
+      const onPointerEnd = () => {
+        pointer.down = false;
+      };
+
+      seedBtn.addEventListener('click', () => {
+        state.seed = randomSeed();
+        rngState = state.seed;
+        syncShare();
+        seedField(true);
+      });
+
+      sproutBtn.addEventListener('click', () => {
+        sproutDrop(Math.random() * width, Math.random() * height, 1.2);
+        status.textContent = 'manual sprout cast';
+      });
+
+      clayRange.addEventListener('input', applySettings);
+      sweepRange.addEventListener('input', applySettings);
+      viscosityRange.addEventListener('input', applySettings);
+
+      pauseBtn.addEventListener('click', () => {
+        paused = !paused;
+        setControls();
+        status.textContent = paused ? 'paused' : 'running';
+        syncShare();
+      });
+
+      copyBtn.addEventListener('click', copyStateLink);
+      exportBtn.addEventListener('click', exportPng);
+      clearBtn.addEventListener('click', clearField);
+
+      window.addEventListener('resize', () => {
+        resizeCanvas();
+        syncShare();
+      });
+
+      canvas.addEventListener('pointerdown', onPointerDown);
+      canvas.addEventListener('pointermove', onPointerMove);
+      canvas.addEventListener('pointerup', onPointerEnd);
+      canvas.addEventListener('pointercancel', onPointerEnd);
+      canvas.addEventListener('pointerleave', onPointerEnd);
+
+      window.addEventListener('blur', () => {
+        if (pointer.down) {
+          pointer.down = false;
+        }
+      });
+
+      resizeCanvas();
+      hydrateFromLocation();
+      if (!drops.length) {
+        seedField(true);
+      } else {
+        syncShare();
+      }
+
+      frameTick();
+    })();
+  </script>
+</body>
+</html>
