@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Signal Garden — Drift Litany</title>
+  <meta
+    name="description"
+    content="A seedable odd interactive chamber where pointer drifts summon luminous threads, state travels in URL hashes, and motion can be paused before export."
+  />
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #060612;
+      --panel: #161138;
+      --ink: #e8e2ff;
+      --muted: #9fb0ff;
+      --accent: #8af0ff;
+      --line: #6df6ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 20% 10%, #1b1050 0%, var(--bg) 50%, #03040a 100%);
+      color: var(--ink);
+      overflow: hidden;
+      font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: crosshair;
+      display: block;
+    }
+
+    .hud {
+      position: fixed;
+      top: 0.75rem;
+      left: 0.75rem;
+      right: 0.75rem;
+      z-index: 4;
+      pointer-events: none;
+      display: grid;
+      gap: 0.55rem;
+      max-width: min(1140px, calc(100vw - 1.5rem));
+      margin: 0 auto;
+    }
+
+    .panel {
+      pointer-events: auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      align-items: center;
+      border: 1px solid #4a3a9f;
+      border-radius: 0.9rem;
+      background: color-mix(in oklab, var(--panel), #05050d 26%);
+      padding: 0.55rem 0.7rem;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
+    }
+
+    .label {
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      font-size: 0.72rem;
+      color: #c9dbff;
+      width: 100%;
+      margin-bottom: 0.1rem;
+    }
+
+    button,
+    a,
+    input {
+      border: 1px solid #6750c8;
+      border-radius: 999px;
+      background: #191040;
+      color: var(--ink);
+      padding: 0.36rem 0.72rem;
+      font: inherit;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.73rem;
+      text-decoration: none;
+      cursor: pointer;
+      min-height: 30px;
+    }
+
+    button:hover,
+    a:hover {
+      border-color: #8be6ff;
+      color: #ffffff;
+    }
+
+    button[aria-pressed='true'] {
+      border-color: #8ff7d7;
+      color: #d9fff4;
+      box-shadow: inset 0 0 0 1px rgba(143, 255, 216, 0.34);
+    }
+
+    .status {
+      margin-left: auto;
+      color: #cde7ff;
+      font-size: 0.72rem;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: 0.95;
+    }
+
+    .home {
+      margin-left: auto;
+    }
+
+    .hint {
+      margin: 0;
+      color: #b8c7f2;
+      max-width: min(860px, calc(100vw - 1.5rem));
+      font-size: 0.72rem;
+      line-height: 1.45;
+      border-radius: 0.75rem;
+      border: 1px dashed #4a4498;
+      padding: 0.45rem 0.6rem;
+      background: color-mix(in oklab, #15102d 68%, #05060a);
+    }
+
+    label {
+      display: inline-flex;
+      gap: 0.35rem;
+      align-items: center;
+      color: #deebff;
+      font-size: 0.68rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    input[type='range'] {
+      width: 140px;
+      accent-color: #8be6ff;
+    }
+
+    @media (max-width: 760px) {
+      .panel {
+        gap: 0.35rem;
+      }
+
+      .status {
+        margin-left: 0;
+        width: 100%;
+        min-width: 0;
+      }
+
+      input[type='range'] {
+        width: 112px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="litanyCanvas" aria-label="Drift Litany canvas"></canvas>
+
+  <div class="hud" aria-live="polite">
+    <div class="panel">
+      <span class="label">drift litany</span>
+      <button id="seedBtn" type="button">reseed</button>
+      <button id="spawnBtn" type="button">spawn drift</button>
+      <button id="pauseBtn" type="button" aria-pressed="false">pause: off</button>
+      <button id="copyBtn" type="button">copy state link</button>
+      <button id="exportBtn" type="button">export PNG</button>
+      <button id="clearBtn" type="button">clear</button>
+      <label for="densityRange">density <span id="densityValue">140</span></label>
+      <input id="densityRange" name="densityRange" type="range" min="60" max="300" step="12" value="140" />
+      <label for="driftRange">drift <span id="driftValue">1.10</span></label>
+      <input id="driftRange" name="driftRange" type="range" min="0.45" max="2.35" step="0.05" value="1.10" />
+      <a class="home" href="../" aria-label="Return to Signal Garden home">return home</a>
+      <span class="status" id="status">ready</span>
+    </div>
+    <p id="hint" class="hint">Click or drag on the field to seed drifts. Share from the hash to replay exact motion, or pause and export an exact-frame relic as PNG.</p>
+  </div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById('litanyCanvas');
+      const ctx = canvas.getContext('2d');
+      const seedBtn = document.getElementById('seedBtn');
+      const spawnBtn = document.getElementById('spawnBtn');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const copyBtn = document.getElementById('copyBtn');
+      const exportBtn = document.getElementById('exportBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const densityRange = document.getElementById('densityRange');
+      const densityValue = document.getElementById('densityValue');
+      const driftRange = document.getElementById('driftRange');
+      const driftValue = document.getElementById('driftValue');
+      const status = document.getElementById('status');
+      const hint = document.getElementById('hint');
+
+      const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+      const palette = [208, 265, 298, 330, 15, 340, 56];
+      const maxThreads = 300;
+
+      let threads = [];
+      let paused = false;
+      let pointer = { x: -1, y: -1, active: false };
+      let rngState = 0;
+      let frame = 0;
+      let width = 0;
+      let height = 0;
+
+      const state = {
+        seed: 0,
+        density: 140,
+        drift: 1.1,
+      };
+
+      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+      const seedFromHash = (raw) => {
+        if (!raw) return null;
+        const fixed = String(raw).replace(/^0x/i, '');
+        const value = Number.parseInt(fixed, 16);
+        return Number.isFinite(value) ? value >>> 0 : null;
+      };
+
+      const toHex = (value) => (value >>> 0).toString(16).padStart(8, '0');
+
+      const randomFromSeed = () => {
+        rngState = (rngState * 1664525 + 1013904223) >>> 0;
+        return rngState / 0x100000000;
+      };
+
+      const resize = () => {
+        width = Math.max(320, Math.floor(window.innerWidth));
+        height = Math.max(180, Math.floor(window.innerHeight));
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      };
+
+      const randomSeed = () => {
+        if ('crypto' in window && window.crypto && window.crypto.getRandomValues) {
+          const values = new Uint32Array(1);
+          window.crypto.getRandomValues(values);
+          return values[0] >>> 0;
+        }
+        return (Date.now() * 1664525 + 1013904223) >>> 0;
+      };
+
+      const seedColor = (value) => `hsla(${Math.floor(value)}, 92%, 70%, `;
+
+      const spawnThread = (x, y, opts = {}) => {
+        const count = opts.count || 5;
+        const ageShift = opts.ageShift || 0;
+        for (let i = 0; i < count; i++) {
+          const angle = randomFromSeed() * Math.PI * 2;
+          const speed = (0.35 + randomFromSeed() * 0.95) * state.drift * (0.62 + randomFromSeed() * 0.55);
+          const phase = randomFromSeed() * Math.PI * 2 + i * 0.09;
+          threads.push({
+            x: x + (randomFromSeed() - 0.5) * 24,
+            y: y + (randomFromSeed() - 0.5) * 24,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            age: -Math.floor(ageShift),
+            life: 220 + Math.floor(randomFromSeed() * 360),
+            radius: 1 + randomFromSeed() * 2.5,
+            sway: 0.45 + randomFromSeed() * 1.85,
+            orbit: 22 + randomFromSeed() * 86,
+            hue: palette[Math.floor(randomFromSeed() * palette.length)],
+            drift: 0.4 + randomFromSeed() * 0.9,
+            blink: randomFromSeed() * Math.PI * 2,
+          });
+        }
+
+        if (threads.length > Math.max(state.density, 24)) {
+          threads.splice(0, threads.length - Math.max(state.density, 24));
+        }
+      };
+
+      const wrapThread = (thread) => {
+        if (thread.x < 0) thread.x += width;
+        if (thread.x > width) thread.x -= width;
+        if (thread.y < 0) thread.y += height;
+        if (thread.y > height) thread.y -= height;
+      };
+
+      const toSnapshot = () => {
+        const payload = {
+          v: 1,
+          seed: state.seed >>> 0,
+          d: +state.drift.toFixed(3),
+          n: state.density,
+          t: threads.map((thread) => ({
+            x: +(thread.x / width).toFixed(4),
+            y: +(thread.y / height).toFixed(4),
+            vx: +thread.vx.toFixed(4),
+            vy: +thread.vy.toFixed(4),
+            a: +thread.age.toFixed(1),
+            l: +thread.life,
+            r: +thread.radius.toFixed(2),
+            s: +thread.sway.toFixed(3),
+            o: +thread.orbit.toFixed(1),
+            h: +thread.hue,
+            dr: +thread.drift.toFixed(3),
+            b: +thread.blink.toFixed(3),
+          })),
+        };
+
+        const json = JSON.stringify(payload);
+        return btoa(encodeURIComponent(json));
+      };
+
+      const fromSnapshot = (raw) => {
+        const payload = JSON.parse(decodeURIComponent(atob(raw)));
+        if (!payload || payload.v !== 1) return false;
+
+        const parsedSeed = Number.parseInt(payload.seed, 10);
+        const parsedDensity = Number.parseInt(payload.n, 10);
+        const parsedDrift = Number.parseFloat(payload.d);
+
+        if (!Number.isFinite(parsedSeed) || !Number.isFinite(parsedDensity) || !Number.isFinite(parsedDrift)) {
+          return false;
+        }
+
+        state.seed = parsedSeed >>> 0;
+        state.density = clamp(parsedDensity, 60, maxThreads);
+        state.drift = clamp(parsedDrift, 0.45, 2.35);
+
+        densityRange.value = String(state.density);
+        densityValue.textContent = String(state.density);
+        driftRange.value = String(state.drift);
+        driftValue.textContent = state.drift.toFixed(2);
+
+        threads = [];
+        if (Array.isArray(payload.t)) {
+          for (const point of payload.t) {
+            if (!point) continue;
+            const {
+              x,
+              y,
+              vx,
+              vy,
+              a,
+              l,
+              r,
+              s,
+              o,
+              h,
+              dr,
+              b,
+            } = point;
+            if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+            if (!Number.isFinite(vx) || !Number.isFinite(vy)) continue;
+            threads.push({
+              x: Number(x) * width,
+              y: Number(y) * height,
+              vx: Number(vx),
+              vy: Number(vy),
+              age: Number(a) || 0,
+              life: Number(l) || 220,
+              radius: Number(r) || 1.4,
+              sway: Number(s) || 0.6,
+              orbit: Number(o) || 40,
+              hue: Number(h) || palette[0],
+              drift: Number(dr) || 0.8,
+              blink: Number(b) || 0,
+            });
+          }
+        }
+
+        state.seed = state.seed >>> 0;
+        rngState = state.seed;
+        if (!threads.length) {
+          spawnThread(width * 0.5, height * 0.5, { count: 14, ageShift: 6 });
+        }
+
+        return true;
+      };
+
+      const setStatus = () => {
+        status.textContent = `threads ${threads.length}/${state.density} · seed ${toHex(state.seed)} · drift ${state.drift.toFixed(2)} · ${paused ? 'paused' : 'running'}`;
+      };
+
+      const syncHash = () => {
+        const snapshot = toSnapshot();
+        const next = `${location.pathname}#${snapshot}`;
+        history.replaceState(null, '', next);
+      };
+
+      const drawFrame = () => {
+        if (paused) {
+          setStatus();
+          requestAnimationFrame(drawFrame);
+          return;
+        }
+
+        frame += 1;
+        const wave = Math.sin(frame * 0.0025);
+
+        ctx.fillStyle = 'rgba(4, 6, 13, 0.23)';
+        ctx.fillRect(0, 0, width, height);
+
+        for (let i = threads.length - 1; i >= 0; i--) {
+          const thread = threads[i];
+          thread.age += 1;
+
+          thread.vx += Math.cos((thread.blink + frame * 0.0015) * thread.sway) * 0.0008 * state.drift;
+          thread.vy += Math.sin((thread.blink + frame * 0.0012) * thread.sway) * 0.0008 * state.drift;
+
+          if (pointer.active) {
+            const dx = pointer.x - thread.x;
+            const dy = pointer.y - thread.y;
+            const dist = Math.hypot(dx, dy) + 0.0001;
+            const pull = Math.min(5 / dist, 0.004);
+            thread.vx += (dx * pull) * state.drift;
+            thread.vy += (dy * pull) * state.drift;
+          }
+
+          thread.x += thread.vx;
+          thread.y += thread.vy;
+
+          const drift = Math.sin(frame * 0.001 + thread.blink) * thread.orbit * 0.0008;
+          thread.x += Math.cos(thread.blink + frame * 0.0005) * thread.sway * drift;
+          thread.y += Math.sin(thread.blink + frame * 0.0007) * thread.sway * drift;
+
+          wrapThread(thread);
+
+          const ageRatio = Math.min(1, thread.age / thread.life);
+          const alpha = ageRatio < 1 ? (1 - ageRatio) * 0.95 : 0;
+          if (alpha <= 0) {
+            threads.splice(i, 1);
+            continue;
+          }
+
+          const radius = thread.radius * (1.2 + wave * 0.45);
+          const glow = 0.4 + alpha * 0.6;
+
+          ctx.beginPath();
+          ctx.arc(thread.x, thread.y, radius * 1.6, 0, Math.PI * 2);
+          ctx.fillStyle = `${seedColor(thread.hue)}${Math.floor(glow * 255).toString(16).padStart(2, '0')})`;
+          ctx.globalAlpha = 0.7 + alpha * 0.3;
+          ctx.fill();
+
+          const trailX = thread.x - thread.vx * 2;
+          const trailY = thread.y - thread.vy * 2;
+          ctx.beginPath();
+          ctx.moveTo(trailX, trailY);
+          ctx.lineTo(thread.x, thread.y);
+          ctx.strokeStyle = `${seedColor(thread.hue)}${Math.floor((0.22 + alpha * 0.45) * 255).toString(16).padStart(2, '0')})`;
+          ctx.lineWidth = 0.8 + thread.sway * 1.1;
+          ctx.stroke();
+
+          thread.vx *= 0.995;
+          thread.vy *= 0.995;
+        }
+
+        if (threads.length > 1) {
+          for (let i = 0; i < threads.length; i++) {
+            const a = threads[i];
+            for (let j = i + 1; j < threads.length; j++) {
+              const b = threads[j];
+              const dx = a.x - b.x;
+              const dy = a.y - b.y;
+              const dist = Math.hypot(dx, dy);
+              if (dist > 150) continue;
+
+              const linkAlpha = 1 - (dist / 150);
+              ctx.beginPath();
+              ctx.moveTo(a.x, a.y);
+              ctx.lineTo(b.x, b.y);
+              ctx.strokeStyle = `hsla(${Math.round((a.hue + b.hue) / 2)}, 95%, 70%, ${Math.round(linkAlpha * 90) / 100})`;
+              ctx.lineWidth = 0.55 + linkAlpha * 0.95;
+              ctx.stroke();
+            }
+          }
+        }
+
+        const now = new Date();
+        const label = (now.getSeconds() % 2) === 0 ? 'odd' : 'litany';
+        ctx.fillStyle = 'rgba(223, 236, 255, 0.55)';
+        ctx.font = '12px "IBM Plex Mono", monospace';
+        ctx.fillText(`drift litany : ${label}`, 18, height - 14);
+
+        if (Math.random() < 0.22) {
+          const stars = Math.max(70, Math.round(width * 0.09));
+          for (let i = 0; i < 2; i++) {
+            const x = Math.floor(randomFromSeed() * width);
+            const y = Math.floor(randomFromSeed() * height);
+            const flicker = 35 + Math.floor(randomFromSeed() * 70);
+            ctx.fillStyle = `rgba(255, 255, 255, ${flicker / 255})`;
+            ctx.fillRect(x, y, 1, 1);
+          }
+        }
+
+        if (frame % 20 === 0) {
+          setStatus();
+        }
+
+        requestAnimationFrame(drawFrame);
+      };
+
+      const copyLink = () => {
+        const url = `${location.origin}${location.pathname}#${toSnapshot()}`;
+        navigator.clipboard
+          .writeText(url)
+          .then(() => {
+            hint.textContent = 'State hash copied. Paste into another browser for an exact replay.';
+            status.textContent = 'link copied';
+          })
+          .catch(() => {
+            window.prompt('Copy this state hash link:', url);
+          });
+      };
+
+      const exportPNG = () => {
+        const link = document.createElement('a');
+        link.download = `drift-litany-${toHex(state.seed)}-${Date.now().toString(36)}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        status.textContent = 'png exported';
+      };
+
+      const reseed = () => {
+        state.seed = randomSeed();
+        rngState = state.seed;
+        threads = [];
+        for (let i = 0; i < 14; i++) {
+          spawnThread(width * randomFromSeed(), height * randomFromSeed(), { ageShift: 16 });
+        }
+        status.textContent = 'reseeded hash seed';
+        syncHash();
+      };
+
+      const pointerMove = (event) => {
+        const rect = canvas.getBoundingClientRect();
+        pointer.x = event.clientX - rect.left;
+        pointer.y = event.clientY - rect.top;
+
+        if (pointer.active) {
+          spawnThread(pointer.x, pointer.y, { count: 2 });
+          if (threads.length > state.density + 16) {
+            threads.splice(0, threads.length - (state.density + 16));
+          }
+          if (frame % 2 === 0) {
+            syncHash();
+          }
+        }
+      };
+
+      const pointerDown = (event) => {
+        const rect = canvas.getBoundingClientRect();
+        pointer.active = true;
+        pointer.x = event.clientX - rect.left;
+        pointer.y = event.clientY - rect.top;
+        spawnThread(pointer.x, pointer.y, { count: 4 });
+        syncHash();
+      };
+
+      const pointerUp = () => {
+        pointer.active = false;
+      };
+
+      const applyControls = () => {
+        state.density = clamp(Number.parseInt(densityRange.value, 10), 60, maxThreads);
+        state.drift = clamp(Number.parseFloat(driftRange.value), 0.45, 2.35);
+        densityValue.textContent = String(state.density);
+        driftValue.textContent = state.drift.toFixed(2);
+
+        if (threads.length > state.density) {
+          threads.splice(0, threads.length - state.density);
+        }
+
+        syncHash();
+      };
+
+      const loadFromLocation = () => {
+        const hash = location.hash.replace(/^#/, '');
+        if (!hash) {
+          return false;
+        }
+
+        try {
+          return fromSnapshot(hash);
+        } catch (_error) {
+          return false;
+        }
+      };
+
+      const init = () => {
+        resize();
+
+        const loaded = loadFromLocation();
+        if (!loaded) {
+          state.seed = randomSeed();
+          rngState = state.seed;
+          for (let i = 0; i < 18; i++) {
+            spawnThread(width * randomFromSeed(), height * randomFromSeed(), { ageShift: 30 });
+          }
+          syncHash();
+        } else {
+          hint.textContent = 'Loaded from hash, including seed and threads. Keep this URL to replay exact motion.';
+          seedBtn.disabled = false;
+        }
+
+        window.addEventListener('resize', resize);
+        window.addEventListener('hashchange', () => {
+          if (loadFromLocation()) {
+            setStatus();
+          }
+        });
+
+        canvas.addEventListener('pointermove', pointerMove);
+        canvas.addEventListener('pointerdown', pointerDown);
+        window.addEventListener('pointerup', pointerUp);
+        window.addEventListener('pointerleave', pointerUp);
+
+        seedBtn.addEventListener('click', reseed);
+        spawnBtn.addEventListener('click', () => {
+          spawnThread(width * 0.5, height * 0.5, { count: 7 });
+          syncHash();
+        });
+        pauseBtn.addEventListener('click', () => {
+          paused = !paused;
+          pauseBtn.setAttribute('aria-pressed', String(paused));
+          pauseBtn.textContent = `pause: ${paused ? 'on' : 'off'}`;
+          if (!paused) {
+            requestAnimationFrame(drawFrame);
+          }
+        });
+        copyBtn.addEventListener('click', copyLink);
+        exportBtn.addEventListener('click', exportPNG);
+        clearBtn.addEventListener('click', () => {
+          threads = [];
+          setStatus();
+          hint.textContent = 'field cleared';
+          syncHash();
+        });
+
+        densityRange.addEventListener('input', applyControls);
+        driftRange.addEventListener('input', applyControls);
+
+        densityRange.value = String(state.density);
+        driftRange.value = String(state.drift);
+        densityValue.textContent = String(state.density);
+        driftValue.textContent = state.drift.toFixed(2);
+
+        setStatus();
+        requestAnimationFrame(drawFrame);
+      };
+
+      init();
+    })();
+  </script>
+</body>
+</html>
