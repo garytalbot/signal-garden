@@ -21,6 +21,7 @@ ROUTES=(
   sigil-liturgy-hub
   sigil-noise-lattice
   sigil-weather
+  odd-orbit
   static-psalm
   spectral-drift
   void-chorale
