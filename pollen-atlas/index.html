@@ -49,8 +49,8 @@
       inset: 0;
       pointer-events: none;
       background:
-        linear-gradient(rgba(255,255,255,var(--ambient-veil)), rgba(255,255,255,0.01) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,calc(var(--ambient-veil) * 0.8)), rgba(255,255,255,0.01) 1px, transparent 1px);
+        linear-gradient(rgb(255 255 255 / var(--ambient-veil)), rgb(255 255 255 / 0.01) 1px, transparent 1px),
+        linear-gradient(90deg, rgb(255 255 255 / calc(var(--ambient-veil) * 0.8)), rgb(255 255 255 / 0.01) 1px, transparent 1px);
       background-size: 100% 3px, 3px 100%;
       opacity: var(--ambient-grid);
       mix-blend-mode: screen;
@@ -118,7 +118,7 @@
 
     .stats {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 10px;
     }
 
@@ -197,6 +197,39 @@
     .actions button {
       text-align: center;
       padding: 11px 14px;
+    }
+
+    .chamber-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .link-button {
+      font: inherit;
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+      padding: 12px 13px;
+      text-align: center;
+      cursor: pointer;
+      transition: transform 130ms ease, border-color 130ms ease, background 130ms ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .link-button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(149, 255, 203, 0.5);
+      background: linear-gradient(180deg, rgba(149,255,203,0.10), rgba(255,255,255,0.03));
+    }
+
+    .link-button:active {
+      transform: translateY(0);
     }
 
     .mini {
@@ -315,6 +348,30 @@
       min-height: 1.5em;
     }
 
+    .help-strip {
+      margin: 0;
+      padding: 12px 14px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.04);
+      color: rgba(238,246,255,0.82);
+      font-size: 13px;
+    }
+
+    .help-strip strong {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .help-strip code {
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04);
+      color: var(--accent-2);
+      white-space: nowrap;
+    }
+
     .chip {
       display: inline-flex;
       align-items: center;
@@ -370,10 +427,11 @@
     <section class="panel atlas" aria-labelledby="title">
       <p class="eyebrow">signal garden side chamber</p>
       <h1 id="title">pollen atlas</h1>
-      <p class="lede">A browser-local cabinet of airborne relics. Pick a specimen, watch its dust drift through the glass, and let the room remember which bloom you touched last.</p>
+      <p class="lede">A browser-local cabinet of airborne relics. Pick a specimen, watch its dust drift through the glass, and let the room remember which bloom you touched last. Residues can be copied as cards, exported as residue postcards, or sent out as shareable links.</p>
 
       <div class="stats" aria-live="polite">
         <div class="stat"><span>specimens</span><strong id="specimenCount">0</strong></div>
+        <div class="stat"><span>residues</span><strong id="residueCount">0</strong></div>
         <div class="stat"><span>current grain</span><strong id="currentGrain">—</strong></div>
         <div class="stat"><span>drift</span><strong id="driftLabel">slow</strong></div>
       </div>
@@ -385,11 +443,26 @@
         <button id="quietBtn" type="button">quiet the glass</button>
         <button id="clearBtn" type="button">clear selection</button>
         <button id="copyBtn" type="button">copy atlas card</button>
+        <button id="copyResidueLinkBtn" type="button">copy residue link</button>
+        <button id="shareResidueBtn" type="button">share residue card</button>
         <button id="exportBtn" type="button">export postcard</button>
+        <button id="helpBtn" type="button" aria-controls="helpStrip" aria-expanded="false">show field notes</button>
+      </div>
+      <div class="chamber-nav" aria-label="Signal Garden chambers">
+        <a class="link-button" href="../">open garden</a>
+        <a class="link-button" href="../afterimage/">visit afterimage</a>
       </div>
 
       <p class="status" id="status">The cabinet is listening.</p>
-      <p class="mini" id="shareStatus">A card can be copied or exported from the tray.</p>
+      <p class="mini" id="shareStatus">A card can be copied, exported, or turned into a residue link when a residue is selected.</p>
+      <p class="help-strip" id="helpStrip" hidden>
+        <strong>field notes:</strong>
+        <code>←</code>/<code>→</code> step between grains,
+        <code>space</code> shuffles drift,
+        <code>q</code> quiets the glass,
+        <code>r</code> recalls the selected grain,
+        <code>?</code> hides or reveals this note.
+      </p>
     </section>
 
     <section class="panel studio" aria-labelledby="studioTitle">
@@ -421,6 +494,7 @@
     const ctx = canvas.getContext('2d');
     const specimenList = document.getElementById('specimenList');
     const specimenCount = document.getElementById('specimenCount');
+    const residueCount = document.getElementById('residueCount');
     const currentGrain = document.getElementById('currentGrain');
     const driftLabel = document.getElementById('driftLabel');
     const statusEl = document.getElementById('status');
@@ -436,10 +510,14 @@
     const quietBtn = document.getElementById('quietBtn');
     const clearBtn = document.getElementById('clearBtn');
     const copyBtn = document.getElementById('copyBtn');
+    const copyResidueLinkBtn = document.getElementById('copyResidueLinkBtn');
+    const shareResidueBtn = document.getElementById('shareResidueBtn');
     const exportBtn = document.getElementById('exportBtn');
+    const helpBtn = document.getElementById('helpBtn');
+    const helpStrip = document.getElementById('helpStrip');
 
     const STORAGE_KEY = 'signal-garden:pollen-atlas:last';
-    const specimens = [
+    const baseSpecimens = [
       {
         id: 'glass-thistle',
         name: 'Glass Thistle',
@@ -514,6 +592,12 @@
       { label: 'restless', speed: 0.95, jitter: 1.7, glow: 1.0 }
     ];
 
+    const RESIDUE_STORAGE_KEY = 'signal-garden:pollen-atlas:residues';
+    const RESIDUE_HASH_KEY = 'residue';
+    let residues = [];
+    let sharedResidue = null;
+    let specimens = [];
+
     const motes = [];
     let selectedIndex = 0;
     let dpr = 1;
@@ -521,7 +605,346 @@
     let height = 0;
     let modeIndex = 0;
     let quiet = false;
+    let helpOpen = false;
     let frame = 0;
+    let atmosphere = null;
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function lerp(a, b, amount) {
+      return a + (b - a) * amount;
+    }
+
+    function blendRgb(a, b, amount) {
+      return [
+        lerp(a[0], b[0], amount),
+        lerp(a[1], b[1], amount),
+        lerp(a[2], b[2], amount)
+      ];
+    }
+
+    function rgbString(r, g, b) {
+      return `${Math.round(r)} ${Math.round(g)} ${Math.round(b)}`;
+    }
+
+    function seasonalPalette(month) {
+      if (month >= 2 && month <= 4) {
+        return {
+          name: 'spring',
+          a: [117, 196, 255],
+          b: [255, 159, 208],
+          c: [155, 255, 208],
+          panel: [11, 18, 29],
+          panel2: [9, 14, 22],
+          grid: 0.12,
+          glow: 0.13,
+          veil: 0.13
+        };
+      }
+      if (month >= 5 && month <= 7) {
+        return {
+          name: 'summer',
+          a: [90, 210, 255],
+          b: [255, 181, 114],
+          c: [157, 255, 187],
+          panel: [10, 17, 27],
+          panel2: [8, 12, 19],
+          grid: 0.11,
+          glow: 0.14,
+          veil: 0.12
+        };
+      }
+      if (month >= 8 && month <= 10) {
+        return {
+          name: 'autumn',
+          a: [214, 149, 85],
+          b: [165, 100, 255],
+          c: [255, 131, 91],
+          panel: [15, 15, 22],
+          panel2: [11, 10, 16],
+          grid: 0.1,
+          glow: 0.11,
+          veil: 0.1
+        };
+      }
+      return {
+        name: 'winter',
+        a: [145, 191, 255],
+        b: [189, 228, 255],
+        c: [208, 171, 255],
+        panel: [9, 14, 24],
+        panel2: [7, 10, 16],
+        grid: 0.13,
+        glow: 0.1,
+        veil: 0.14
+      };
+    }
+
+    function dayPhase(hour) {
+      if (hour < 5.5) return { name: 'night', factor: 0.14 };
+      if (hour < 8) return { name: 'dawn', factor: 0.35 };
+      if (hour < 11) return { name: 'morning', factor: 0.72 };
+      if (hour < 15) return { name: 'noon', factor: 1 };
+      if (hour < 18) return { name: 'afternoon', factor: 0.86 };
+      if (hour < 21) return { name: 'dusk', factor: 0.54 };
+      return { name: 'night', factor: 0.22 };
+    }
+
+    function updateAtmosphere(now = new Date()) {
+      const season = seasonalPalette(now.getMonth());
+      const hour = now.getHours() + now.getMinutes() / 60;
+      const phase = dayPhase(hour);
+      const blend = clamp((phase.factor - 0.14) / 0.86, 0, 1);
+      const moonwash = 1 - Math.abs((hour - 12) / 12);
+      const seasonShift = {
+        spring: 8,
+        summer: -4,
+        autumn: 24,
+        winter: -12
+      }[season.name];
+      const phaseShift = {
+        night: -10,
+        dawn: -4,
+        morning: 5,
+        noon: 8,
+        afternoon: 2,
+        dusk: 14
+      }[phase.name];
+      const a = blendRgb(season.a, [255, 255, 255], blend * 0.18 + moonwash * 0.04);
+      const b = blendRgb(season.b, [255, 255, 255], blend * 0.12);
+      const c = blendRgb(season.c, [255, 255, 255], blend * 0.14 + moonwash * 0.03);
+      const panel = blendRgb(season.panel, [20, 24, 35], phase.factor * 0.12);
+      const panel2 = blendRgb(season.panel2, [14, 18, 27], phase.factor * 0.12);
+
+      atmosphere = {
+        season: season.name,
+        phase: phase.name,
+        label: `${season.name} ${phase.name}`,
+        hueShift: seasonShift + phaseShift,
+        a: rgbString(...a),
+        b: rgbString(...b),
+        c: rgbString(...c),
+        panel: rgbString(...panel),
+        panel2: rgbString(...panel2),
+        grid: clamp(season.grid + (phase.factor - 0.5) * 0.02, 0.08, 0.16),
+        glow: clamp(season.glow + (phase.factor - 0.5) * 0.03, 0.08, 0.16),
+        veil: clamp(season.veil + (phase.factor - 0.5) * 0.02, 0.08, 0.18)
+      };
+
+      const root = document.documentElement.style;
+      root.setProperty('--ambient-a', atmosphere.a);
+      root.setProperty('--ambient-b', atmosphere.b);
+      root.setProperty('--ambient-c', atmosphere.c);
+      root.setProperty('--ambient-panel', atmosphere.panel);
+      root.setProperty('--ambient-panel-2', atmosphere.panel2);
+      root.setProperty('--ambient-grid', atmosphere.grid.toFixed(3));
+      root.setProperty('--ambient-glow', atmosphere.glow.toFixed(3));
+      root.setProperty('--ambient-veil', atmosphere.veil.toFixed(3));
+    }
+
+    function readResidueStorage() {
+      try {
+        const raw = localStorage.getItem(RESIDUE_STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function encodeBase64Url(text) {
+      const bytes = new TextEncoder().encode(String(text));
+      let binary = '';
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+      return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    }
+
+    function decodeBase64Url(text) {
+      const base64 = String(text).replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+      const binary = atob(padded);
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      return new TextDecoder().decode(bytes);
+    }
+
+    function readSharedResidueFromHash() {
+      try {
+        const params = new URLSearchParams(location.hash.replace(/^#/, ''));
+        const encoded = params.get(RESIDUE_HASH_KEY);
+        if (!encoded) return null;
+        const parsed = JSON.parse(decodeBase64Url(encoded));
+        const residue = normalizeResidue(parsed);
+        if (!residue) return null;
+        const sharedId = `shared-${residue.id || 'residue'}-${String(residue.capturedAt || 'link').replace(/[:.]/g, '-')}`;
+        return {
+          ...residue,
+          id: sharedId,
+          shared: true,
+          sharePayload: residue,
+          source: 'shared link',
+          note: `${residue.note} This residue arrived through a shared atlas link.`,
+          caption: `${residue.caption} Shared from a link.`,
+        };
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function buildResidueLink(specimen) {
+      const source = specimen?.sharePayload && specimen.shared ? specimen.sharePayload : specimen;
+      const payload = {
+        kind: 'residue',
+        source: source?.source || 'afterimage',
+        name: source?.name,
+        family: source?.family,
+        season: source?.season,
+        color: source?.color,
+        memory: source?.memory,
+        note: source?.note,
+        caption: source?.caption,
+        hue: source?.hue,
+        paletteName: source?.paletteName,
+        paletteIndex: source?.paletteIndex,
+        capturedAt: source?.capturedAt,
+        trail: source?.trail,
+        ghosts: source?.ghosts,
+        pulses: source?.pulses,
+        colors: source?.colors,
+      };
+      const encoded = encodeBase64Url(JSON.stringify(payload));
+      const url = new URL(location.href);
+      url.hash = `${RESIDUE_HASH_KEY}=${encoded}`;
+      return url.toString();
+    }
+
+    function normalizeTrailPoint(point) {
+      return {
+        x: Number(point?.x) || 0,
+        y: Number(point?.y) || 0,
+        at: Number(point?.at) || 0,
+      };
+    }
+
+    function normalizeResidue(entry) {
+      if (!entry || typeof entry !== 'object') return null;
+      const id = typeof entry.id === 'string' && entry.id ? entry.id : null;
+      const paletteName = typeof entry.paletteName === 'string' && entry.paletteName ? entry.paletteName : 'afterimage';
+      const name = typeof entry.name === 'string' && entry.name ? entry.name : `${paletteName} residue`;
+      const trail = Array.isArray(entry.trail) ? entry.trail.slice(0, 24).map(normalizeTrailPoint).filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y)) : [];
+      const ghosts = Array.isArray(entry.ghosts)
+        ? entry.ghosts.slice(0, 16).map((ghost) => ({
+          x: Number(ghost?.x) || 0,
+          y: Number(ghost?.y) || 0,
+          radius: Number(ghost?.radius) || 0,
+          hue: Number(ghost?.hue) || 0,
+          glyph: typeof ghost?.glyph === 'string' ? ghost.glyph : '◌',
+        }))
+        : [];
+      const paletteIndex = Number.isInteger(entry.paletteIndex) ? entry.paletteIndex : 0;
+      const hue = Number.isFinite(entry.hue) ? entry.hue : (paletteIndex * 71 + trail.length * 13 + ghosts.length * 9) % 360;
+      const colors = Array.isArray(entry.colors) && entry.colors.length
+        ? entry.colors.filter((color) => typeof color === 'string' && color.trim()).slice(0, 6)
+        : [
+            `hsl(${hue}, 86%, 68%)`,
+            `hsl(${(hue + 34) % 360}, 88%, 64%)`,
+            `hsl(${(hue + 78) % 360}, 84%, 72%)`,
+          ];
+      const capturedAt = typeof entry.capturedAt === 'string' && entry.capturedAt ? entry.capturedAt : new Date().toISOString();
+
+      return {
+        id,
+        kind: 'residue',
+        source: 'afterimage',
+        name,
+        family: 'Afterimage residue',
+        season: 'freshly pressed',
+        color: Array.isArray(entry.color) ? entry.color.join(' / ') : (typeof entry.color === 'string' && entry.color ? entry.color : colors.join(' / ')),
+        memory: typeof entry.memory === 'string' && entry.memory ? entry.memory : `${trail.length} trail points captured from the screen`,
+        note: typeof entry.note === 'string' && entry.note ? entry.note : 'A ghost trail pressed out of the afterimage chamber and into the atlas glass.',
+        caption: typeof entry.caption === 'string' && entry.caption ? entry.caption : 'A browser-local residue pinned from a live afterimage pass.',
+        hue,
+        paletteName,
+        paletteIndex,
+        capturedAt,
+        trail,
+        ghosts,
+        pulses: Array.isArray(entry.pulses) ? entry.pulses.slice(0, 6) : [],
+        colors,
+      };
+    }
+
+    function loadResidues() {
+      residues = readResidueStorage().map(normalizeResidue).filter(Boolean);
+      return residues;
+    }
+
+    function buildSpecimens() {
+      loadResidues();
+      specimens = [...baseSpecimens, ...residues, ...(sharedResidue ? [sharedResidue] : [])];
+      return specimens;
+    }
+
+    function getResidueCount() {
+      return residues.length + (sharedResidue ? 1 : 0);
+    }
+
+    function syncResidueCount() {
+      if (residueCount) {
+        residueCount.textContent = String(getResidueCount());
+      }
+    }
+
+    function refreshResidues({ keepSelectionId = specimens[selectedIndex]?.id ?? null, announce = false } = {}) {
+      buildSpecimens();
+      const nextIndex = keepSelectionId ? specimens.findIndex((specimen) => specimen.id === keepSelectionId) : -1;
+      selectedIndex = nextIndex >= 0 ? nextIndex : Math.max(0, Math.min(selectedIndex, specimens.length - 1));
+      if (specimens.length === 0) {
+        selectedIndex = 0;
+      }
+      renderSpecimens();
+      selectSpecimen(selectedIndex, false);
+      syncResidueCount();
+      if (announce) {
+        statusEl.textContent = getResidueCount()
+          ? `${getResidueCount()} pressed residue${getResidueCount() === 1 ? '' : 's'} are waiting in the tray.`
+          : 'No pressed residues found yet. The atlas is waiting for a ghost trail.';
+      }
+      return specimens[selectedIndex] ?? null;
+    }
+
+    function residueShareStatus() {
+      const specimen = specimens[selectedIndex];
+      if (specimen?.kind === 'residue') {
+        return specimen.shared
+          ? 'A shared residue card can be copied, shared, exported, or linked from the tray.'
+          : 'A residue card can be copied, shared, exported, or linked from the tray.';
+      }
+
+      return 'A card can be copied, exported, or linked from the tray.';
+    }
+
+    function updateShareControls() {
+      const specimen = specimens[selectedIndex];
+      const isResidue = specimen?.kind === 'residue';
+      copyBtn.textContent = isResidue ? 'copy residue card' : 'copy atlas card';
+      copyResidueLinkBtn.disabled = !isResidue;
+      copyResidueLinkBtn.title = isResidue
+        ? 'Copy a residue-specific link that rehydrates this atlas card.'
+        : 'Select a residue to generate a residue-specific link.';
+      shareResidueBtn.disabled = !isResidue;
+      shareResidueBtn.title = isResidue
+        ? 'Share the residue card text together with its direct atlas link.'
+        : 'Select a residue to share its card and direct atlas link.';
+      exportBtn.textContent = isResidue ? 'export residue postcard' : 'export postcard';
+      shareStatus.textContent = helpOpen
+        ? 'Field notes are open: the chamber can be navigated from the tray or the keyboard, and residue links still light up when a residue is selected.'
+        : residueShareStatus();
+    }
 
     function resize() {
       dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
@@ -564,7 +987,9 @@
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = index === selectedIndex ? 'active' : '';
-        btn.innerHTML = `<strong>${specimen.name}</strong><span>${specimen.family}</span>`;
+        btn.innerHTML = specimen.kind === 'residue'
+          ? `<strong>${specimen.name}</strong><span>${specimen.family}</span><span>${specimen.shared ? 'shared residue' : 'pressed ' + new Date(specimen.capturedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>`
+          : `<strong>${specimen.name}</strong><span>${specimen.family}</span>`;
         btn.title = specimen.caption;
         btn.addEventListener('click', () => selectSpecimen(index, true));
         specimenList.appendChild(btn);
@@ -594,8 +1019,10 @@
       memoryLabel.textContent = specimen.memory;
       currentGrain.textContent = specimen.name;
       noteText.textContent = specimen.note;
-      statusEl.textContent = `Holding ${specimen.name}. The cabinet has gone ${driftModes[modeIndex].label}.`;
+      const atmosphereLabel = atmosphere ? atmosphere.label : 'steady dark';
+      statusEl.textContent = `Holding ${specimen.name}. The cabinet has gone ${driftModes[modeIndex].label} in a ${atmosphereLabel} chamber.`;
       renderSpecimens();
+      updateShareControls();
       seedMotes();
       if (remember) saveSelection(selectedIndex);
     }
@@ -603,20 +1030,44 @@
     function shuffleDrift() {
       modeIndex = (modeIndex + 1) % driftModes.length;
       driftLabel.textContent = driftModes[modeIndex].label;
-      statusEl.textContent = `Drift mode shifted to ${driftModes[modeIndex].label}.`;
+      const atmosphereLabel = atmosphere ? atmosphere.label : 'steady dark';
+      statusEl.textContent = `Drift mode shifted to ${driftModes[modeIndex].label}. The chamber stays ${atmosphereLabel}.`;
     }
 
     function toggleQuiet() {
       quiet = !quiet;
       quietBtn.textContent = quiet ? 'wake the glass' : 'quiet the glass';
-      statusEl.textContent = quiet ? 'The field hushed itself.' : 'The field resumed its small weather.';
+      const atmosphereLabel = atmosphere ? atmosphere.label : 'steady dark';
+      statusEl.textContent = quiet
+        ? `The field hushed itself inside a ${atmosphereLabel} chamber.`
+        : `The field resumed its small weather inside a ${atmosphereLabel} chamber.`;
+    }
+
+    function showSpecimen(index, remember = false) {
+      const previousIndex = selectedIndex;
+      selectSpecimen(index, remember);
+      const direction = selectedIndex === previousIndex ? 'Holding' : 'Moved to';
+      const specimen = specimens[selectedIndex];
+      statusEl.textContent = `${direction} ${specimen.name}. The chamber remains ${atmosphere ? atmosphere.label : 'steady dark'}.`;
+    }
+
+    function stepSpecimen(delta) {
+      showSpecimen(selectedIndex + delta, true);
+    }
+
+    function toggleHelp(force) {
+      helpOpen = typeof force === 'boolean' ? force : !helpOpen;
+      helpStrip.hidden = !helpOpen;
+      helpBtn.setAttribute('aria-expanded', String(helpOpen));
+      helpBtn.textContent = helpOpen ? 'hide field notes' : 'show field notes';
+      updateShareControls();
     }
 
     function clearSelection() {
       localStorage.removeItem(STORAGE_KEY);
       selectSpecimen(0, false);
-      statusEl.textContent = 'Selection cleared. The first specimen is back in the tray.';
-      shareStatus.textContent = 'The atlas card now points at the first grain again.';
+      const atmosphereLabel = atmosphere ? atmosphere.label : 'steady dark';
+      statusEl.textContent = `Selection cleared. The first specimen is back in the tray, and the chamber remains ${atmosphereLabel}.`;
     }
 
     function sanitize(text) {
@@ -629,8 +1080,10 @@
 
     function currentCardLines() {
       const specimen = specimens[selectedIndex];
-      return [
-        'Signal Garden / Pollen Atlas',
+      const lines = [
+        specimen.kind === 'residue'
+          ? 'Signal Garden / Pollen Atlas residue card'
+          : 'Signal Garden / Pollen Atlas card',
         `specimen: ${specimen.name}`,
         `family: ${specimen.family}`,
         `season: ${specimen.season}`,
@@ -640,10 +1093,30 @@
         `drift: ${driftModes[modeIndex].label}`,
         `quiet glass: ${quiet ? 'yes' : 'no'}`
       ];
+
+      if (specimen.kind === 'residue') {
+        lines.splice(4, 0,
+          `source: ${specimen.source}`,
+          `captured: ${new Date(specimen.capturedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`,
+          `trail: ${specimen.trail.length} points`,
+        );
+      }
+
+      return lines;
     }
 
     function atlasCardText() {
       return currentCardLines().join('\n');
+    }
+
+    async function copyTextToClipboard(text, fallbackLabel = 'Copy your Pollen Atlas link:') {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (error) {
+        window.prompt(fallbackLabel, text);
+        return false;
+      }
     }
 
     function atlasCardSvg() {
@@ -663,6 +1136,13 @@
         const glow = 0.16 + (index % 5) * 0.04;
         return `<circle cx="${x}" cy="${y}" r="${r}" fill="hsla(${(specimen.hue + index * 9) % 360}, 90%, 72%, ${glow})" />`;
       }).join('');
+      const residueTrace = specimen.kind === 'residue' && specimen.trail.length
+        ? `<path d="${specimen.trail.map((point, index) => `${index === 0 ? 'M' : 'L'} ${110 + point.x * 0.72} ${320 + point.y * 0.62}`).join(' ')}" fill="none" stroke="${accent}" stroke-opacity="0.32" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 12" />
+  ${specimen.trail.slice(-10).map((point, index) => `<circle cx="${110 + point.x * 0.72}" cy="${320 + point.y * 0.62}" r="${3 + (index % 3)}" fill="${accent}" fill-opacity="${0.16 + index * 0.02}" />`).join('\n  ')}`
+        : '';
+      const residueGlow = specimen.kind === 'residue' && specimen.ghosts.length
+        ? specimen.ghosts.slice(0, 8).map((ghost, index) => `<circle cx="${160 + (ghost.x * 0.38 + index * 13) % 650}" cy="${390 + (ghost.y * 0.26 + index * 17) % 520}" r="${Math.max(6, ghost.radius * 0.28)}" fill="${accent}" fill-opacity="${0.06 + index * 0.02}" />`).join('\n  ')
+        : '';
 
       return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title desc">
@@ -687,6 +1167,8 @@
   <rect x="88" y="88" width="784" height="1040" rx="26" fill="rgba(255,255,255,0.018)" stroke="rgba(255,255,255,0.08)" />
   <ellipse cx="686" cy="316" rx="232" ry="210" fill="url(#halo)" filter="url(#soft)" />
   ${dust}
+  ${residueTrace}
+  ${residueGlow}
   <text x="110" y="140" fill="#95ffcb" font-family="system-ui, sans-serif" font-size="26" letter-spacing="5">SIGNAL GARDEN / POLLEN ATLAS</text>
   <text x="110" y="${titleY}" fill="#eef6ff" font-family="system-ui, sans-serif" font-size="78" font-weight="700" letter-spacing="-3">${sanitize(specimen.name)}</text>
   <text x="110" y="214" fill="#9fb5ce" font-family="system-ui, sans-serif" font-size="30">${sanitize(specimen.caption)}</text>
@@ -706,9 +1188,10 @@
 
     async function copyAtlasCard() {
       const text = atlasCardText();
+      const specimen = specimens[selectedIndex];
       try {
         await navigator.clipboard.writeText(text);
-        shareStatus.textContent = 'Atlas card copied to clipboard.';
+        shareStatus.textContent = `${specimen.kind === 'residue' ? 'Residue card' : 'Atlas card'} copied to clipboard.`;
       } catch (error) {
         const area = document.createElement('textarea');
         area.value = text;
@@ -719,7 +1202,7 @@
         area.select();
         document.execCommand('copy');
         area.remove();
-        shareStatus.textContent = 'Atlas card copied with a fallback selection.';
+        shareStatus.textContent = `${specimen.kind === 'residue' ? 'Residue card' : 'Atlas card'} copied with a fallback selection.`;
       }
     }
 
@@ -731,20 +1214,75 @@
       const stamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, '-');
       const a = document.createElement('a');
       a.href = url;
-      a.download = `pollen-atlas-${specimen.id}-${stamp}.svg`;
+      a.download = `${specimen.kind === 'residue' ? 'pollen-atlas-residue' : 'pollen-atlas'}-${specimen.id}-${stamp}.svg`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1500);
-      shareStatus.textContent = 'Atlas postcard exported as an SVG.';
+      shareStatus.textContent = `${specimen.kind === 'residue' ? 'Residue' : 'Atlas'} postcard exported as an SVG.`;
+    }
+
+    async function copyResidueLink() {
+      const specimen = specimens[selectedIndex];
+      if (!specimen || specimen.kind !== 'residue') {
+        shareStatus.textContent = 'Select a residue to copy its direct link.';
+        return;
+      }
+
+      const url = buildResidueLink(specimen);
+      const copied = await copyTextToClipboard(url, 'Copy this Pollen Atlas residue link:');
+      if (copied) {
+        shareStatus.textContent = 'Residue link copied. The card can travel by URL now.';
+        return;
+      }
+
+      shareStatus.textContent = 'Residue link needs a manual copy. Clipboard spirits were unavailable.';
+    }
+
+    async function shareResidueCard() {
+      const specimen = specimens[selectedIndex];
+      if (!specimen || specimen.kind !== 'residue') {
+        shareStatus.textContent = 'Select a residue to share its card.';
+        return;
+      }
+
+      const url = buildResidueLink(specimen);
+      const text = `${atlasCardText()}\n\nResidue link: ${url}`;
+      const sharePayload = {
+        title: `Signal Garden residue card: ${specimen.name}`,
+        text,
+        url,
+      };
+
+      if (navigator.share && (!navigator.canShare || navigator.canShare(sharePayload))) {
+        try {
+          await navigator.share(sharePayload);
+          shareStatus.textContent = 'Residue card shared. The atlas card and link left together.';
+          return;
+        } catch (error) {
+          if (error && error.name === 'AbortError') {
+            shareStatus.textContent = 'Residue card share canceled.';
+            return;
+          }
+        }
+      }
+
+      const copied = await copyTextToClipboard(text, 'Copy this Pollen Atlas residue card:');
+      shareStatus.textContent = copied
+        ? 'Residue card copied with its direct link. The tray has a handoff path now.'
+        : 'Residue card needs a manual copy. Clipboard spirits were unavailable.';
     }
 
     function draw() {
       frame += 1;
       const mode = driftModes[modeIndex];
+      const atmosphereShift = atmosphere ? atmosphere.hueShift : 0;
+      const atmosphereLabel = atmosphere ? atmosphere.label : 'steady dark';
       ctx.clearRect(0, 0, width, height);
 
-      ctx.fillStyle = 'rgba(5, 8, 12, 0.28)';
+      ctx.fillStyle = atmosphere
+        ? `rgba(5, 8, 12, ${0.2 + atmosphere.glow * 0.26})`
+        : 'rgba(5, 8, 12, 0.28)';
       ctx.fillRect(0, 0, width, height);
 
       const selected = specimens[selectedIndex];
@@ -763,7 +1301,7 @@
         const alpha = mote.alpha * pulse * (0.6 + mode.glow * 0.4);
 
         ctx.beginPath();
-        ctx.fillStyle = `hsla(${mote.hue}, 92%, 72%, ${alpha})`;
+        ctx.fillStyle = `hsla(${(mote.hue + atmosphereShift) % 360}, 92%, 72%, ${alpha})`;
         ctx.arc(mote.x, mote.y, mote.radius * (0.7 + pulse), 0, Math.PI * 2);
         ctx.fill();
       });
@@ -772,8 +1310,8 @@
       const haloX = width * 0.68;
       const haloY = height * 0.36;
       const gradient = ctx.createRadialGradient(haloX, haloY, 10, haloX, haloY, haloRadius);
-      gradient.addColorStop(0, `hsla(${selected.hue}, 90%, 70%, ${quiet ? 0.12 : 0.22})`);
-      gradient.addColorStop(0.45, `hsla(${(selected.hue + 30) % 360}, 90%, 64%, ${quiet ? 0.06 : 0.12})`);
+      gradient.addColorStop(0, `hsla(${(selected.hue + atmosphereShift) % 360}, 90%, 70%, ${quiet ? 0.12 : 0.22})`);
+      gradient.addColorStop(0.45, `hsla(${(selected.hue + atmosphereShift + 30) % 360}, 90%, 64%, ${quiet ? 0.06 : 0.12})`);
       gradient.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = gradient;
       ctx.beginPath();
@@ -783,7 +1321,7 @@
       ctx.save();
       ctx.translate(width * 0.68, height * 0.36);
       ctx.rotate(Math.sin(frame * 0.004) * 0.18);
-      ctx.strokeStyle = `hsla(${selected.hue}, 92%, 74%, ${quiet ? 0.25 : 0.48})`;
+      ctx.strokeStyle = `hsla(${(selected.hue + atmosphereShift) % 360}, 92%, 74%, ${quiet ? 0.25 : 0.48})`;
       ctx.lineWidth = 1.2;
       for (let i = 0; i < 3; i++) {
         ctx.beginPath();
@@ -792,16 +1330,82 @@
       }
       ctx.restore();
 
+      if (selected.kind === 'residue' && selected.trail.length) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.shadowColor = `hsla(${(selected.hue + atmosphereShift) % 360}, 92%, 72%, 0.56)`;
+        ctx.shadowBlur = quiet ? 4 : 18;
+        ctx.strokeStyle = `hsla(${(selected.hue + atmosphereShift) % 360}, 90%, 72%, ${quiet ? 0.16 : 0.36})`;
+        ctx.lineWidth = quiet ? 1.8 : 2.8;
+        ctx.beginPath();
+        selected.trail.forEach((point, index) => {
+          const px = 120 + point.x * 0.72;
+          const py = 310 + point.y * 0.62;
+          if (index === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        });
+        ctx.stroke();
+
+        selected.trail.slice(-10).forEach((point, index) => {
+          const px = 120 + point.x * 0.72;
+          const py = 310 + point.y * 0.62;
+          ctx.fillStyle = `hsla(${(selected.hue + atmosphereShift + index * 8) % 360}, 92%, 72%, ${0.12 + index * 0.02})`;
+          ctx.beginPath();
+          ctx.arc(px, py, 3 + (index % 3), 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        selected.ghosts.slice(0, 8).forEach((ghost, index) => {
+          const px = 150 + (ghost.x * 0.38 + index * 13) % 650;
+          const py = 360 + (ghost.y * 0.26 + index * 17) % 520;
+          ctx.fillStyle = `hsla(${(selected.hue + atmosphereShift + index * 11) % 360}, 90%, 72%, ${0.05 + index * 0.015})`;
+          ctx.beginPath();
+          ctx.arc(px, py, Math.max(5, ghost.radius * 0.24), 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.restore();
+      }
+
+      if (!quiet) {
+        ctx.save();
+        ctx.fillStyle = `rgba(255, 255, 255, ${atmosphere ? atmosphere.veil * 0.15 : 0.02})`;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+      }
+
+      if (frame % 480 === 0) {
+        statusEl.textContent = `Holding ${selected.name}. The cabinet has gone ${mode.label} in a ${atmosphereLabel} chamber.`;
+      }
+
       requestAnimationFrame(draw);
     }
 
     function restore() {
-      selectedIndex = loadSelection();
+      sharedResidue = readSharedResidueFromHash();
+      buildSpecimens();
+      syncResidueCount();
+      updateAtmosphere();
+      const sharedIndex = sharedResidue ? specimens.findIndex((item) => item.id === sharedResidue.id) : -1;
+      selectedIndex = sharedIndex >= 0 ? sharedIndex : loadSelection();
       driftLabel.textContent = driftModes[modeIndex].label;
       selectSpecimen(selectedIndex, false);
+      if (sharedResidue && specimens[selectedIndex]?.id === sharedResidue.id) {
+        statusEl.textContent = `Opened a residue link for ${specimens[selectedIndex].name}. The card is now pinned in the tray.`;
+      }
     }
 
     window.addEventListener('resize', resize);
+    window.addEventListener('storage', (event) => {
+      if (event.key === RESIDUE_STORAGE_KEY) {
+        refreshResidues({ keepSelectionId: specimens[selectedIndex]?.id ?? null, announce: true });
+      }
+    });
+    window.addEventListener('hashchange', () => {
+      sharedResidue = readSharedResidueFromHash();
+      refreshResidues({ keepSelectionId: sharedResidue?.id ?? specimens[selectedIndex]?.id ?? null, announce: Boolean(sharedResidue) });
+    });
     window.addEventListener('keydown', (event) => {
       if (event.key === ' ') {
         event.preventDefault();
@@ -809,6 +1413,17 @@
       } else if (event.key.toLowerCase() === 'r') {
         selectSpecimen(selectedIndex, true);
         statusEl.textContent = `Recalled ${specimens[selectedIndex].name}.`;
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        stepSpecimen(1);
+      } else if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        stepSpecimen(-1);
+      } else if (event.key === '?' || (event.key === '/' && event.shiftKey)) {
+        event.preventDefault();
+        toggleHelp();
+      } else if (event.key.toLowerCase() === 'q') {
+        toggleQuiet();
       }
     });
 
@@ -816,10 +1431,17 @@
     quietBtn.addEventListener('click', toggleQuiet);
     clearBtn.addEventListener('click', clearSelection);
     copyBtn.addEventListener('click', copyAtlasCard);
+    copyResidueLinkBtn.addEventListener('click', copyResidueLink);
+    shareResidueBtn.addEventListener('click', shareResidueCard);
     exportBtn.addEventListener('click', exportAtlasCard);
+    helpBtn.addEventListener('click', () => toggleHelp());
 
+    buildSpecimens();
     resize();
     restore();
+    setInterval(() => {
+      updateAtmosphere();
+    }, 60000);
     requestAnimationFrame(draw);
   </script>
 </body>

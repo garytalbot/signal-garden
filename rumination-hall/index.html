@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rumination Hall</title>
+  <style>
+    :root {
+      --bg: #08070d;
+      --deep: #120f1f;
+      --altar: #1f1a2f;
+      --gold: #d1a35a;
+      --ember: #ffddb8;
+      --glow: rgba(255, 211, 145, 0.38);
+      --cold: #8f81ff;
+      --phase1: rgba(120, 75, 36, 0.45);
+      --phase2: rgba(166, 95, 55, 0.55);
+      --phase3: rgba(233, 188, 116, 0.66);
+      --font-ui: "Cormorant Garamond", "Times New Roman", Georgia, serif;
+      --font-glyph: "Palatino Linotype", Palatino, Georgia, serif;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      font-family: var(--font-ui);
+      background:
+        radial-gradient(circle at 30% 20%, rgba(255, 200, 127, 0.09), transparent 35%),
+        radial-gradient(circle at 80% 80%, rgba(120, 95, 230, 0.1), transparent 35%),
+        linear-gradient(180deg, #07050a 0%, var(--bg) 45%, #05050a 100%);
+      color: #e6ddf6;
+      overflow: hidden;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      padding: clamp(0.8rem, 2vw, 2rem);
+    }
+
+    .cathedral {
+      position: relative;
+      width: min(1060px, 100%);
+      height: min(720px, 100%);
+      border-radius: 1rem;
+      border: 1px solid rgba(255, 225, 181, 0.25);
+      background:
+        linear-gradient(to bottom, rgba(23, 15, 36, 0.96), rgba(12, 7, 18, 0.9)),
+        radial-gradient(circle at 50% 0%, rgba(255, 226, 172, 0.08), transparent 42%),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 56px);
+      box-shadow:
+        0 45px 140px rgba(0, 0, 0, 0.6),
+        inset 0 0 70px rgba(255, 220, 180, 0.05);
+      overflow: hidden;
+    }
+
+    .cathedral::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, transparent 28%, rgba(255, 214, 153, 0.07) 29%, transparent 30.5%),
+        linear-gradient(90deg, transparent 59%, rgba(255, 214, 153, 0.07) 60%, transparent 61.5%),
+        linear-gradient(90deg, transparent 15%, rgba(255, 214, 153, 0.06) 16%, transparent 17%),
+        linear-gradient(-80deg, rgba(255, 255, 255, 0.05), transparent 50%);
+      opacity: 0.42;
+      mix-blend-mode: screen;
+      pointer-events: none;
+    }
+
+    .return-link {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      z-index: 4;
+      color: #c6b2f9;
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(198, 178, 249, 0.6);
+      padding-bottom: 0.1rem;
+      letter-spacing: 0.1rem;
+      transition: color 0.5s ease, text-shadow 0.5s ease;
+      z-index: 8;
+      font-size: clamp(0.85rem, 1.6vw, 1rem);
+    }
+
+    .return-link:hover {
+      color: var(--ember);
+      text-shadow: 0 0 12px rgba(255, 208, 130, 0.8);
+    }
+
+    .ambient {
+      position: absolute;
+      inset: -40% -20% auto -20%;
+      height: 70%;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%, var(--glow), transparent 70%);
+      animation: pulse 8s ease-in-out infinite;
+      opacity: 0.55;
+      pointer-events: none;
+    }
+
+    .nave {
+      position: absolute;
+      inset: 12% 11% 10% 11%;
+      border-radius: 0 0 100% 100%;
+      border-top: 2px solid rgba(255, 214, 181, 0.6);
+      border-left: 2px solid rgba(255, 214, 181, 0.35);
+      border-right: 2px solid rgba(255, 214, 181, 0.35);
+      border-bottom: 0;
+      background:
+        linear-gradient(to top, rgba(15, 11, 27, 0.84) 0%, rgba(20, 15, 34, 0.2) 100%),
+        repeating-linear-gradient(to right, transparent 0 28px, rgba(255, 255, 255, 0.02) 28px 36px);
+      box-shadow: inset 0 40px 90px rgba(0, 0, 0, 0.45);
+      overflow: hidden;
+    }
+
+    .nave::before,
+    .nave::after {
+      content: "";
+      position: absolute;
+      inset: -20% 0 auto 0;
+      height: 80%;
+      border: 2px solid rgba(255, 212, 170, 0.3);
+      border-bottom: 0;
+      border-radius: 65% 65% 0 0;
+      opacity: 0.55;
+      filter: blur(0.6px);
+    }
+
+    .nave::before {
+      top: -45%;
+      left: 10%;
+      width: 80%;
+      transform: scaleX(0.97);
+      opacity: 0.35;
+    }
+
+    .nave::after {
+      top: -20%;
+      left: -4%;
+      width: 108%;
+      transform: scaleX(1.01);
+    }
+
+    .pillar {
+      --i: 0;
+      position: absolute;
+      width: clamp(0.9rem, 1.5vw, 1.1rem);
+      bottom: 0;
+      top: 20%;
+      left: calc((100% - 18%) / 7 * var(--i) + 9%);
+      transform: translateX(-50%);
+      border-radius: 0.5rem 0.5rem 0 0;
+      background:
+        linear-gradient(to bottom, rgba(255, 226, 180, 0.22), rgba(20, 14, 35, 0.6)),
+        repeating-linear-gradient(0deg, rgba(255, 220, 180, 0.02) 0 5px, transparent 5px 14px);
+      border: 1px solid rgba(247, 224, 184, 0.28);
+      box-shadow:
+        inset 0 0 8px rgba(255, 220, 180, 0.35),
+        0 0 18px rgba(0, 0, 0, 0.6);
+      transition: background 0.6s ease, box-shadow 0.6s ease;
+    }
+
+    .glyph-wrap {
+      position: absolute;
+      z-index: 4;
+      top: 17%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(80%, 900px);
+      text-align: center;
+      pointer-events: auto;
+      filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.75));
+    }
+
+    .glyph-line {
+      margin: 0;
+      line-height: 1.08;
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0.08em;
+      white-space: pre;
+      user-select: none;
+      color: rgba(236, 222, 255, 0.9);
+      font-family: var(--font-glyph);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      text-shadow: 0 0 12px rgba(255, 216, 157, 0.28);
+      font-size: clamp(1rem, 2.8vw, 2.3rem);
+    }
+
+    .glyph {
+      display: inline-block;
+      transition: transform 0.35s ease, color 0.35s ease, text-shadow 0.35s ease;
+      cursor: default;
+    }
+
+    .glyph:hover {
+      transform: scale(1.15) translateY(-0.05em) rotate(-3deg);
+      color: var(--gold);
+      text-shadow: 0 0 20px rgba(255, 214, 145, 0.85);
+    }
+
+    .glyph.awry {
+      color: #ffffff;
+      transform: scale(1.22) rotate(-7deg);
+      text-shadow: 0 0 26px rgba(255, 255, 255, 0.85);
+    }
+
+    .controls {
+      position: absolute;
+      right: 2.5%;
+      top: 52%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      z-index: 6;
+    }
+
+    .ritual {
+      border: 1px solid rgba(255, 208, 130, 0.52);
+      background:
+        linear-gradient(to right, rgba(34, 24, 39, 0.7), rgba(18, 12, 28, 0.95));
+      color: #f7e7c5;
+      padding: 0.56rem 0.9rem;
+      width: clamp(12rem, 18vw, 14rem);
+      border-radius: 0.7rem;
+      cursor: pointer;
+      text-align: left;
+      letter-spacing: 0.08em;
+      font-family: var(--font-ui);
+      font-size: 0.88rem;
+      text-transform: uppercase;
+      position: relative;
+      overflow: hidden;
+      transition: background 0.5s ease, color 0.35s ease, border 0.35s ease;
+      outline: none;
+    }
+
+    .ritual::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      transform: translateX(-100%);
+      background: linear-gradient(120deg, transparent, rgba(255, 212, 130, 0.22), transparent);
+      transition: transform 0.6s ease;
+      pointer-events: none;
+    }
+
+    .ritual:hover::before {
+      transform: translateX(100%);
+    }
+
+    .ritual:hover {
+      border-color: rgba(255, 238, 193, 0.8);
+      color: var(--ember);
+    }
+
+    .ritual.spent {
+      background:
+        linear-gradient(to right, rgba(45, 32, 65, 0.9), rgba(16, 10, 24, 0.98));
+      opacity: 0.6;
+      cursor: default;
+      border-color: rgba(255, 200, 150, 0.22);
+      color: #9f8fba;
+      text-decoration: line-through;
+    }
+
+    .ritual:focus-visible {
+      box-shadow: 0 0 0 2px rgba(255, 214, 130, 0.45);
+    }
+
+    .cathedral[data-phase="1"] {
+      --phase1: rgba(125, 68, 26, 0.52);
+    }
+
+    .cathedral[data-phase="2"] {
+      --phase1: rgba(173, 88, 36, 0.58);
+      --phase2: rgba(209, 132, 62, 0.58);
+    }
+
+    .cathedral[data-phase="3"] {
+      --phase1: rgba(207, 141, 54, 0.6);
+      --phase2: rgba(255, 188, 92, 0.64);
+      --phase3: rgba(255, 231, 190, 0.78);
+    }
+
+    .altar {
+      position: absolute;
+      left: 50%;
+      bottom: 10%;
+      width: clamp(10rem, 24vw, 16rem);
+      height: clamp(2.4rem, 5vw, 4rem);
+      transform: translateX(-50%);
+      border-radius: 0.6rem 0.6rem 0.2rem 0.2rem;
+      background:
+        radial-gradient(ellipse at center top, var(--phase3), transparent 70%),
+        linear-gradient(to top, rgba(12, 8, 15, 0.9), rgba(45, 35, 60, 0.98));
+      border: 1px solid rgba(255, 210, 145, 0.36);
+      box-shadow: 0 -2px 22px rgba(255, 200, 140, 0.25);
+      z-index: 3;
+      transition: box-shadow 1.4s ease, border-color 1.2s ease;
+    }
+
+    .altar::before {
+      content: "";
+      position: absolute;
+      inset: 35% -8%;
+      border-radius: 0.3rem;
+      background: linear-gradient(to right, transparent, rgba(255, 220, 170, 0.3), transparent);
+      filter: blur(0.5px);
+    }
+
+    .incantation {
+      position: absolute;
+      left: 2rem;
+      bottom: 2rem;
+      width: calc(100% - 6rem);
+      z-index: 5;
+      color: #efd3b4;
+      letter-spacing: 0.12em;
+      font-size: clamp(0.75rem, 1.4vw, 0.95rem);
+      opacity: 0.82;
+      min-height: 1.5em;
+      text-transform: uppercase;
+      transition: color 1s ease;
+    }
+
+    #dust {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .mote {
+      position: absolute;
+      width: var(--w);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--phase1), transparent 70%);
+      animation: drift var(--t) linear infinite;
+      animation-delay: var(--d);
+      filter: blur(var(--b));
+    }
+
+    .cathedral[data-phase="1"] .mote {
+      background: radial-gradient(circle, var(--phase1), transparent 72%);
+    }
+
+    .cathedral[data-phase="2"] .mote {
+      background: radial-gradient(circle, var(--phase2), transparent 72%);
+    }
+
+    .cathedral[data-phase="3"] .mote {
+      background: radial-gradient(circle, var(--phase3), transparent 72%);
+    }
+
+    .hush {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 18%;
+      height: 10%;
+      z-index: 2;
+      background:
+        linear-gradient(to right,
+          transparent,
+          rgba(255, 222, 162, 0.05) 22%,
+          rgba(255, 222, 162, 0.1) 48%,
+          rgba(255, 222, 162, 0.05) 76%,
+          transparent);
+      animation: shimmer 12s ease-in-out infinite;
+      filter: blur(1px);
+    }
+
+    .cathedral[data-phase="3"] .hush {
+      opacity: 1;
+      background-size: 140% 100%;
+    }
+
+    @keyframes drift {
+      0% {
+        transform: translateY(0) translateX(0);
+        opacity: 0;
+      }
+      10% {
+        opacity: 0.45;
+      }
+      100% {
+        transform: translateY(-118vh) translateX(30px);
+        opacity: 0;
+      }
+    }
+
+    @keyframes pulse {
+      0%,100% {
+        transform: scale(1);
+        opacity: 0.32;
+      }
+      50% {
+        transform: scale(1.07);
+        opacity: 0.62;
+      }
+    }
+
+    @keyframes shimmer {
+      0%, 100% {
+        opacity: 0.26;
+      }
+      50% {
+        opacity: 0.6;
+      }
+    }
+
+    @media (max-width: 800px) {
+      .controls {
+        top: auto;
+        right: auto;
+        bottom: 8%;
+        left: 50%;
+        transform: translateX(-50%);
+        flex-direction: row;
+      }
+
+      .ritual {
+        width: min(9rem, 48vw);
+      }
+
+      .incantation {
+        left: 1rem;
+        width: calc(100% - 2rem);
+        font-size: 0.72rem;
+      }
+
+      .glyph-line {
+        font-size: clamp(0.95rem, 6vw, 1.45rem);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .cathedral {
+        border-radius: 0.6rem;
+      }
+
+      .pillar {
+        width: 0.65rem;
+      }
+
+      .glyph-wrap {
+        top: 22%;
+      }
+
+      .nave {
+        inset: 18% 8% 12% 8%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <section class="cathedral" id="cathedral" data-phase="0" aria-label="Ritual cathedral interface">
+    <a class="return-link" href="../">← return</a>
+    <div class="ambient"></div>
+    <div class="hush"></div>
+    <div class="nave" aria-hidden="true"></div>
+
+    <div class="pillar" style="--i:0"></div>
+    <div class="pillar" style="--i:1"></div>
+    <div class="pillar" style="--i:2"></div>
+    <div class="pillar" style="--i:3"></div>
+    <div class="pillar" style="--i:4"></div>
+    <div class="pillar" style="--i:5"></div>
+    <div class="pillar" style="--i:6"></div>
+
+    <div class="glyph-wrap">
+      <h1 id="glyphWall" class="glyph-line" aria-live="polite"></h1>
+    </div>
+
+    <div class="controls" role="list">
+      <button class="ritual" data-phase="1">Raise the Ember Sigil</button>
+      <button class="ritual" data-phase="2">Unseal the Choir Gate</button>
+      <button class="ritual" data-phase="3">Summon the Quiet Choir</button>
+    </div>
+
+    <div class="altar" id="altar" aria-hidden="true"></div>
+    <p class="incantation" id="incantation">approach the hall in silence</p>
+
+    <div id="dust" aria-hidden="true"></div>
+  </section>
+
+  <script>
+    const cathedral = document.getElementById('cathedral');
+    const glyphWall = document.getElementById('glyphWall');
+    const phrase = 'RUMINATION HALL';
+    const glyphs = ['ᚠ', '⟐', '☿', '✶', '◈', '∴', '∴', '⩺', '⚚', '✧', '⌘', '⌬', '✩'];
+
+    let incantation = 'approach the hall in silence';
+    const messages = [
+      'The lower lamps breathe.',
+      'The choir vaults wake in amber.',
+      'All bells are still, but the silence turns around you.'
+    ];
+
+    function makeGlyphText(text) {
+      glyphWall.innerHTML = '';
+      for (const ch of text) {
+        const span = document.createElement('span');
+        span.className = 'glyph';
+        span.textContent = ch;
+        span.dataset.origin = ch;
+        glyphWall.appendChild(span);
+      }
+    }
+
+    const randomGlyph = () => glyphs[Math.floor(Math.random() * glyphs.length)];
+
+    function activateGlyphHover() {
+      glyphWall.querySelectorAll('.glyph').forEach(glyph => {
+        glyph.addEventListener('mouseenter', () => {
+          glyph.classList.add('awry');
+          glyph.textContent = randomGlyph();
+        });
+
+        glyph.addEventListener('mouseleave', () => {
+          glyph.classList.remove('awry');
+          glyph.textContent = glyph.dataset.origin;
+        });
+
+        glyph.addEventListener('mousemove', e => {
+          const rect = glyph.getBoundingClientRect();
+          const x = e.clientX - (rect.left + rect.width / 2);
+          const y = e.clientY - (rect.top + rect.height / 2);
+          const damp = 0.08;
+          glyph.style.transform = `scale(1.22) translate(${x * damp}px, ${y * damp}px) rotate(${(x + y) * 0.1}deg)`;
+        });
+
+        glyph.addEventListener('mouseout', () => {
+          glyph.style.transform = '';
+        });
+      });
+    }
+
+    function makeDust() {
+      const dust = document.getElementById('dust');
+      const count = window.innerWidth < 700 ? 18 : 28;
+      dust.innerHTML = '';
+
+      for (let i = 0; i < count; i++) {
+        const mote = document.createElement('span');
+        const width = (Math.random() * 7 + 2).toFixed(2);
+        const t = (Math.random() * 14 + 8).toFixed(2) + 's';
+        const d = (-Math.random() * 16).toFixed(2) + 's';
+        const left = Math.random() * 100;
+        const b = (Math.random() * 1.4).toFixed(2) + 'px';
+        const top = Math.random() * 100;
+
+        mote.className = 'mote';
+        mote.style.setProperty('--w', `${width}px`);
+        mote.style.setProperty('--t', t);
+        mote.style.setProperty('--d', d);
+        mote.style.setProperty('--b', b);
+        mote.style.left = `${left}%`;
+        mote.style.top = `${top}vh`;
+        mote.style.setProperty('animation-delay', d);
+        dust.appendChild(mote);
+      }
+    }
+
+    const controls = document.querySelectorAll('.ritual');
+    const chant = document.getElementById('incantation');
+    const altar = document.getElementById('altar');
+    let phase = 0;
+
+    controls.forEach(button => {
+      button.addEventListener('click', () => {
+        const target = Number(button.dataset.phase);
+
+        if (button.classList.contains('spent')) {
+          return;
+        }
+        if (target !== phase + 1) {
+          return;
+        }
+
+        phase = target;
+        button.classList.add('spent');
+        cathedral.dataset.phase = String(phase);
+        chant.textContent = messages[phase - 1];
+
+        const ambient = 0.35 + phase * 0.2;
+        altar.style.boxShadow = `0 -3px ${22 + phase * 12}px rgba(255, ${220 - phase * 4}, ${140 + phase * 8}, ${ambient})`;
+
+        controls.forEach(btn => {
+          const n = Number(btn.dataset.phase);
+          if (n <= phase) {
+            btn.classList.add('spent');
+          }
+        });
+      });
+    });
+
+    makeGlyphText(phrase);
+    activateGlyphHover();
+    makeDust();
+
+    const resizeObserver = new ResizeObserver(() => {
+      makeDust();
+    });
+
+    resizeObserver.observe(document.body);
+  </script>
+</body>
+</html>

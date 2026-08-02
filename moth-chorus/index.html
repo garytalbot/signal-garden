@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Signal Garden · moth chorus</title>
+  <meta name="description" content="Static computational-art chamber: moth particles form a strange harmonic chorus over a spectral field." />
+  <style>
+    :root {
+      color-scheme: dark;
+      --paper: #0e1220;
+      --ink: #f2f6ff;
+      --muted: #93a3c4;
+      --glow: #87c7ff;
+      --accent: #f37cf8;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font: 14px/1.4 "Book Antiqua", "Garamond", Georgia, serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 22% 12%, #4b2f6a55 0, transparent 42%),
+        radial-gradient(circle at 78% 85%, #2f3f8c66 0, transparent 46%),
+        radial-gradient(circle at 50% 50%, #151a2c 0, #060910 72%);
+    }
+    .stage {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: clamp(10px, 2vw, 22px);
+    }
+    .chamber {
+      position: relative;
+      width: min(1100px, 100vw);
+      height: min(700px, calc(100vh - 20px));
+      background:
+        linear-gradient(170deg, rgba(255, 255, 255, 0.04), transparent 58%),
+        radial-gradient(circle at 50% 50%, rgba(132, 149, 255, 0.12), transparent 65%),
+        #0a0d18;
+      border: 1px solid #ffffff26;
+      border-radius: 30px;
+      overflow: hidden;
+      box-shadow: 0 34px 80px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);
+      isolation: isolate;
+    }
+    .chamber::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        repeating-linear-gradient(transparent 0 22px, #ffffff0a 22px 23px),
+        repeating-linear-gradient(90deg, transparent 0 22px, #ffffff06 22px 23px);
+      mix-blend-mode: screen;
+      opacity: .12;
+    }
+    .hud {
+      position: absolute;
+      left: 16px;
+      top: 14px;
+      width: min(340px, calc(100vw - 32px));
+      z-index: 3;
+      padding: 10px 12px;
+      border-radius: 16px;
+      border: 1px solid #ffffff20;
+      background: linear-gradient(180deg, rgba(12, 15, 30, 0.82), rgba(11, 14, 25, 0.72));
+      box-shadow: 0 14px 34px rgba(0,0,0,.38);
+      backdrop-filter: blur(10px);
+    }
+    .eyebrow {
+      margin: 0 0 6px;
+      font-size: 11px;
+      letter-spacing: 0.26em;
+      text-transform: uppercase;
+      color: #c8c9ff;
+    }
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 500;
+    }
+    p {
+      margin: 6px 0 0;
+      color: var(--muted);
+    }
+    .controls {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    button, .link {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: #111831;
+      color: var(--ink);
+      border-radius: 999px;
+      font: inherit;
+      font-size: 12px;
+      padding: 7px 12px;
+      text-decoration: none;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: transform .12s ease, border-color .12s ease, background .12s ease;
+    }
+    button:hover, .link:hover {
+      background: #19234a;
+      border-color: #91cbff88;
+      transform: translateY(-1px);
+    }
+    button[aria-pressed="true"] {
+      background: #291c45;
+      border-color: #ffb0e3aa;
+    }
+    .status {
+      margin-top: 8px;
+      min-height: 1.4em;
+      color: #d5deff;
+      font-size: 12px;
+      letter-spacing: .02em;
+    }
+    .status strong { color: #fff; }
+    #field {
+      width: 100%;
+      height: 100%;
+    }
+    .moth-body { fill: currentColor; }
+    .moth-eye { fill: #1a1f3e; }
+    .moth-wing {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .ring {
+      fill: none;
+      opacity: .35;
+      stroke-linecap: round;
+    }
+    .thread {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .pulse {
+      fill: none;
+      stroke-linecap: round;
+      mix-blend-mode: screen;
+    }
+    .anchor {
+      opacity: .12;
+      fill: none;
+      stroke-width: 1;
+      stroke: #ffffff;
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <section class="chamber">
+      <aside class="hud">
+        <p class="eyebrow">signal garden micro-piece</p>
+        <h1>moth choir</h1>
+        <p>Odd computational ritual: each click drops a resonance pulse that bends the moth swarm and brightens the chorus mesh.</p>
+        <div class="controls">
+          <button type="button" id="spawn" aria-label="Release extra chorus pulse">spawn pulse</button>
+          <button type="button" id="reroll" aria-label="Re-randomize moth positions">reroll swarm</button>
+          <button type="button" id="hush" aria-pressed="false" aria-label="Mute the chorus glow">hush</button>
+          <a class="link" href="../" aria-label="Return to signal garden">open garden</a>
+        </div>
+        <p class="status" id="status">status: <strong>ready</strong> · click the field to summon a moth-chant.</p>
+      </aside>
+
+      <svg id="field" viewBox="-500 -280 1000 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Moth chorus field">
+        <defs>
+          <filter id="mothGlow" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter id="pulseGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <g id="rings" />
+        <g id="pulses" />
+        <g id="threads" />
+        <g id="moths" />
+      </svg>
+    </section>
+  </main>
+
+  <script>
+    const field = document.getElementById('field');
+    const ringsLayer = document.getElementById('rings');
+    const pulsesLayer = document.getElementById('pulses');
+    const threadsLayer = document.getElementById('threads');
+    const mothLayer = document.getElementById('moths');
+    const status = document.getElementById('status');
+    const hushButton = document.getElementById('hush');
+    const spawnButton = document.getElementById('spawn');
+    const rerollButton = document.getElementById('reroll');
+
+    const ns = 'http://www.w3.org/2000/svg';
+    const TAU = Math.PI * 2;
+    const VIEW_W = 1000;
+    const VIEW_H = 560;
+
+    const state = {
+      hush: false,
+      anchor: null,
+      globalPulse: 0,
+      lastFrame: performance.now(),
+      totalMoths: 26,
+      rings: [],
+      moths: [],
+      threads: [],
+      pulses: []
+    };
+
+    function rand(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+    function randInt(max) {
+      return Math.floor(Math.random() * max);
+    }
+    function toWorld(clientX, clientY) {
+      const b = field.getBoundingClientRect();
+      return {
+        x: ((clientX - b.left) / b.width) * VIEW_W - VIEW_W / 2,
+        y: ((clientY - b.top) / b.height) * VIEW_H - VIEW_H / 2
+      };
+    }
+
+    function wingPath(side, openness) {
+      const spread = 12 + openness * 24;
+      const rise = 9 + openness * 18;
+      const settle = 4 + openness * 7;
+      return `M 0 0 C ${side * (spread * 0.35)} ${-settle} ${side * (spread * 0.75)} ${-rise} ${side * (spread)} 0 S ${side * (spread * 0.75)} ${rise} 0 0`;
+    }
+
+    function buildMoths() {
+      mothLayer.innerHTML = '';
+      state.moths = [];
+      for (let i = 0; i < state.totalMoths; i++) {
+        const hue = rand(200, 320);
+        const group = document.createElementNS(ns, 'g');
+        group.setAttribute('filter', 'url(#mothGlow)');
+        group.style.color = `hsl(${hue}, 78%, 69%)`;
+        const body = document.createElementNS(ns, 'ellipse');
+        body.setAttribute('class', 'moth-body');
+        body.setAttribute('rx', '8');
+        body.setAttribute('ry', '4.5');
+        body.setAttribute('cx', '0');
+        body.setAttribute('cy', '0');
+        const eye = document.createElementNS(ns, 'circle');
+        eye.setAttribute('class', 'moth-eye');
+        eye.setAttribute('r', '0.85');
+        eye.setAttribute('cx', '0');
+        eye.setAttribute('cy', '0');
+        const leftWing = document.createElementNS(ns, 'path');
+        leftWing.setAttribute('class', 'moth-wing');
+        leftWing.setAttribute('stroke', `hsl(${hue}, 95%, 76%)`);
+        const rightWing = document.createElementNS(ns, 'path');
+        rightWing.setAttribute('class', 'moth-wing');
+        rightWing.setAttribute('stroke', `hsl(${hue + 25}, 95%, 68%)`);
+        [body, eye, leftWing, rightWing].forEach((el) => group.appendChild(el));
+        const moth = {
+          group,
+          body,
+          leftWing,
+          rightWing,
+          eye,
+          x: rand(-430, 430),
+          y: rand(-250, 250),
+          vx: rand(-0.45, 0.45),
+          vy: rand(-0.35, 0.35),
+          orbit: rand(48, 250),
+          orbitalSpeed: rand(0.00035, 0.00135) * (Math.random() < .5 ? 1 : -1),
+          phaseA: rand(0, TAU),
+          phaseB: rand(0, TAU),
+          tempo: rand(0.62, 1.92),
+          phase: rand(0, TAU),
+          hue,
+          flare: rand(0.5, 1)
+        };
+        mothLayer.appendChild(group);
+        state.moths.push(moth);
+      }
+    }
+
+    function buildRings() {
+      ringsLayer.innerHTML = '';
+      state.rings = [];
+      const count = 7;
+      for (let i = 0; i < count; i++) {
+        const ring = document.createElementNS(ns, 'circle');
+        ring.setAttribute('class', 'ring');
+        ring.setAttribute('fill', 'none');
+        ring.setAttribute('filter', 'url(#mothGlow)');
+        ring.setAttribute('cx', '0');
+        ring.setAttribute('cy', '0');
+        ring.setAttribute('r', '20');
+        ring.setAttribute('stroke-width', `${i % 2 ? 0.65 : 1}`);
+        ringsLayer.appendChild(ring);
+        state.rings.push({
+          el: ring,
+          base: rand(45, 250),
+          pulse: rand(0.003, 0.009) * (i % 2 ? 1.1 : 0.7),
+          phase: rand(0, TAU),
+          sat: rand(35, 68),
+          hue: rand(200, 345),
+          width: 0.55 + (i / count) * 1.15,
+        });
+      }
+    }
+
+    function buildThreads() {
+      threadsLayer.innerHTML = '';
+      state.threads = [];
+      const links = state.totalMoths * 1.2;
+      for (let i = 0; i < links; i++) {
+        const path = document.createElementNS(ns, 'path');
+        path.setAttribute('class', 'thread');
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke-width', '1');
+        threadsLayer.appendChild(path);
+        state.threads.push({
+          path,
+          a: randInt(state.totalMoths),
+          b: randInt(state.totalMoths),
+          phase: rand(0, TAU),
+          hue: rand(190, 320),
+          weight: rand(0.7, 1.4),
+        });
+      }
+      state.threads.forEach((thread) => {
+        if (thread.a === thread.b) {
+          thread.b = (thread.b + 1) % state.totalMoths;
+        }
+      });
+    }
+
+    function addPulse(x, y, size = 1) {
+      const pulse = document.createElementNS(ns, 'circle');
+      pulse.setAttribute('class', 'pulse');
+      pulse.setAttribute('filter', 'url(#pulseGlow)');
+      pulse.setAttribute('cx', x);
+      pulse.setAttribute('cy', y);
+      pulse.setAttribute('r', '3');
+      const entry = {
+        x,
+        y,
+        r: 0,
+        age: 0,
+        ttl: rand(140, 240),
+        power: size,
+        el: pulse,
+      };
+      pulse.setAttribute('stroke', `hsl(${rand(235, 305)}, 92%, 68%)`);
+      pulse.setAttribute('stroke-width', (1 + size).toFixed(2));
+      pulsesLayer.appendChild(pulse);
+      state.pulses.push(entry);
+      state.globalPulse = 1;
+      updateStatus(`status: pulse cast · <strong>${state.pulses.length}</strong> resonance wave${state.pulses.length > 1 ? 's' : ''}`);
+    }
+
+    function updateStatus(text) {
+      status.innerHTML = text;
+    }
+
+    function updateMoths(time, dt) {
+      for (const moth of state.moths) {
+        const attractorPhase = time * 0.0001 * moth.tempo + moth.phaseA;
+        const anchorX = Math.cos(attractorPhase) * moth.orbit + Math.cos(time * 0.00006 + moth.phaseB) * 30;
+        const anchorY = Math.sin(attractorPhase * 1.1) * moth.orbit + Math.sin(time * 0.00008 + moth.phaseB) * 20;
+        let ax = (anchorX - moth.x) * 0.0018;
+        let ay = (anchorY - moth.y) * 0.0018;
+        moth.phase += 0.0011 * dt;
+
+        if (state.anchor) {
+          const dxA = state.anchor.x - moth.x;
+          const dyA = state.anchor.y - moth.y;
+          const distA = Math.hypot(dxA, dyA) + 0.0001;
+          const sway = (1 - Math.min(distA / 220, 1));
+          ax += (dxA / distA) * 0.012 * sway;
+          ay += (dyA / distA) * 0.012 * sway;
+        }
+
+        for (const pulse of state.pulses) {
+          const dx = pulse.x - moth.x;
+          const dy = pulse.y - moth.y;
+          const dist = Math.hypot(dx, dy) + 0.0001;
+          const pull = Math.exp(-(dist / 185)) * pulse.power * 0.5;
+          ax += (dx / dist) * 0.09 * pull;
+          ay += (dy / dist) * 0.09 * pull;
+        }
+
+        ax += Math.cos(time * 0.0004 + moth.phase) * 0.004 * moth.flare;
+        ay += Math.sin(time * 0.00033 + moth.phase * 1.2) * 0.004 * moth.flare;
+
+        moth.vx = (moth.vx + ax) * 0.965;
+        moth.vy = (moth.vy + ay) * 0.965;
+        moth.x += moth.vx * dt;
+        moth.y += moth.vy * dt;
+
+        if (moth.x < -500 || moth.x > 500) {
+          moth.vx *= -0.85;
+          moth.x = Math.max(-500, Math.min(500, moth.x));
+        }
+        if (moth.y < -280 || moth.y > 280) {
+          moth.vy *= -0.85;
+          moth.y = Math.max(-280, Math.min(280, moth.y));
+        }
+
+        const velocity = Math.hypot(moth.vx, moth.vy) + 0.0001;
+        const dir = Math.atan2(moth.vy, moth.vx);
+        const wingOpen = (Math.sin(time * 0.004 * moth.tempo + moth.phase) + 1.6) * (state.hush ? 0.4 : 1);
+        const sway = state.globalPulse * 9 * (1 - velocity);
+        moth.leftWing.setAttribute('d', wingPath(-1, wingOpen));
+        moth.rightWing.setAttribute('d', wingPath(1, wingOpen));
+        moth.leftWing.setAttribute('stroke-width', (2.2 + 0.6 * wingOpen + state.globalPulse * 1.2).toFixed(2));
+        moth.rightWing.setAttribute('stroke-width', (2.2 + 0.6 * wingOpen + state.globalPulse * 1.2).toFixed(2));
+        moth.leftWing.setAttribute('transform', `rotate(${-(15 + sway)} 0 0)`);
+        moth.rightWing.setAttribute('transform', `rotate(${(15 + sway)} 0 0)`);
+        moth.body.setAttribute('fill', `hsl(${(moth.hue + wingOpen * 5) % 360}, ${state.hush ? '55%' : '75%'}, ${55 + wingOpen}%)`);
+        moth.leftWing.setAttribute('stroke', `hsl(${(moth.hue + 12) % 360}, 92%, ${state.hush ? '36%' : '68%'})`);
+        moth.rightWing.setAttribute('stroke', `hsl(${(moth.hue - 8 + 360) % 360}, 93%, ${state.hush ? '36%' : '68%'})`);
+        moth.eye.setAttribute('fill', `hsl(${moth.hue}, 40%, ${state.hush ? '4%' : '25%'})`);
+        moth.group.setAttribute(
+          'transform',
+          `translate(${moth.x.toFixed(2)},${moth.y.toFixed(2)}) rotate(${(dir * 180 / Math.PI).toFixed(2)}) scale(${(state.hush ? 0.9 : 1)})`
+        );
+      }
+    }
+
+    function updateRings(time) {
+      const hushFactor = state.hush ? 0.22 : 1;
+      for (let index = 0; index < state.rings.length; index++) {
+        const ring = state.rings[index];
+        const wobble = Math.sin(time * ring.pulse + ring.phase);
+        const r = ring.base + (8 + 16 * hushFactor) + wobble * 8 * hushFactor + state.globalPulse * 26;
+        ring.el.setAttribute('r', r.toFixed(2));
+        ring.el.setAttribute('stroke-width', ring.width.toFixed(2));
+        ring.el.setAttribute('stroke', `hsl(${(ring.hue + Math.sin(time * 0.0003 + ring.phase) * 40) % 360}, ${ring.sat}%, ${60 + (r / 8) % 20}%)`);
+        ring.el.setAttribute('stroke-opacity', state.hush ? '0.08' : '0.3');
+      }
+    }
+
+    function updateThreads(time) {
+      for (const thread of state.threads) {
+        const a = state.moths[thread.a];
+        const b = state.moths[thread.b];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const dist = Math.hypot(dx, dy) + 0.001;
+        const tone = (Math.sin(time * 0.001 + thread.phase + dist * 0.012) + 1) / 2;
+        const visibility = Math.max(0.03, 0.55 - dist / 540) * tone;
+        const cx = (a.x + b.x) / 2 + Math.cos(time * 0.0015 + thread.phase) * dist * 0.16;
+        const cy = (a.y + b.y) / 2 + Math.sin(time * 0.0012 - thread.phase) * dist * 0.16;
+        const alpha = (visibility * thread.weight * (state.hush ? 0.32 : 1)).toFixed(3);
+        thread.path.setAttribute('d', `M ${a.x.toFixed(2)} ${a.y.toFixed(2)} Q ${cx.toFixed(2)} ${cy.toFixed(2)} ${b.x.toFixed(2)} ${b.y.toFixed(2)}`);
+        thread.path.setAttribute('stroke', `hsla(${(thread.hue + time * 0.03 + dist * 0.04) % 360}, 85%, 62%, ${alpha})`);
+        thread.path.setAttribute('stroke-width', (1.1 + tone * 0.8).toFixed(2));
+      }
+    }
+
+    function updatePulses() {
+      if (!state.pulses.length) return;
+      const survivors = [];
+      for (const pulse of state.pulses) {
+        pulse.age += 1;
+        const life = pulse.age / pulse.ttl;
+        pulse.r = Math.min(420, life * 380);
+        const alpha = Math.max(0, 1 - life);
+        pulse.el.setAttribute('r', pulse.r.toFixed(2));
+        pulse.el.setAttribute('stroke-width', (2.6 * (1 - life * 0.6)).toFixed(3));
+        pulse.el.setAttribute('stroke-opacity', (alpha * 0.55 * (state.hush ? 0.5 : 1)).toFixed(3));
+        if (life < 1) survivors.push(pulse);
+        if (life >= 1) pulse.el.remove();
+      }
+      state.pulses = survivors;
+      if (!state.pulses.length && state.globalPulse > 0.7) {
+        updateStatus('status: <strong>chorus settles</strong> · hover and click for another summons');
+      }
+      state.globalPulse *= 0.985;
+      if (state.globalPulse < 0.02) state.globalPulse = 0;
+    }
+
+    function step(frameNow) {
+      const dt = Math.min((frameNow - state.lastFrame) / 16.666, 4);
+      state.lastFrame = frameNow;
+      const time = frameNow * 1;
+      updateRings(time);
+      updateMoths(time, dt);
+      updateThreads(time);
+      updatePulses();
+      requestAnimationFrame(step);
+    }
+
+    function resetSwarm() {
+      buildMoths();
+      buildThreads();
+      if (!state.hush) {
+        state.pulses.forEach((pulse) => pulse.el.remove());
+      }
+      state.pulses = [];
+      state.globalPulse = 0.55;
+      updateStatus('status: <strong>swarm remixed</strong> · click and drag the silence');
+    }
+
+    field.addEventListener('pointermove', (event) => {
+      const point = toWorld(event.clientX, event.clientY);
+      state.anchor = point;
+      if (Math.random() < 0.16 && !state.hush) {
+        addPulse(point.x, point.y, 0.28);
+      }
+    });
+    field.addEventListener('pointerleave', () => {
+      state.anchor = null;
+    });
+    field.addEventListener('pointerdown', (event) => {
+      const point = toWorld(event.clientX, event.clientY);
+      addPulse(point.x, point.y, 1);
+    });
+
+    spawnButton.addEventListener('click', () => {
+      addPulse((Math.random() - 0.5) * 300, (Math.random() - 0.5) * 220, 1);
+      addPulse((Math.random() - 0.5) * 300, (Math.random() - 0.5) * 220, 0.7);
+    });
+    rerollButton.addEventListener('click', resetSwarm);
+    hushButton.addEventListener('click', () => {
+      state.hush = !state.hush;
+      hushButton.setAttribute('aria-pressed', String(state.hush));
+      hushButton.textContent = state.hush ? 'resume' : 'hush';
+      updateStatus(`status: <strong>${state.hush ? 'muted' : 'alive'}</strong> · ${state.hush ? 'holding breath' : 'chorus resumed'}`);
+    });
+
+    buildMoths();
+    buildRings();
+    buildThreads();
+    addPulse(0, 0, 0.75);
+    updateStatus('status: <strong>live</strong> · click the field, or just watch the swarm compose itself');
+    requestAnimationFrame(step);
+  </script>
+</body>
+</html>

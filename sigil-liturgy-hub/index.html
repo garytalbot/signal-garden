@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sigil-Liturgy Hub</title>
+  <style>
+    :root {
+      --bg-1: #06060d;
+      --bg-2: #10071f;
+      --bg-3: #240b38;
+      --ink: #e8ddff;
+      --muted: #b5a4d3;
+      --aura: #9d7dff;
+      --ember: #f6c56c;
+      --glow: #83ffe1;
+      --card: rgba(16, 10, 31, 0.66);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: "Trebuchet MS", "Trebuchet", "Cormorant Garamond", Georgia, serif;
+      color: var(--ink);
+      overflow-x: hidden;
+      background: radial-gradient(circle at 20% 10%, #15102f 0%, transparent 45%),
+                  radial-gradient(circle at 80% 20%, #0b1b32 0%, transparent 40%),
+                  linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: -20vmax;
+      pointer-events: none;
+      background: radial-gradient(circle at center, rgba(157, 125, 255, 0.14), transparent 45%);
+      animation: drift 24s linear infinite;
+      opacity: 0.8;
+      z-index: -2;
+      mix-blend-mode: screen;
+    }
+
+    body::after {
+      background: radial-gradient(circle at center, rgba(131, 255, 225, 0.09), transparent 50%);
+      animation-duration: 30s;
+      animation-direction: reverse;
+      animation-delay: -12s;
+    }
+
+    @keyframes drift {
+      0% { transform: translate(-8vmax, -6vmax) rotate(0deg) scale(0.9); }
+      50% { transform: translate(4vmax, 2vmax) rotate(180deg) scale(1.05); }
+      100% { transform: translate(-8vmax, -6vmax) rotate(360deg) scale(0.9); }
+    }
+
+    .veil {
+      min-height: 100vh;
+      position: relative;
+      padding: clamp(1.2rem, 3vw, 2.5rem);
+      display: grid;
+      align-content: center;
+      gap: 1.2rem;
+      max-width: 72rem;
+      margin: 0 auto;
+    }
+
+    .crumb {
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 8;
+    }
+
+    .crumb a {
+      color: #f2e8ff;
+      text-decoration: none;
+      font-size: 0.82rem;
+      letter-spacing: 0.08em;
+      border: 1px solid rgba(242, 232, 255, 0.22);
+      padding: 0.55rem 0.85rem;
+      border-radius: 999px;
+      background: rgba(18, 12, 32, 0.5);
+      backdrop-filter: blur(2px);
+      transition: transform 220ms ease, border-color 250ms ease, box-shadow 250ms ease;
+    }
+
+    .crumb a:hover {
+      border-color: var(--glow);
+      box-shadow: 0 0 24px rgba(131, 255, 225, 0.28);
+      transform: translateY(-1px);
+    }
+
+    .glyph-portal {
+      padding: clamp(1.25rem, 2.5vw, 2rem);
+      border-radius: 1.2rem;
+      border: 1px solid rgba(157, 125, 255, 0.32);
+      background: linear-gradient(145deg, rgba(18, 12, 34, 0.84), rgba(7, 10, 28, 0.7));
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04),
+                  0 0 32px rgba(157, 125, 255, 0.2);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .glyph-portal::after {
+      content: "";
+      position: absolute;
+      inset: -10px;
+      background: conic-gradient(from 0deg at 50% 50%, transparent, rgba(157,125,255,.32), transparent);
+      z-index: -1;
+      opacity: 0.4;
+      animation: spin 26s linear infinite;
+      filter: blur(0.8px);
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    h1 {
+      margin: 0 0 0.4rem;
+      font-size: clamp(2rem, 5vw, 3.6rem);
+      line-height: 1.03;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      max-width: 62ch;
+      font-size: clamp(1rem, 2.1vw, 1.15rem);
+      line-height: 1.5;
+    }
+
+    .sigil-grid {
+      margin-top: 1.5rem;
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
+    .sigil-card {
+      position: relative;
+      padding: 1rem;
+      border-radius: 0.95rem;
+      border: 1px solid rgba(245, 232, 255, 0.22);
+      text-decoration: none;
+      color: inherit;
+      background: var(--card);
+      backdrop-filter: blur(3px);
+      overflow: hidden;
+      min-height: 180px;
+      display: grid;
+      align-content: start;
+      gap: 0.5rem;
+      transition: transform 240ms ease, border-color 240ms ease, background 240ms ease, box-shadow 240ms ease;
+      animation: float 5.8s ease-in-out infinite;
+    }
+
+    .sigil-card:nth-child(2) { animation-delay: .6s; }
+    .sigil-card:nth-child(3) { animation-delay: 1.1s; }
+    .sigil-card:nth-child(4) { animation-delay: 1.6s; }
+    .sigil-card:nth-child(5) { animation-delay: 2.1s; }
+
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .sigil-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(120deg, transparent, rgba(157, 125, 255, 0.15), transparent);
+      transform: translateX(-120%);
+      transition: transform 300ms ease;
+    }
+
+    .sigil-card:hover {
+      transform: translateY(-5px) scale(1.02);
+      border-color: rgba(131, 255, 225, 0.55);
+      box-shadow: 0 14px 36px rgba(0,0,0,0.35),
+                  0 0 18px rgba(131, 255, 225, 0.2);
+      background: linear-gradient(140deg, rgba(18, 12, 34, 0.9), rgba(19, 16, 39, 0.74));
+    }
+
+    .sigil-card:hover::before { transform: translateX(120%); }
+
+    .sigil-card h2 {
+      margin: 0;
+      font-size: 1.17rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      z-index: 2;
+    }
+
+    .sigil-card p { margin: 0; color: #d8ccf1; z-index: 2; }
+
+    .sigil-card .meta {
+      margin-top: auto;
+      font-size: 0.82rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.11em;
+      z-index: 2;
+    }
+
+    .sigil-card .pulse {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      right: 0.85rem;
+      top: 0.9rem;
+      border-radius: 999px;
+      background: var(--ember);
+      box-shadow: 0 0 0 0 rgba(246,197,108,0.55);
+      animation: ping 2.2s infinite;
+    }
+
+    @keyframes ping {
+      0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(246,197,108,0.55); }
+      70%,100% { transform: scale(1.2); box-shadow: 0 0 0 15px rgba(246,197,108,0); }
+    }
+
+    .sigil-footer {
+      margin-top: 1.2rem;
+      color: var(--muted);
+      font-size: 0.93rem;
+      line-height: 1.5;
+      max-width: 65ch;
+    }
+
+    .sigil-footer b {
+      color: #fff;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .motes {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: -1;
+      opacity: 0.35;
+    }
+
+    .mote {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: white;
+      filter: blur(0.2px);
+      opacity: 0;
+      animation: mote 14s linear infinite;
+    }
+
+    .mote:nth-child(1) { left: 15%; top: 120%; animation-delay: 0s; background: var(--glow); }
+    .mote:nth-child(2) { left: 40%; top: 130%; animation-delay: 3s; background: var(--aura); }
+    .mote:nth-child(3) { left: 65%; top: 120%; animation-delay: 5.4s; background: var(--ember); }
+    .mote:nth-child(4) { left: 80%; top: 122%; animation-delay: 8.6s; background: #f8f7ff; }
+    .mote:nth-child(5) { left: 22%; top: 110%; animation-delay: 10.2s; background: var(--aura); }
+
+    @keyframes mote {
+      0% { transform: translateY(0) translateX(0) scale(0.6); opacity: 0; }
+      8% { opacity: 0.5; }
+      30% { opacity: 1; }
+      100% { transform: translateY(-130vh) translateX(28px) scale(1.2); opacity: 0; }
+    }
+
+    @media (max-width: 600px) {
+      .sigil-grid { grid-template-columns: 1fr; }
+      .veil { padding: 0.9rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="crumb" aria-label="Navigation crumb">
+    <a href="../">⇠ Return to the plain</a>
+  </nav>
+
+  <div class="motes" aria-hidden="true">
+    <span class="mote"></span><span class="mote"></span><span class="mote"></span><span class="mote"></span><span class="mote"></span>
+  </div>
+
+  <main class="veil">
+    <section class="glyph-portal" aria-labelledby="hub-title">
+      <h1 id="hub-title">Sigil-Liturgy Hub</h1>
+      <p class="subtitle">
+        Welcome, vessel. You are not loading a site so much as stepping through layers of residue.
+        This is the ritual router for the five chambers: <strong>residue</strong>, <strong>glyph</strong>, <strong>moth</strong>, <strong>chorus</strong>, and <strong>sigil-weather</strong>.
+        Choose one, follow the pulse, and let your next state remember you.
+      </p>
+
+      <div class="sigil-grid" role="list">
+        <a class="sigil-card" href="../residue/" role="listitem">
+          <span class="pulse" aria-hidden="true"></span>
+          <h2>Residue</h2>
+          <p>
+            The archive of old intentions. Scrape the ash of abandoned plans and find
+            unburned patterns waiting for ignition.
+          </p>
+          <div class="meta">Path: /residue/</div>
+        </a>
+
+        <a class="sigil-card" href="../glyph/" role="listitem">
+          <span class="pulse" aria-hidden="true"></span>
+          <h2>Glyph</h2>
+          <p>
+            Decode drifting marks into routes. Every symbol here is a shortcut,
+            every shortcut a weather vane for the impossible.
+          </p>
+          <div class="meta">Path: /glyph/</div>
+        </a>
+
+        <a class="sigil-card" href="../moth/" role="listitem">
+          <span class="pulse" aria-hidden="true"></span>
+          <h2>Moth</h2>
+          <p>
+            Follow the swarm. The moths map blind devotion into practical logistics,
+            turning wandering into disciplined signal.
+          </p>
+          <div class="meta">Path: /moth/</div>
+        </a>
+
+        <a class="sigil-card" href="../chorus/" role="listitem">
+          <span class="pulse" aria-hidden="true"></span>
+          <h2>Chorus</h2>
+          <p>
+            Collective tone, fragmented but deliberate. Speak into the chamber and hear
+            where your frequency lands.
+          </p>
+          <div class="meta">Path: /chorus/</div>
+        </a>
+
+        <a class="sigil-card" href="../sigil-weather/" role="listitem">
+          <span class="pulse" aria-hidden="true"></span>
+          <h2>Sigil-Weather</h2>
+          <p>
+            Forecasts of phase and drift. Track pressure, omen, and atmospheric oddity
+            before crossing thresholds.
+          </p>
+          <div class="meta">Path: /sigil-weather/</div>
+        </a>
+      </div>
+
+      <p class="sigil-footer">
+        <b>Ritual protocol:</b> pick an entry, hover once, and do not leave quickly.
+        The links will respond to hesitation; the page remembers your hesitation as a
+        kind of consent.
+      </p>
+    </section>
+  </main>
+</body>
+</html>

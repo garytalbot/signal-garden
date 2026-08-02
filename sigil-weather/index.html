@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sigil Weather — Ritual Chart</title>
+  <style>
+    :root {
+      --bg: #060812;
+      --ink: #e9eeff;
+      --muted: #9db1d6;
+      --glow: #86f8e0;
+      --line: #f4be63;
+      --line2: #98c5ff;
+      --line3: #bf89ff;
+      --panel: rgba(12, 19, 33, 0.86);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    body {
+      color: var(--ink);
+      font-family: "Trebuchet MS", "Segoe UI", Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at 12% 6%, rgba(134, 248, 224, 0.2), transparent 34%),
+        radial-gradient(circle at 90% 14%, rgba(130, 188, 255, 0.18), transparent 30%),
+        linear-gradient(165deg, #040712 0%, #09152a 30%, #060d1e 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.32;
+      background-image: repeating-linear-gradient(0deg, transparent 0 8px, rgba(255, 255, 255, 0.04) 8px 10px);
+      mix-blend-mode: screen;
+    }
+
+    .back {
+      position: absolute;
+      left: 1rem;
+      top: 1rem;
+      z-index: 2;
+      color: var(--line);
+      text-decoration: none;
+      border: 1px solid rgba(244, 190, 99, 0.45);
+      border-radius: 999px;
+      padding: 0.45rem 0.8rem;
+      background: rgba(10, 18, 33, 0.62);
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+
+    .back:hover {
+      border-color: rgba(244, 190, 99, 0.9);
+    }
+
+    .orbis {
+      max-width: 1080px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+      padding: 4.4rem 1rem 1.4rem;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.5rem, 3vw, 2.3rem);
+      letter-spacing: 0.03em;
+    }
+
+    .subtitle {
+      margin-top: 0.45rem;
+      margin-bottom: 1.2rem;
+      color: var(--muted);
+      max-width: 72ch;
+      line-height: 1.5;
+    }
+
+    .chart-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 0.9rem;
+      align-items: stretch;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(137, 162, 215, 0.25);
+      border-radius: 16px;
+      padding: 0.9rem;
+      box-shadow: 0 16px 40px rgba(1, 8, 19, 0.45);
+      backdrop-filter: blur(2px);
+    }
+
+    .chart-shell {
+      min-height: 560px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: stretch;
+    }
+
+    #sigilCanvas {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      background:
+        radial-gradient(circle at 70% 12%, rgba(255, 255, 255, 0.08), transparent 38%),
+        linear-gradient(145deg, rgba(18, 25, 43, 0.96), rgba(8, 12, 24, 0.95));
+    }
+
+    .legend {
+      margin-top: 0.9rem;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      color: #bfd0f8;
+      font-size: 0.86rem;
+      opacity: 0.95;
+    }
+
+    .meta {
+      margin-top: 0.85rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 0.7rem;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.6rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .meta strong {
+      color: var(--ink);
+      font-family: "Courier New", Consolas, Monaco, monospace;
+      letter-spacing: 0.03em;
+    }
+
+    .metric-list {
+      display: grid;
+      gap: 0.55rem;
+      margin-top: 0.4rem;
+    }
+
+    .metric {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.58rem 0.65rem;
+      border-radius: 10px;
+      border: 1px solid rgba(145, 183, 255, 0.22);
+      background: rgba(7, 13, 28, 0.45);
+    }
+
+    .metric .name {
+      color: #bfd1f3;
+      font-weight: 600;
+      font-size: 0.88rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .metric .value {
+      text-align: right;
+      font-family: "Courier New", Monaco, Consolas, monospace;
+      color: var(--line);
+      font-size: 0.95rem;
+    }
+
+    .trend {
+      color: var(--glow);
+      font-size: 0.82rem;
+      white-space: nowrap;
+      text-align: right;
+    }
+
+    .forecast {
+      margin-top: 0.9rem;
+      font-size: 1rem;
+      line-height: 1.5;
+      color: #ffd4a3;
+      border-left: 2px solid rgba(255, 212, 163, 0.5);
+      padding-left: 0.7rem;
+    }
+
+    .controls {
+      margin-top: 0.9rem;
+      display: flex;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 0.56rem 0.88rem;
+      color: #061024;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      background: linear-gradient(120deg, var(--glow), var(--line2));
+      cursor: pointer;
+    }
+
+    button.alt {
+      background: linear-gradient(120deg, #a07cff, #5ab9ff);
+      color: #08111f;
+    }
+
+    label {
+      color: #c2d2f7;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.9rem;
+    }
+
+    input[type="range"] {
+      accent-color: #7bf4d8;
+      width: 130px;
+    }
+
+    .footer-note {
+      margin-top: 0.85rem;
+      color: #9eb6de;
+      font-size: 0.86rem;
+    }
+
+    @media (max-width: 860px) {
+      .chart-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .chart-shell {
+        min-height: auto;
+      }
+
+      .meta {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="back" href="../">← Return</a>
+  <main class="orbis">
+    <h1>Sigil Weather Ritual</h1>
+    <p class="subtitle">
+      UTC time is drawn into an orbital noise field. Each second, the chart rewrites as an encoded weather-oracle sigil.
+      No frameworks, one canvas, one chant loop.
+    </p>
+
+    <section class="chart-layout">
+      <section class="panel chart-shell">
+        <canvas id="sigilCanvas" aria-label="Animated ritual weather chart"></canvas>
+
+        <div class="legend">
+          <span>mode: <strong id="modeLabel">breathing</strong></span>
+          <span>seed: <strong id="seedLabel">--</strong></span>
+          <span>storm factor: <strong id="factorLabel">1.0</strong>x</span>
+        </div>
+
+        <div class="meta">
+          <div>UTC now: <strong id="utcNow">--</strong></div>
+          <div>Orbit phase: <strong id="phaseLabel">--</strong></div>
+          <div>Weather-like mean: <strong id="meanValue">--</strong></div>
+          <div>Glyph alignment: <strong id="glyphAlign">--</strong></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="forecast" id="forecastText">Loading ritual readout.</div>
+
+        <div class="metric-list" id="metricList"></div>
+
+        <div class="controls">
+          <button id="pulseBtn" type="button">Pulse Alignment</button>
+          <button id="modeBtn" class="alt" type="button">Lock / Unlock Orbit</button>
+          <label>
+            Noise pulse
+            <input id="stormFactor" type="range" min="0.4" max="2.2" step="0.1" value="1.0" />
+          </label>
+        </div>
+
+        <p class="footer-note">
+          Glyph bars use UTC minutes/hours, noise texture, and a deterministic drift function to mimic weather-like shifts.
+        </p>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const glyphs = [
+      { id: 'Vapor Pressure', marker: 'V' },
+      { id: 'Cinder Humidity', marker: 'C' },
+      { id: 'Static Winds', marker: 'S' },
+      { id: 'Nightfall Drift', marker: 'N' },
+      { id: 'Runic Clouding', marker: 'R' },
+      { id: 'Oracle Charge', marker: 'O' },
+      { id: 'Ashlight Rain', marker: 'A' },
+      { id: 'Thread Voltage', marker: 'T' }
+    ];
+
+    const canvas = document.getElementById('sigilCanvas');
+    const context = canvas.getContext('2d');
+    const utcNow = document.getElementById('utcNow');
+    const phaseLabel = document.getElementById('phaseLabel');
+    const meanValue = document.getElementById('meanValue');
+    const modeLabel = document.getElementById('modeLabel');
+    const seedLabel = document.getElementById('seedLabel');
+    const glyphAlign = document.getElementById('glyphAlign');
+    const forecastText = document.getElementById('forecastText');
+    const metricList = document.getElementById('metricList');
+    const factorLabel = document.getElementById('factorLabel');
+    const factorInput = document.getElementById('stormFactor');
+
+    const pulseBtn = document.getElementById('pulseBtn');
+    const modeBtn = document.getElementById('modeBtn');
+
+    const state = {
+      locked: false,
+      lockedAt: 0,
+      seed: Math.random() * 9999,
+      stormFactor: 1.0,
+      lastSecond: -1,
+      frozenBands: []
+    };
+
+    const previous = new Array(glyphs.length).fill(null);
+
+    function fract(x) {
+      return x - Math.floor(x);
+    }
+
+    function mix(a, b, t) {
+      return a + (b - a) * t;
+    }
+
+    function fade(t) {
+      return t * t * (3 - 2 * t);
+    }
+
+    function baseNoise(x, y, salt) {
+      return fract(Math.sin(x * 127.1 + y * 311.7 + salt * 17.17) * 43758.5453123);
+    }
+
+    function smoothNoise(x, y, salt) {
+      const x0 = Math.floor(x);
+      const y0 = Math.floor(y);
+      const xf = x - x0;
+      const yf = y - y0;
+
+      const a = baseNoise(x0, y0, salt);
+      const b = baseNoise(x0 + 1, y0, salt);
+      const c = baseNoise(x0, y0 + 1, salt);
+      const d = baseNoise(x0 + 1, y0 + 1, salt);
+
+      const u = fade(xf);
+      const v = fade(yf);
+      return mix(mix(a, b, u), mix(c, d, u), v);
+    }
+
+    function fbm(x, y, seed) {
+      let sum = 0;
+      let amp = 0.5;
+      let freq = 1;
+      let norm = 0;
+
+      for (let i = 0; i < 4; i += 1) {
+        const n = smoothNoise(x * freq, y * freq, seed + i * 31);
+        sum += n * amp;
+        norm += amp;
+        amp *= 0.5;
+        freq *= 2;
+      }
+
+      return sum / norm;
+    }
+
+    function formatUtcTime(date) {
+      const z = date.toISOString();
+      return z.slice(0, 10) + ' ' + z.slice(11, 19) + ' UTC';
+    }
+
+    function computeBands(date) {
+      const t = date.getTime() / 1000;
+      const minute = date.getUTCMinutes() + date.getUTCSeconds() / 60;
+      const hour = date.getUTCHours();
+      const day = date.getUTCDate() + date.getUTCHours() / 24;
+      const wave = Math.sin((hour + minute / 60) * (Math.PI * 2) / 24 + state.seed * 0.017);
+
+      return glyphs.map((entry, index) => {
+        const span = index / glyphs.length * Math.PI * 2;
+        const nA = fbm(span * 1.85, t * 0.06 + state.seed * 0.01, state.seed + index * 3.11) - 0.5;
+        const nB = fbm(span * 0.72, day * 0.18 + t * 0.03, 55 + state.seed + index * 1.7) - 0.5;
+        const pulse = fbm(span * 3.6 + 3, t * 0.19 + index, state.seed + 77) - 0.5;
+
+        const raw =
+          54 +
+          nA * 22 +
+          nB * 16 +
+          pulse * 12 +
+          wave * 8 +
+          Math.sin(minute * 0.45 + index * 1.4) * 5;
+
+        const value = Math.max(2, Math.min(98, raw * state.stormFactor + 50));
+        const rounded = Math.round(value);
+        const trend = previous[index] === null
+          ? 'initial'
+          : rounded > previous[index] ? 'rising' : rounded < previous[index] ? 'falling' : 'steady';
+        const glyph = entry.marker.repeat(1);
+
+        return {
+          name: entry.id,
+          glyph,
+          value: rounded,
+          trend
+        };
+      });
+    }
+
+    function drawChart(date, bands) {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(rect.width * dpr);
+      canvas.height = Math.floor(rect.width * dpr);
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      context.clearRect(0, 0, rect.width, rect.height);
+
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+      const base = Math.min(rect.width, rect.height) * 0.44;
+      const orbit = base * 0.68;
+      const t = date.getTime() / 1000;
+
+      context.fillStyle = '#0b1220';
+      context.fillRect(0, 0, rect.width, rect.height);
+
+      for (let ring = 4; ring >= 1; ring -= 1) {
+        const r = base * (0.24 + ring * 0.13);
+        context.beginPath();
+        context.arc(cx, cy, r, 0, Math.PI * 2);
+        context.strokeStyle = `rgba(255, 255, 255, ${0.04 + ring * 0.015})`;
+        context.lineWidth = 1;
+        context.stroke();
+      }
+
+      bands.forEach((band, index) => {
+        const i = index / bands.length;
+        const angle = i * Math.PI * 2 - Math.PI / 2;
+        const width = (Math.PI * 2) / bands.length * 0.72;
+
+        const jitter = (fbm(i * 5, t * 0.7, index + state.seed) - 0.5) * 0.14;
+        const radial = orbit * (0.2 + (band.value / 100) * 0.73);
+        const outer = base * (0.28 + (band.value / 100) * 0.63) + jitter * 14;
+
+        const hue = 205 + index * 16;
+        const sat = 88;
+        const start = angle - width / 2;
+        const end = angle + width / 2;
+
+        context.beginPath();
+        context.arc(cx, cy, outer, start, end, false);
+        context.strokeStyle = `hsla(${hue}, ${sat}%, 64%, 0.88)`;
+        context.lineWidth = Math.max(3.5, 3 + band.value / 23);
+        context.shadowColor = `hsla(${hue}, ${sat}%, 70%, 0.75)`;
+        context.shadowBlur = 8;
+        context.stroke();
+        context.shadowBlur = 0;
+
+        const markerX = cx + Math.cos(end) * (outer + 12);
+        const markerY = cy + Math.sin(end) * (outer + 12);
+        context.fillStyle = '#ecfbff';
+        context.font = 'bold 15px Courier New';
+        context.fillText(band.glyph, markerX - 4, markerY + 3);
+
+        const drift = Math.sin(t * 0.9 + i * 7.2) * 6;
+        const tailOuter = Math.max(outer * 0.78, radial);
+        context.beginPath();
+        context.moveTo(cx + Math.cos(angle) * base * 0.23, cy + Math.sin(angle) * base * 0.23);
+        context.lineTo(cx + Math.cos(angle + 0.3) * (tailOuter + drift), cy + Math.sin(angle + 0.3) * (tailOuter + drift));
+        context.strokeStyle = `hsla(${hue}, 80%, 58%, 0.32)`;
+        context.lineWidth = 2;
+        context.stroke();
+      });
+
+      for (let i = 0; i < 160; i += 1) {
+        const x = (i / 159) * rect.width;
+        const p = (fbm(i * 0.09, t * 0.22, state.seed) - 0.5) * 8;
+        const y = cy + base * 0.92 + p + Math.sin(t * 1.4 + i * 0.21) * 4;
+
+        context.fillStyle = `rgba(200, 232, 255, ${0.2 + (i % 11) / 40})`;
+        context.fillRect(x, y, 1.6, 1.6);
+      }
+
+      context.fillStyle = 'rgba(200, 229, 255, 0.95)';
+      context.beginPath();
+      context.arc(cx, cy, base * 0.05, 0, Math.PI * 2);
+      context.fill();
+
+      context.fillStyle = '#80f5ce';
+      context.font = '12px "Courier New", monospace';
+      context.fillText('UTC ORBIT', 12, rect.height - 12);
+    }
+
+    function renderMetrics(date, bands) {
+      const second = date.getUTCSeconds();
+      if (state.locked && !state.lockedAt) {
+        state.lockedAt = date.getTime();
+      }
+
+      if (second === state.lastSecond) {
+        return;
+      }
+      state.lastSecond = second;
+
+      const total = bands.reduce((sum, b) => sum + b.value, 0);
+      const mean = total / bands.length;
+
+      utcNow.textContent = formatUtcTime(date);
+      phaseLabel.textContent = `${date.getUTCHours().toString().padStart(2, '0')}:${date.getUTCMinutes().toString().padStart(2, '0')}`;
+      meanValue.textContent = `${mean.toFixed(1)} units`;
+      seedLabel.textContent = state.seed.toFixed(0);
+      modeLabel.textContent = state.locked ? 'locked' : 'breathing';
+      factorLabel.textContent = state.stormFactor.toFixed(1);
+
+      const align = bands[0] && bands[1]
+        ? `${bands[0].glyph}${bands[1].glyph}${bands[2].glyph}`
+        : '--';
+      glyphAlign.textContent = align;
+
+      if (mean >= 75) {
+        forecastText.textContent = 'Forecast: active storms. The ritual circle is unstable; expect surges in every glyph band.';
+      } else if (mean >= 60) {
+        forecastText.textContent = 'Forecast: mixed front. Layers overlap; pressure moves in short, erratic bursts.';
+      } else if (mean >= 42) {
+        forecastText.textContent = 'Forecast: watchful drift. Signals stay legible with soft oscillations.';
+      } else {
+        forecastText.textContent = 'Forecast: calm veil. Noise settles into thin static; bar activity remains low.';
+      }
+
+      metricList.innerHTML = bands.map((band) => {
+        const trendMark = band.trend === 'rising' ? '[+]' : band.trend === 'falling' ? '[-]' : '[=]';
+        return `
+          <div class="metric">
+            <span class="name">${band.name}</span>
+            <span class="trend">${trendMark} ${band.trend}</span>
+            <span class="value">${band.value}</span>
+          </div>
+        `;
+      }).join('');
+
+      bands.forEach((band, index) => {
+        previous[index] = band.value;
+      });
+    }
+
+    function sample() {
+      const date = state.locked ? new Date(state.lockedAt) : new Date();
+      const bands = computeBands(date);
+
+      drawChart(date, bands);
+      renderMetrics(date, bands);
+
+      requestAnimationFrame(sample);
+    }
+
+    pulseBtn.addEventListener('click', () => {
+      state.seed = Math.random() * 9999;
+      state.lastSecond = -1;
+    });
+
+    modeBtn.addEventListener('click', () => {
+      state.locked = !state.locked;
+      if (!state.locked) {
+        state.lockedAt = 0;
+      } else {
+        state.lockedAt = Date.now();
+      }
+      state.lastSecond = -1;
+    });
+
+    factorInput.addEventListener('input', (event) => {
+      state.stormFactor = Number(event.target.value);
+      factorLabel.textContent = state.stormFactor.toFixed(1);
+    });
+
+    sample();
+  </script>
+</body>
+</html>

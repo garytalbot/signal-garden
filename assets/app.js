@@ -13,6 +13,8 @@ const afterimageModeEl = document.getElementById('afterimageMode');
 const harmonyModeEl = document.getElementById('harmonyMode');
 const lastNameEl = document.getElementById('lastName');
 const sourceLabelEl = document.getElementById('sourceLabel');
+const shareCardTitleEl = document.getElementById('shareCardTitle');
+const shareCardBodyEl = document.getElementById('shareCardBody');
 const residentNameEl = document.getElementById('residentName');
 const residentMoodEl = document.getElementById('residentMood');
 const gardenCritterEl = document.getElementById('gardenCritter');
@@ -40,6 +42,7 @@ const highlightsGridEl = document.getElementById('highlightsGrid');
 const highlightsStatusEl = document.getElementById('highlightsStatus');
 const copyLinkBtn = document.getElementById('copyLink');
 const sharePostcardBtn = document.getElementById('sharePostcard');
+const copyFieldCardBtn = document.getElementById('copyFieldCard');
 const replayBtn = document.getElementById('replay');
 const exportPngBtn = document.getElementById('exportPng');
 const themeColorMeta = document.querySelector('meta[name="theme-color"]');
@@ -250,6 +253,8 @@ const BROADCAST_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const CRITTER_HALO_STYLE_ID = 'critter-halo-inline-styles';
 const CRITTER_HALO_MIN = 3;
 const CRITTER_HALO_MAX = 6;
+const KEYBOARD_HELP_TEXT = 'Shortcuts: U undo • R replay • D daily signal • W weather • C constellations • M meteor shower • A afterimages • H signal chorus.';
+const KEYBOARD_HELP_TIMEOUT_MS = 4200;
 const GALLERY_HIGHLIGHTS = [
   {
     id: 'midnight-promenade',
@@ -338,6 +343,8 @@ let signalOverlayChorusGroup = null;
 let signalCursorPoint = null;
 let signalChorusFrame = null;
 let signalChorusVisibilityBound = false;
+let keyboardHelpVisible = false;
+let keyboardHelpTimer = null;
 const AFTERIMAGE_GHOST_LIMIT = 24;
 const AFTERIMAGE_CURSOR_LIMIT = 18;
 
@@ -369,6 +376,35 @@ function getAccentColor(index, preset = currentWeatherPreset) {
 function getAccentToken(index) {
   const safeIndex = clamp(index, 0, ACCENT_SLOT_COUNT - 1);
   return `var(--weather-accent-${safeIndex})`;
+}
+
+function getGardenHintText() {
+  return bloomCount === 0
+    ? 'Move your cursor to aim a bloom. Click to plant. Press U to undo. Press A for afterimages. Press ? for shortcuts.'
+    : 'Click to plant. Press U to undo the last bloom. Press C to toggle constellations. Press M to toggle the meteor shower. Press A to toggle afterimages. Press W to switch weather when the field is yours. Press ? for shortcuts.';
+}
+
+function syncHintText() {
+  hintEl.textContent = keyboardHelpVisible ? KEYBOARD_HELP_TEXT : getGardenHintText();
+}
+
+function showKeyboardHelp() {
+  keyboardHelpVisible = true;
+  window.clearTimeout(keyboardHelpTimer);
+  syncHintText();
+  keyboardHelpTimer = window.setTimeout(() => {
+    keyboardHelpVisible = false;
+    keyboardHelpTimer = null;
+    syncHintText();
+  }, KEYBOARD_HELP_TIMEOUT_MS);
+}
+
+function hideKeyboardHelp() {
+  if (!keyboardHelpVisible && keyboardHelpTimer === null) return;
+  keyboardHelpVisible = false;
+  window.clearTimeout(keyboardHelpTimer);
+  keyboardHelpTimer = null;
+  syncHintText();
 }
 
 function ensureSignalChorusStyles() {
@@ -1564,6 +1600,7 @@ function syncControls() {
   replayBtn.disabled = disabled;
   copyLinkBtn.disabled = disabled;
   sharePostcardBtn.disabled = disabled;
+  copyFieldCardBtn.disabled = disabled;
   exportPngBtn.disabled = disabled;
   const visibleHerbariumEntries = getVisibleHerbariumEntries();
   if (copyHerbariumBtn) {
@@ -1576,15 +1613,14 @@ function syncControls() {
   if (disabled) stage.setAttribute('data-empty', 'true');
   else stage.removeAttribute('data-empty');
 
-  hintEl.textContent = disabled
-    ? 'Move your cursor to aim a bloom. Click to plant. Press U to undo. Press A for afterimages.'
-    : 'Click to plant. Press U to undo the last bloom. Press C to toggle constellations. Press M to toggle the meteor shower. Press A to toggle afterimages. Press W to switch weather when the field is yours.';
+  syncHintText();
 
   syncWeaveUi();
   syncMeteorUi();
   syncAfterimageUi();
   syncHarmonyUi();
   syncWeatherUi();
+  syncShareCardUi();
 }
 
 function updatePreview(x, y) {
@@ -2440,27 +2476,27 @@ function buildExportSvg() {
     : 'none yet';
   const exportDateKey = currentBroadcastKey ?? getUtcDateKey();
   const exportDateLabel = escapeXml(formatBroadcastDate(exportDateKey));
+  const exportCaption = escapeXml(getGardenExportCaption());
+  const fieldLabel = escapeXml(getGardenFieldLabel());
+  const modeStackLabel = escapeXml(describeModeStack());
   const gardenTitle = escapeXml(
     fieldSourceMode === 'broadcast' && currentBroadcastKey
-      ? `Daily signal • ${exportDateLabel}`
+      ? `Daily field card • ${exportDateLabel}`
       : fieldSourceMode === 'shared'
-        ? 'Shared garden postcard'
-        : 'Signal Garden postcard'
+        ? 'Shared field card'
+        : 'Signal Garden field card'
   );
-  const gardenSubtitle = escapeXml(
-    fieldSourceMode === 'broadcast' && currentBroadcastKey
-      ? `UTC broadcast ${currentBroadcastKey} • ${bloomHistory.length} blooms • ${afterimageModeLabel}`
-      : `${bloomHistory.length} blooms • weather set to ${currentWeatherPreset.label} • ${afterimageModeLabel}`
-  );
-  const footerCopy = escapeXml(`signal.garden • ${fieldSourceMode === 'broadcast' && currentBroadcastKey ? currentBroadcastKey : 'portable field'} • ${afterimageModeLabel}`);
+  const gardenSubtitle = exportCaption;
+  const footerCopy = escapeXml(`signal.garden • ${fieldLabel} • ${modeStackLabel}`);
   const skyModeBadgeWidth = Math.min(178, Math.max(132, width - 272));
   const skyModeBadgeX = Math.max(16, width - skyModeBadgeWidth - 64);
   const summaryItems = [
     { label: 'WEATHER', value: weatherLabel },
     { label: 'SOURCE', value: sourceLabel },
+    { label: 'FIELD', value: fieldLabel },
     { label: 'LAST BLOOM', value: lastBloomName },
     { label: 'COUNT', value: String(bloomHistory.length) },
-    { label: 'AFTERIMAGE', value: escapeXml(afterimageModeLabel.toUpperCase()) },
+    { label: 'STACK', value: modeStackLabel },
   ];
 
   const links = bloomHistory.slice(1).map((spec, index) => {
@@ -2807,7 +2843,7 @@ async function exportGardenPng() {
 
     exportPngBtn.dataset.state = 'done';
     exportPngBtn.textContent = 'PNG exported';
-    logField('Garden export complete. The field has been pressed into a labeled weather postcard.', afterimageEnabled ? 'afterimages postcard ready' : signalChorusEnabled ? 'chorus postcard ready' : meteorShowerEnabled ? 'meteor postcard ready' : 'png ready');
+    logField(`Garden export complete. ${getGardenExportCaption()}`, afterimageEnabled ? 'afterimages postcard ready' : signalChorusEnabled ? 'chorus postcard ready' : meteorShowerEnabled ? 'meteor postcard ready' : 'png ready');
     window.clearTimeout(exportToastTimer);
     exportToastTimer = window.setTimeout(() => {
       exportPngBtn.dataset.state = 'idle';
@@ -2828,18 +2864,17 @@ async function shareGardenPostcard() {
 
   sharePostcardBtn.disabled = true;
   sharePostcardBtn.dataset.state = 'working';
-  sharePostcardBtn.textContent = 'packing postcard...';
+  sharePostcardBtn.textContent = 'packing field card...';
 
   try {
     const pngBlob = await renderGardenPngBlob();
     const filename = makePostcardFilename();
     const shareUrl = makeShareUrl();
-    const shareText = `Signal Garden • ${currentWeatherPreset.label} • ${bloomHistory.length} blooms • ${describeModeStack()}`;
+    const shareCard = getShareCardCopy();
     const postcardFile = new File([pngBlob], filename, { type: 'image/png' });
     const sharePayload = {
-      title: 'Signal Garden postcard',
-      text: `${shareText}
-${shareUrl}`,
+      title: 'Signal Garden field card',
+      text: shareCard.copyText,
       url: shareUrl,
       files: [postcardFile],
     };
@@ -2847,37 +2882,58 @@ ${shareUrl}`,
     if (navigator.share && (!navigator.canShare || navigator.canShare(sharePayload))) {
       await navigator.share(sharePayload);
       sharePostcardBtn.dataset.state = 'done';
-      sharePostcardBtn.textContent = 'postcard shared';
-      logField('Postcard shared with the full garden attached. Extremely portable weather.', afterimageEnabled ? `postcard shared • ${currentWeatherPreset.label} • afterimages` : signalChorusEnabled ? `postcard shared • ${currentWeatherPreset.label} • chorus` : meteorShowerEnabled ? `postcard shared • ${currentWeatherPreset.label} • meteor` : `postcard shared • ${currentWeatherPreset.label}`);
+      sharePostcardBtn.textContent = 'field card shared';
+      logField(`Field card shared with the full garden attached. ${getGardenExportCaption()}`, afterimageEnabled ? `field card shared • ${currentWeatherPreset.label} • afterimages` : signalChorusEnabled ? `field card shared • ${currentWeatherPreset.label} • chorus` : meteorShowerEnabled ? `field card shared • ${currentWeatherPreset.label} • meteor` : `field card shared • ${currentWeatherPreset.label}`);
     } else {
       downloadBlob(pngBlob, filename);
-      await copyTextToClipboard(shareUrl, 'Copy this Signal Garden postcard link:');
+      await copyTextToClipboard(shareUrl, 'Copy this Signal Garden field card link:');
       sharePostcardBtn.dataset.state = 'done';
       sharePostcardBtn.textContent = 'saved + link copied';
-      logField('Native share skipped the party, so the postcard was downloaded and the matching link copied instead.', afterimageEnabled ? 'postcard saved locally • afterimages' : signalChorusEnabled ? 'postcard saved locally • chorus' : meteorShowerEnabled ? 'postcard saved locally • meteor' : 'postcard saved locally');
+      logField(`Native share skipped the party, so the field card was downloaded and the matching link copied instead. ${getGardenExportCaption()}`, afterimageEnabled ? 'field card saved locally • afterimages' : signalChorusEnabled ? 'field card saved locally • chorus' : meteorShowerEnabled ? 'field card saved locally • meteor' : 'field card saved locally');
     }
 
     window.clearTimeout(sharePostcardBtn.copyStateTimer);
     sharePostcardBtn.copyStateTimer = window.setTimeout(() => {
       sharePostcardBtn.dataset.state = 'idle';
-      sharePostcardBtn.textContent = 'share postcard';
+      sharePostcardBtn.textContent = 'share field card';
       syncControls();
     }, 2400);
   } catch (error) {
     if (error?.name === 'AbortError') {
       sharePostcardBtn.dataset.state = 'idle';
-      sharePostcardBtn.textContent = 'share postcard';
+      sharePostcardBtn.textContent = 'share field card';
       syncControls();
-      logField('Postcard share canceled. The weather remains local for now.', 'share canceled');
+      logField('Field card share canceled. The weather remains local for now.', 'share canceled');
       return;
     }
 
     console.error(error);
     sharePostcardBtn.dataset.state = 'idle';
-    sharePostcardBtn.textContent = 'share postcard';
+    sharePostcardBtn.textContent = 'share field card';
     syncControls();
-    logField('Postcard share hit a weird browser pothole. Export PNG still works.', 'share needs retry');
+    logField('Field card share hit a weird browser pothole. Export PNG still works.', 'share needs retry');
   }
+}
+
+async function copyFieldCard() {
+  if (!bloomHistory.length) return;
+
+  const shareCard = getShareCardCopy();
+  const copied = await copyTextToClipboard(shareCard.copyText, 'Copy this Signal Garden field card:');
+
+  if (copied) {
+    window.clearTimeout(shareToastTimer);
+    copyFieldCardBtn.dataset.state = 'copied';
+    copyFieldCardBtn.textContent = 'field card copied';
+    logField(`Field card copied. ${shareCard.bodyLine} • ${shareCard.metaLine}`, 'field card copied');
+    shareToastTimer = window.setTimeout(() => {
+      copyFieldCardBtn.dataset.state = 'idle';
+      copyFieldCardBtn.textContent = 'copy field card';
+    }, 1800);
+    return;
+  }
+
+  logField('Clipboard got stage fright, so the field card opened the old-fashioned way instead.', 'manual copy required');
 }
 
 async function copyTextToClipboard(text, fallbackLabel = 'Copy your Signal Garden link:') {
@@ -3391,11 +3447,74 @@ function loadGardenFromHash({ replay = false } = {}) {
 }
 
 function describeModeStack() {
-  return [
-    `constellations ${constellationWeaveEnabled ? 'on' : 'off'}`,
-    `meteor shower ${meteorShowerEnabled ? 'on' : 'off'}`,
-    `afterimages ${afterimageEnabled ? 'on' : 'off'}`,
-  ].join(' • ');
+  const modes = [];
+  if (constellationWeaveEnabled) modes.push('constellations');
+  if (meteorShowerEnabled) modes.push('meteor shower');
+  if (afterimageEnabled) modes.push('afterimages');
+  if (signalChorusEnabled) modes.push('signal chorus');
+  return modes.length ? modes.join(' • ') : 'quiet field';
+}
+
+function getGardenFieldLabel() {
+  if (fieldSourceMode === 'broadcast' && currentBroadcastKey) {
+    return `daily signal ${formatBroadcastDate(currentBroadcastKey)}`;
+  }
+
+  if (fieldSourceMode === 'shared') {
+    return 'shared field card';
+  }
+
+  return 'browser-local field';
+}
+
+function getGardenExportCaption() {
+  const count = bloomHistory.length;
+
+  if (!count) {
+    return 'A browser-local field waiting for the first bloom.';
+  }
+
+  const bloomWord = `${count} bloom${count === 1 ? '' : 's'}`;
+  const modeLine = describeModeStack();
+  const sourceLine = fieldSourceMode === 'broadcast' && currentBroadcastKey
+    ? `Shared as the daily signal ${formatBroadcastDate(currentBroadcastKey)}.`
+    : fieldSourceMode === 'shared'
+      ? 'Loaded from a shared permalink.'
+      : 'Held in the browser only.';
+
+  return `A browser-local field of ${bloomWord} in ${currentWeatherPreset.label.toLowerCase()} weather. Modes awake: ${modeLine}. ${sourceLine}`;
+}
+
+function getShareCardCopy() {
+  const count = bloomHistory.length;
+  const countLabel = count ? `${count} bloom${count === 1 ? '' : 's'}` : 'empty field';
+  const titleLine = fieldSourceMode === 'broadcast' && currentBroadcastKey
+    ? `Daily field card • ${formatBroadcastDate(currentBroadcastKey)}`
+    : fieldSourceMode === 'shared'
+      ? 'Shared field card'
+      : 'Signal Garden field card';
+
+  return {
+    titleLine,
+    bodyLine: `weather: ${currentWeatherPreset.label} • blooms: ${countLabel}`,
+    metaLine: `field: ${getGardenFieldLabel()} • stack: ${describeModeStack()}`,
+    copyText: [
+      titleLine,
+      `weather: ${currentWeatherPreset.label}`,
+      `blooms: ${countLabel}`,
+      `field: ${getGardenFieldLabel()}`,
+      `stack: ${describeModeStack()}`,
+      makeShareUrl(),
+    ].join('\n'),
+  };
+}
+
+function syncShareCardUi() {
+  if (!shareCardTitleEl || !shareCardBodyEl) return;
+
+  const { titleLine, bodyLine, metaLine } = getShareCardCopy();
+  shareCardTitleEl.textContent = titleLine;
+  shareCardBodyEl.textContent = `${bodyLine}\n${metaLine}`;
 }
 
 stage.addEventListener('pointermove', (event) => {
@@ -3547,11 +3666,22 @@ copyLinkBtn.addEventListener('click', copyShareLink);
 copyHerbariumBtn?.addEventListener('click', copyHerbarium);
 exportHerbariumBtn?.addEventListener('click', exportHerbariumPostcard);
 sharePostcardBtn.addEventListener('click', shareGardenPostcard);
+copyFieldCardBtn.addEventListener('click', copyFieldCard);
 exportPngBtn.addEventListener('click', exportGardenPng);
 replayBtn.addEventListener('click', () => replayGarden());
 
 document.addEventListener('keydown', (event) => {
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+  if ((event.key === '?' || (event.key === '/' && event.shiftKey)) && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    event.preventDefault();
+    if (keyboardHelpVisible) {
+      hideKeyboardHelp();
+      return;
+    }
+
+    showKeyboardHelp();
+    return;
+  }
   if (event.key.toLowerCase() === 'u' && !event.metaKey && !event.ctrlKey && !event.altKey) {
     event.preventDefault();
     prepareEditableField();

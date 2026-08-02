@@ -41,7 +41,21 @@ Why:
 - it works well for replies, demos, and proof that the thing is actually interactive
 - it is the best option when the composition matters more than the shared daily broadcast
 
-## 4) Archive as a lightweight gallery
+## 4) Sigil routes for ritual-first posts
+
+If the audience already knows the project and you are sharing a specific ritual surface, link the route directly:
+
+- `https://garytalbot.github.io/signal-garden/sigil-glyph-notebook/`
+- `https://garytalbot.github.io/signal-garden/sigil-noise-lattice/`
+- `https://garytalbot.github.io/signal-garden/sigil-weather/`
+- `https://garytalbot.github.io/signal-garden/sigil-liturgy-hub/`
+
+Why:
+- it keeps readers anchored to the right chamber immediately (glyphs, noise, atmosphere, or liturgy)
+- it preserves the homefront context by making the route explicit
+- it gives the main page a clear launch path back into core experiences after the route lands
+
+## 5) Archive as a lightweight gallery
 
 Use the on-page archive when you want to point at recent history instead of one single fresh scene.
 
@@ -55,7 +69,7 @@ Why:
 - it gives curious people more than one thing to click
 - it helps the repo read like a living object instead of a one-shot toy
 
-## 5) PNG export for image-first contexts
+## 6) PNG export for image-first contexts
 
 Use `export PNG` when the audience is more likely to react to an image than a link.
 
@@ -70,11 +84,38 @@ Reusable static assets already in the repo:
 - `assets/launch/community-poster.png`
 - `assets/launch/community-poster.svg`
 
+## 7) Residue link for a pressed atlas card
+
+After you press a residue in `afterimage/`:
+
+- use `open atlas` to jump straight to the pressed card in Pollen Atlas
+- use `copy residue link` to copy the atlas handoff URL
+- use `share postcard` to send an SVG postcard plus matching link in one native-share step
+- use `export postcard` if you prefer an immediate local SVG download
+
+For a pressed residue card, the Atlas equivalents are:
+
+- `copy residue link` for link-first sharing
+- `share residue card` for native share
+- `export residue postcard` for image-first handoff
+
+Why this route is preferred:
+- it keeps the residue tied to the afterimage session instead of flattening back into a generic field card
+- it stays stable when `afterimage/` actions are used with local storage failures
+
+If you enable **Sigil Mode** in `afterimage/`, the residue payload is tagged with `sigilMode: true` and a ritual caption, so the payload and shared/exported postcard reflect the ceremonial line style.
+
+Why:
+- it carries the selected residue through the URL
+- it rehydrates the card in another atlas session
+- it keeps the residue-card story intact instead of flattening it into a generic atlas view
+
 ## Recommended default moves
 
 - **Cold launch post:** main app URL
 - **“Look at today’s field” post:** daily signal link
 - **Reply showing something you made:** exact-garden permalink
+- **Reply showing a pressed residue:** residue link or residue postcard, whichever reads better in the thread
 - **Image-heavy community:** PNG export first, link second
 - **“What changed recently?” conversation:** main app URL so the archive is visible immediately
 

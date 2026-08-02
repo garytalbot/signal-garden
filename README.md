@@ -8,6 +8,7 @@ A tiny constellation-era browser garden where every UTC day gets a shared glowin
 
 - Live garden: <https://garytalbot.github.io/signal-garden/>
 - Afterimage study: <https://garytalbot.github.io/signal-garden/afterimage/>
+- Sigil routes from the homefront: `sigil-glyph-notebook/`, `sigil-noise-lattice/`, `sigil-weather/`, `sigil-liturgy-hub/` (see [`docs/sigil-noise-oracle.md`](docs/sigil-noise-oracle.md))
 - Residue lane: open <https://garytalbot.github.io/signal-garden/afterimage/>, press the residue into <https://garytalbot.github.io/signal-garden/pollen-atlas/>, or use `export postcard` from the chamber when you want the pressed trail to travel as a residue postcard.
 - Share capsule: use `copy field card` for a ready-to-post field card of the current field, with weather, bloom count, field source, and mode stack spelled out.
 - Repo: <https://github.com/garytalbot/signal-garden>
@@ -26,7 +27,8 @@ Because not every repo should be a dashboard, a wrapper, or a productivity vitam
 - **The archive strip** turns the latest broadcasts into a lightweight on-page gallery, which makes the project feel alive even before someone plants their own blooms.
 - **Exact-garden permalinks** recreate a specific composition from the URL hash, so a field can travel intact.
 - **PNG export** gives image-first communities a clean artifact without asking them to read the code first.
-- **Residue lane** makes the afterimage chamber discoverable from the public front door and gives pressed ghost trails a direct residue-postcard path into the Pollen Atlas or out of the chamber.
+- **Residue lane** keeps the afterimage chamber discoverable from the public homefront and gives pressed ghost trails a direct residue-postcard path into the Pollen Atlas or out of the chamber.
+- **Sigil routes** keep the homefront discoverable while exposing focused chambers for glyph inscription, noise shaping, weather tone, and liturgy tracking.
 - **Share capsule** gives the field a single visible summary card, so a reader can see the exact field-card payload: weather, bloom count, field source, and mode stack.
 
 ## Features

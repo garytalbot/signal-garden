@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Void Chorale</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07080d;
+      --panel: #10111a;
+      --text: #c7f8f8;
+      --muted: #8ae0df;
+      --accent: #7cfffc;
+      --glyph: #5ef7f0;
+      --noise: #7a8dff;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      font-family: "IBM Plex Mono", "Liberation Mono", "Courier New", Courier, monospace;
+      background: radial-gradient(circle at 50% 35%, #121426 0%, var(--bg) 55%, #020205 100%);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      padding: 0.75rem;
+      box-sizing: border-box;
+    }
+
+    .hud {
+      position: relative;
+      z-index: 5;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.3rem 0.55rem;
+      border: 1px solid #203;
+      background: linear-gradient(180deg, rgba(16, 17, 26, 0.75), rgba(8, 9, 14, 0.45));
+      backdrop-filter: blur(1px);
+    }
+
+    .hud a,
+    .hud button {
+      border-radius: 0;
+      border: 1px solid #2a2f4f;
+      background: #0a0b13;
+      color: var(--text);
+      text-decoration: none;
+      padding: 0.35rem 0.65rem;
+      font-size: 0.84rem;
+      letter-spacing: 0.05em;
+    }
+
+    .hud a:hover,
+    .hud button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      cursor: pointer;
+    }
+
+    #mode-btn {
+      margin-left: auto;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    #status {
+      color: var(--muted);
+      font-size: 0.82rem;
+      white-space: nowrap;
+      margin-left: 0.5rem;
+    }
+
+    pre {
+      margin: 0;
+      flex: 1;
+      min-height: 0;
+      white-space: pre;
+      overflow: hidden;
+      background:
+        linear-gradient(to bottom, rgba(12, 14, 22, 0.35), rgba(9, 10, 16, 0.5)),
+        var(--panel);
+      border: 1px solid #252943;
+      color: var(--glyph);
+      text-shadow: 0 0 6px rgba(100, 255, 255, 0.2);
+      padding: 0.7rem;
+      line-height: 1;
+      font-size: 16px;
+      letter-spacing: 0.02em;
+      font-weight: 500;
+      box-sizing: border-box;
+      user-select: none;
+    }
+
+    .veil {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(
+        120deg,
+        rgba(255, 255, 255, 0.03),
+        rgba(255, 255, 255, 0) 48%,
+        rgba(0, 255, 255, 0.07)
+      );
+      mix-blend-mode: overlay;
+      opacity: 0.15;
+    }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <a href="../">← Return</a>
+    <span id="status">deterministic verse lattice</span>
+    <button id="mode-btn">noise mode</button>
+    <span class="veil"></span>
+  </div>
+  <pre id="lattice"></pre>
+
+  <script>
+    (() => {
+      const lattice = document.getElementById('lattice');
+      const status = document.getElementById('status');
+      const modeBtn = document.getElementById('mode-btn');
+
+      const glyph = [' ', '·', '·', '•', '◌', '◦', '◉', '◦', '◉', '◦', '.', ':', ';', '+', '-', '/', '\\', '|', '_', '~', '*', '✦', '✧', '✤'];
+      const noise = ['0', '1', 'x', '%', '#', '$', '&', '@', '*', '?', '/', '\\', '|', '!', '?', '}', '{', '<', '>', '.', ','];
+      const verse = [
+        'the glyphs remember what the mouth forgets',
+        'ink breathes in a loop between two moons',
+        'every star is a hinge on a silent prayer',
+        'drift your hand until the line begins to sing',
+        'a lattice of sighs descends through sleep',
+        'if the sentence fails, let noise answer',
+        'a pulse of glass, a pulse of ash',
+        'silence composes in integer rows',
+        'we are the drift, we are the chant',
+        'close your eyes; the code keeps the ritual'
+      ];
+      const words = ['void', 'hush', 'drift', 'fract', 'glyph', 'signal', 'verse', 'lattice', 'ash', 'moon', 'echo', 'night'];
+
+      let cols = 120;
+      let rows = 60;
+      let mode = 'verse';
+      let scroll = 0;
+      let last = performance.now();
+      const drifters = Array.from({ length: 34 }, () => spawnDrifter());
+
+      function seedNoise(seed) {
+        return (Math.sin(seed * 12.9898) * 43758.5453123) % 1;
+      }
+
+      function spawnDrifter() {
+        return {
+          x: Math.random() * cols,
+          y: Math.random() * rows,
+          vx: (Math.random() - 0.5) * 0.16,
+          vy: (Math.random() - 0.5) * 0.11,
+          phase: Math.random() * Math.PI * 2,
+          text: pickDriftText(mode)
+        };
+      }
+
+      function pickDriftText(currentMode) {
+        if (currentMode === 'verse') {
+          const phrase = verse[Math.floor(Math.random() * verse.length)].replace(/[^a-z\s]/gi, '');
+          return phrase.trim().split(' ').filter(Boolean)[Math.floor(Math.random() * 4)] || 'a';
+        }
+        return noise[Math.floor(Math.random() * noise.length)] + noise[Math.floor(Math.random() * noise.length)];
+      }
+
+      function resizeCanvas() {
+        const w = Math.max(1, window.innerWidth - 16);
+        const h = Math.max(1, window.innerHeight - 72);
+        cols = Math.max(30, Math.floor(w / 8.8));
+        rows = Math.max(16, Math.floor(h / 16));
+        lattice.style.height = `${h}px`;
+      }
+
+      function setMode(next) {
+        mode = next;
+        status.textContent = mode === 'verse' ? 'deterministic verse lattice' : 'stochastic noise lattice';
+        modeBtn.textContent = mode === 'verse' ? 'noise mode' : 'deterministic verse mode';
+        drifters.forEach(d => {
+          d.text = pickDriftText(mode);
+          if (mode === 'noise') {
+            d.vx = (Math.random() - 0.5) * 0.30;
+            d.vy = (Math.random() - 0.5) * 0.20;
+          }
+        });
+      }
+
+      function generateLine(rowIndex, phase, currentMode) {
+        const row = new Array(cols).fill(' ');
+
+        for (let c = 0; c < cols; c++) {
+          const sample = Math.abs(seedNoise(rowIndex * 97.123 + c * 12.73 + phase * 0.07));
+          if (currentMode === 'verse') {
+            row[c] = glyph[Math.floor(sample * glyph.length * 1.4) % glyph.length];
+          } else {
+            row[c] = (Math.random() < 0.8 ? noise[Math.floor(Math.random() * noise.length)] : glyph[Math.floor(sample * glyph.length)]);
+          }
+        }
+
+        if (currentMode === 'verse') {
+          const line = verse[Math.floor((rowIndex + phase) % verse.length) % verse.length];
+          const drift = Math.round(Math.sin((rowIndex * 0.21) + phase * 0.55) * 3);
+          let cursor = (rowIndex * 5 + Math.round(scroll)) % cols;
+
+          for (let i = 0; i < line.length && cursor < cols; i++) {
+            const p = (cursor + i + drift) % cols;
+            if (line[i] && line[i] !== ' ') row[p] = line[i];
+          }
+
+          // mirror a second phrase for ritual density
+          const shard = line.slice(0, Math.max(6, Math.floor(line.length * 0.45)));
+          cursor = (cols - (rowIndex * 4 + Math.round(scroll * 1.7)) % cols) - shard.length;
+          for (let i = 0; i < shard.length; i++) {
+            const p = (cursor + i + cols) % cols;
+            row[p] = shard[i] === ' ' ? row[p] : shard[i];
+          }
+        }
+
+        return row;
+      }
+
+      function drawDrifters(grid, t) {
+        for (const d of drifters) {
+          d.x += d.vx + Math.sin(t * 0.001 + d.phase) * 0.03;
+          d.y += d.vy + Math.cos(t * 0.001 + d.phase) * 0.02;
+
+          if (d.x < 0) d.x += cols;
+          if (d.x >= cols) d.x -= cols;
+          if (d.y < 0) d.y += rows;
+          if (d.y >= rows) d.y -= rows;
+
+          if (Math.random() < 0.012) d.text = pickDriftText(mode);
+
+          const x = Math.round(d.x);
+          const y = Math.round(d.y);
+          if (y >= 0 && y < rows) {
+            for (let i = 0; i < d.text.length && x + i < cols; i++) {
+              if (x + i >= 0) {
+                grid[y][x + i] = d.text[i];
+              }
+            }
+            if (grid[y][x]) {
+              grid[y][x] = (mode === 'noise') ? (Math.random() < 0.7 ? grid[y][x] : noise[(x + y) % noise.length]) : grid[y][x];
+            }
+          }
+        }
+      }
+
+      function tick(now) {
+        const dt = Math.min(40, now - last);
+        last = now;
+        const speed = mode === 'verse' ? 0.014 : 0.028;
+        scroll = (scroll + dt * speed) % verse.length;
+
+        const phase = now * 0.006;
+        const grid = Array.from({ length: rows }, (_, r) => generateLine(r, phase, mode));
+
+        drawDrifters(grid, now);
+
+        // scroll illusion: shift rows by the same phase used above
+        const shift = Math.floor(phase * 0.01);
+        const ordered = grid.map((r, i) => grid[(i + shift) % rows]);
+
+        lattice.textContent = ordered.map(row => row.join('')).join('\n');
+
+        requestAnimationFrame(tick);
+      }
+
+      modeBtn.addEventListener('click', () => {
+        setMode(mode === 'verse' ? 'noise' : 'verse');
+      });
+
+      window.addEventListener('resize', resizeCanvas);
+
+      resizeCanvas();
+      setMode('verse');
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>

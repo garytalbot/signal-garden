@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sigil Noise Lattice</title>
+  <style>
+    :root {
+      --bg: #07070b;
+      --ink: #c6d0ff;
+      --muted: #8b89a3;
+      --panel: rgba(11, 13, 23, 0.58);
+      --accent: #9a79ff;
+      --glow: 0 0 22px rgba(154, 121, 255, 0.35), 0 0 40px rgba(154, 121, 255, 0.2);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      color: var(--ink);
+      font-family: "Creepster", "Trebuchet MS", "Palatino Linotype", Georgia, serif;
+      background: radial-gradient(circle at 20% 0%, #1b113f 0%, #0a0814 30%, var(--bg) 60%, #03030a 100%);
+      overflow-x: hidden;
+      overflow-y: scroll;
+    }
+
+    body {
+      min-height: 420vh;
+      position: relative;
+      isolation: isolate;
+      letter-spacing: 0.02em;
+      text-shadow: 0 0 20px rgba(198, 208, 255, 0.35);
+    }
+
+    .grain {
+      position: fixed;
+      inset: 0;
+      z-index: -3;
+      pointer-events: none;
+      opacity: 0.28;
+      background-image: radial-gradient(circle at 30% 20%, rgba(180, 170, 255, 0.14), transparent 38%),
+        radial-gradient(circle at 70% 80%, rgba(0, 255, 240, 0.08), transparent 40%),
+        repeating-linear-gradient(0deg, transparent 0 1px, rgba(255, 255, 255, 0.015) 1px 2px);
+      mix-blend-mode: screen;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -2;
+      filter: saturate(1.15) contrast(1.08);
+    }
+
+    .portal {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background: radial-gradient(circle at 50% 50%, rgba(10, 10, 26, 0) 0%, rgba(10, 10, 26, 0.65) 55%, rgba(10, 10, 26, 0.92) 90%);
+    }
+
+    .back-nav {
+      position: fixed;
+      left: 1.3rem;
+      top: 1rem;
+      z-index: 4;
+      color: #e2ddff;
+      text-decoration: none;
+      font-size: 0.96rem;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+      padding: 0.55rem 0.75rem;
+      border: 1px solid rgba(198, 208, 255, 0.22);
+      border-radius: 999px;
+      background: rgba(8, 10, 16, 0.55);
+      backdrop-filter: blur(6px);
+      pointer-events: auto;
+      box-shadow: var(--glow);
+      transition: all 0.2s ease;
+    }
+
+    .back-nav:hover { transform: translateY(-1px); }
+
+    .controls {
+      position: fixed;
+      right: 1rem;
+      bottom: 1rem;
+      width: min(380px, calc(100vw - 2rem));
+      z-index: 4;
+      border: 1px solid rgba(150, 130, 255, 0.3);
+      border-radius: 16px;
+      padding: 0.95rem;
+      background: var(--panel);
+      backdrop-filter: blur(10px) saturate(1.2);
+      box-shadow: var(--glow);
+      pointer-events: auto;
+      animation: drift 18s ease-in-out infinite alternate;
+      max-height: calc(100vh - 2rem);
+      overflow: auto;
+    }
+
+    @keyframes drift {
+      from { transform: translateY(0px) rotate(0deg); }
+      to { transform: translateY(-6px) rotate(-0.3deg); }
+    }
+
+    .controls h1 {
+      margin: 0 0 0.4rem;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: #f5f0ff;
+    }
+
+    .controls p {
+      margin: 0 0 0.8rem;
+      font-family: Georgia, serif;
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .row {
+      display: grid;
+      gap: 0.35rem;
+      margin-bottom: 0.75rem;
+    }
+
+    label {
+      font-size: 0.74rem;
+      color: #d6d0fb;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .value {
+      font-size: 0.75rem;
+      color: #aee6ff;
+      letter-spacing: 0.11em;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #b8a0ff;
+      appearance: none;
+      height: 2px;
+      background: linear-gradient(90deg, #7f67ff, #58f0ff);
+      border-radius: 999px;
+      cursor: pointer;
+    }
+
+    input[type="checkbox"], select {
+      accent-color: #b8a0ff;
+      transform: translateY(2px);
+    }
+
+    select {
+      width: 100%;
+      background: rgba(5, 6, 12, 0.8);
+      color: var(--ink);
+      border: 1px solid rgba(155, 130, 255, 0.32);
+      border-radius: 8px;
+      padding: 0.35rem;
+    }
+
+    .meta {
+      margin-top: 0.5rem;
+      display: grid;
+      gap: 0.35rem;
+      font-size: 0.72rem;
+      color: #9f9cc0;
+      line-height: 1.4;
+      border-top: 1px dashed rgba(168, 161, 216, 0.28);
+      padding-top: 0.55rem;
+    }
+
+    .ghost {
+      position: sticky;
+      top: 78vh;
+      width: min(100vw - 2rem, 800px);
+      margin: 0 auto;
+      text-align: center;
+      pointer-events: none;
+      z-index: 3;
+      color: rgba(230, 221, 255, 0.24);
+      font-size: clamp(1.2rem, 3vw, 2.2rem);
+      text-transform: uppercase;
+      letter-spacing: 0.36em;
+      line-height: 1.4;
+      opacity: 0;
+      animation: manifest 22s ease-in-out infinite alternate;
+    }
+
+    @keyframes manifest {
+      0% { opacity: 0; filter: blur(6px); }
+      30% { opacity: 0.32; }
+      65% { opacity: 0.16; }
+      100% { opacity: 0.48; filter: blur(0px); }
+    }
+
+    .sigil-space { height: 420vh; }
+
+    @media (max-width: 540px) {
+      .back-nav {
+        left: 0.65rem;
+        top: 0.65rem;
+        font-size: 0.82rem;
+      }
+
+      .controls {
+        width: calc(100vw - 1rem);
+        right: 0.5rem;
+        bottom: 0.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <canvas id="sigil"></canvas>
+  <div class="portal" aria-hidden="true"></div>
+
+  <a class="back-nav" href="../">← Back to signal-garden</a>
+
+  <div class="controls">
+    <h1>Sigil Drift Console</h1>
+    <p>Scroll to bend the noise. Move controls to tune the ritual geometry and spawn rates.</p>
+
+    <div class="row">
+      <label for="density">Sigil Density <span class="value" id="densityVal">420</span></label>
+      <input id="density" type="range" min="140" max="1400" step="20" value="420" />
+    </div>
+
+    <div class="row">
+      <label for="drift">Drift Speed <span class="value" id="driftVal">1.2</span></label>
+      <input id="drift" type="range" min="0.2" max="3.1" step="0.1" value="1.2" />
+    </div>
+
+    <div class="row">
+      <label for="chaos">Chaos Index <span class="value" id="chaosVal">0.9</span></label>
+      <input id="chaos" type="range" min="0.2" max="2.4" step="0.05" value="0.9" />
+    </div>
+
+    <div class="row">
+      <label for="twist">Spin Field</label>
+      <select id="twist">
+        <option value="spiral">Spiral</option>
+        <option value="folds">Folds</option>
+        <option value="rift">Rift Drift</option>
+      </select>
+    </div>
+
+    <div class="row" style="grid-template-columns: auto auto; gap: 0.65rem; align-items:center;">
+      <label><input id="invert" type="checkbox" /> Invert polarity</label>
+      <label><input id="stutter" type="checkbox" /> Stutter trail</label>
+    </div>
+
+    <div class="meta">
+      <span id="fps">fps: --</span>
+      <span>Scroll index: <strong id="scrollVal">0</strong></span>
+      <span>Noise seed: <strong id="seedVal"></strong></span>
+    </div>
+  </div>
+
+  <div class="sigil-space"></div>
+  <div class="ghost">scroll… drift… listen</div>
+
+  <script>
+    const canvas = document.getElementById('sigil');
+    const ctx = canvas.getContext('2d');
+
+    const densityInput = document.getElementById('density');
+    const driftInput = document.getElementById('drift');
+    const chaosInput = document.getElementById('chaos');
+    const twistInput = document.getElementById('twist');
+    const invertInput = document.getElementById('invert');
+    const stutterInput = document.getElementById('stutter');
+    const densityVal = document.getElementById('densityVal');
+    const driftVal = document.getElementById('driftVal');
+    const chaosVal = document.getElementById('chaosVal');
+    const scrollVal = document.getElementById('scrollVal');
+    const seedVal = document.getElementById('seedVal');
+    const fpsEl = document.getElementById('fps');
+
+    const sigils = ['◈', '⚚', '⌬', '⧉', '✶', 'ᚠ', 'ᚷ', '⚹', '⟐', '◍', '𖤐'];
+
+    let dpr = Math.max(window.devicePixelRatio || 1, 1);
+    let w = 0;
+    let h = 0;
+    let t = 0;
+    let scrollY = 0;
+    let baseSeed = Math.random() * 9999;
+    seedVal.textContent = baseSeed.toFixed(0);
+    let particles = [];
+    let mode = 'spiral';
+
+    const state = {
+      density: Number(densityInput.value),
+      drift: Number(driftInput.value),
+      chaos: Number(chaosInput.value),
+      invert: false,
+      stutter: false,
+    };
+
+    function resize() {
+      dpr = Math.max(window.devicePixelRatio || 1, 1);
+      w = canvas.width = Math.floor(innerWidth * dpr);
+      h = canvas.height = Math.floor(innerHeight * dpr);
+      canvas.style.width = `${innerWidth}px`;
+      canvas.style.height = `${innerHeight}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      rebuild();
+    }
+
+    function fract(n) { return n - Math.floor(n); }
+    function mix(a, b, t) { return a + (b - a) * t; }
+    function fade(t) { return t * t * (3 - 2 * t); }
+
+    function hash(x, y) {
+      return fract(Math.sin(x * 127.1 + y * 311.7 + baseSeed) * 43758.5453123);
+    }
+
+    function noise(x, y) {
+      const xi = Math.floor(x);
+      const yi = Math.floor(y);
+      const xf = x - xi;
+      const yf = y - yi;
+      const u = fade(xf);
+      const v = fade(yf);
+      const n00 = hash(xi, yi);
+      const n10 = hash(xi + 1, yi);
+      const n01 = hash(xi, yi + 1);
+      const n11 = hash(xi + 1, yi + 1);
+      const x1 = mix(n00, n10, u);
+      const x2 = mix(n01, n11, u);
+      return mix(x1, x2, v);
+    }
+
+    function fbm(x, y) {
+      let f = 0;
+      let a = 0.5;
+      let amp = 0.65;
+      for (let i = 0; i < 4; i++) {
+        f += amp * noise(x * a * 1.4, y * a * 1.4);
+        x *= 1.9;
+        y *= 1.9;
+        amp *= state.chaos * 0.38;
+        a *= 0.84;
+      }
+      return f / 2.4;
+    }
+
+    function createParticle() {
+      return {
+        x: Math.random() * innerWidth,
+        y: Math.random() * innerHeight,
+        speed: 0.35 + Math.random() * 1.6,
+        radius: 8 + Math.random() * 24,
+        phase: Math.random() * Math.PI * 2,
+        glyph: sigils[(Math.random() * sigils.length) | 0],
+        alpha: 0.22 + Math.random() * 0.6,
+        layer: Math.random() * 2.1,
+      };
+    }
+
+    function rebuild() {
+      particles = [];
+      const n = Math.round(state.density);
+      for (let i = 0; i < n; i++) {
+        particles.push(createParticle());
+      }
+    }
+
+    function setParticleCount(v) {
+      const target = Math.max(1, Math.round(v));
+      if (target > particles.length) {
+        while (particles.length < target) particles.push(createParticle());
+      } else if (target < particles.length) {
+        particles.length = target;
+      }
+    }
+
+    function updateValues() {
+      state.density = Number(densityInput.value);
+      state.drift = Number(driftInput.value);
+      state.chaos = Number(chaosInput.value);
+      state.invert = invertInput.checked;
+      state.stutter = stutterInput.checked;
+      mode = twistInput.value;
+      densityVal.textContent = state.density;
+      driftVal.textContent = state.drift.toFixed(1);
+      chaosVal.textContent = state.chaos.toFixed(2);
+      setParticleCount(state.density);
+    }
+
+    densityInput.addEventListener('input', updateValues);
+    driftInput.addEventListener('input', updateValues);
+    chaosInput.addEventListener('input', updateValues);
+    twistInput.addEventListener('change', updateValues);
+    invertInput.addEventListener('change', (e) => {
+      state.invert = e.target.checked;
+      updateValues();
+    });
+    stutterInput.addEventListener('change', (e) => {
+      state.stutter = e.target.checked;
+      updateValues();
+    });
+    window.addEventListener('scroll', () => {
+      scrollY = Math.max(0, window.scrollY);
+      scrollVal.textContent = Math.round(scrollY);
+    });
+
+    function modeWarp(nx, ny, s, px, py) {
+      let angle;
+      if (mode === 'spiral') {
+        const spin = Math.atan2(py - innerHeight / 2, px - innerWidth / 2);
+        angle = mix(fbm(nx, ny) * Math.PI * 2.8, spin + Math.sin(s * 0.08), 0.22);
+      } else if (mode === 'folds') {
+        angle = Math.atan2(Math.cos(nx * 0.18 + s * 0.3), Math.sin(ny * 0.18 - s * 0.22));
+      } else {
+        const a = Math.sin(nx + ny + s * 0.55) * Math.PI;
+        const b = Math.cos((nx - ny) * 1.2 - s * 0.4) * Math.PI;
+        angle = (a + b) * 0.55;
+      }
+      return angle;
+    }
+
+    let last = performance.now();
+    let frameCount = 0;
+    let fpsTimer = performance.now();
+
+    function frame(now) {
+      const dt = Math.min(40, now - last) / 16.667;
+      last = now;
+      t += dt * 0.005 * state.drift;
+
+      if (state.stutter) {
+        ctx.clearRect(0, 0, innerWidth, innerHeight);
+      } else {
+        const trail = state.invert ? 0.11 : 0.18;
+        ctx.fillStyle = `rgba(4, 6, 12, ${state.invert ? 0.11 : trail})`;
+        ctx.fillRect(0, 0, innerWidth, innerHeight);
+      }
+
+      const pxScroll = scrollY * 0.0015;
+      const inv = state.invert ? -1 : 1;
+
+      for (const p of particles) {
+        const sx = p.x * 0.0018 * state.chaos + t * 1.5;
+        const sy = p.y * 0.0018 * state.chaos + pxScroll + t * 0.7;
+        const nA = fbm(sx + 5.37, sy + 1.77);
+        const nB = fbm(sx + 11.11, sy + 9.21);
+        const angle = (modeWarp(nA, nB, t * 0.85, p.x, p.y) + p.phase) * inv;
+
+        p.x += Math.cos(angle) * p.speed * state.drift * (0.45 + state.chaos * 0.16) * dt;
+        p.y += Math.sin(angle) * p.speed * state.drift * (0.45 + state.chaos * 0.16) * dt;
+        p.y += pxScroll * 0.006 * dt;
+        p.x += Math.sin(nB * Math.PI * 2) * 0.15 * state.chaos;
+
+        if (p.x < -40) p.x = innerWidth + 40;
+        if (p.x > innerWidth + 40) p.x = -40;
+        if (p.y < -40) p.y = innerHeight + 40;
+        if (p.y > innerHeight + 40) p.y = -40;
+
+        const glow = 0.25 + 0.75 * nA;
+        const alpha = (p.alpha * glow * (state.invert ? 0.65 : 1));
+        const size = p.radius * (0.4 + 0.2 * p.layer);
+        const hue = 270 + 40 * Math.sin((nB + t + p.phase) * 2) + 70 * Math.cos(pxScroll + p.phase);
+        const sat = state.invert ? 30 : 72;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(angle);
+        ctx.globalAlpha = Math.max(0, alpha);
+        ctx.fillStyle = `hsla(${hue}, ${sat}%, ${state.invert ? 45 : 70}%, ${alpha})`;
+        ctx.font = `${size}px "Georgia", serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = `hsla(${hue}, ${sat + 15}%, 72%, 0.7)`;
+        ctx.shadowBlur = 12 + state.chaos * 8;
+        ctx.fillText(p.glyph, 0, 0);
+        ctx.restore();
+      }
+
+      frameCount++;
+      if (now - fpsTimer >= 1000) {
+        const fps = Math.round((frameCount * 1000) / (now - fpsTimer));
+        fpsEl.textContent = `fps: ${fps}`;
+        fpsTimer = now;
+        frameCount = 0;
+      }
+
+      requestAnimationFrame(frame);
+    }
+
+    function bootstrap() {
+      resize();
+      rebuild();
+      updateValues();
+      requestAnimationFrame(frame);
+    }
+
+    window.addEventListener('resize', resize);
+    bootstrap();
+  </script>
+</body>
+</html>

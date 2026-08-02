@@ -131,6 +131,47 @@
       margin-top: 14px;
     }
 
+    .chamber-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 14px;
+    }
+
+    .link-button {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.05));
+      color: var(--text);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font: inherit;
+      cursor: pointer;
+      transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .link-button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(140, 255, 207, 0.55);
+    }
+
+    .link-button:active {
+      transform: translateY(0);
+    }
+
+    .status {
+      margin: 10px 0 0;
+      min-height: 1.4em;
+      color: var(--accent-2);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+
     button {
       appearance: none;
       border: 1px solid rgba(255, 255, 255, 0.14);
@@ -141,6 +182,8 @@
       font: inherit;
       cursor: pointer;
       transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+      position: relative;
+      overflow: hidden;
     }
 
     button:hover {
@@ -150,6 +193,51 @@
 
     button:active {
       transform: translateY(0);
+    }
+
+    #shareBtn.share-active {
+      border-color: rgba(255, 136, 216, 0.58);
+      color: #ffd8ef;
+      box-shadow: 0 0 0 rgba(255, 136, 216, 0.32);
+      animation: sigil-rhythm 2.4s ease-in-out infinite;
+    }
+
+    #shareBtn.share-active::after {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      border-radius: inherit;
+      border: 1px solid rgba(122, 183, 255, 0.38);
+      opacity: 0;
+      pointer-events: none;
+      animation: sigil-counterpoint 2.8s linear infinite;
+    }
+
+    #shareBtn.share-active::before {
+      content: "";
+      position: absolute;
+      inset: 5px;
+      border-radius: inherit;
+      border: 1px solid rgba(255, 136, 216, 0.22);
+      pointer-events: none;
+      animation: sigil-pulse 3.6s ease-in-out infinite;
+    }
+
+    #shareBtn[disabled].share-active {
+      animation: none;
+      box-shadow: none;
+    }
+
+    #shareBtn[disabled].share-active::before,
+    #shareBtn[disabled].share-active::after {
+      animation: none;
+      opacity: 0;
+    }
+
+    #sigilModeBtn[aria-pressed="true"] {
+      color: #ffdaef;
+      border-color: rgba(255, 136, 216, 0.62);
+      background: linear-gradient(180deg, rgba(255, 136, 216, 0.11), rgba(255, 136, 216, 0.03));
     }
 
     .hint {
@@ -178,6 +266,40 @@
       font-weight: 700;
     }
 
+    @keyframes sigil-rhythm {
+      0%, 100% {
+        box-shadow: 0 0 0 0 rgba(255, 136, 216, 0.24);
+      }
+      50% {
+        box-shadow: 0 0 0 8px rgba(255, 136, 216, 0);
+      }
+    }
+
+    @keyframes sigil-counterpoint {
+      0% {
+        transform: rotate(0deg);
+        opacity: 0;
+      }
+      24% {
+        opacity: 0.7;
+      }
+      70%, 100% {
+        transform: rotate(360deg);
+        opacity: 0;
+      }
+    }
+
+    @keyframes sigil-pulse {
+      0%, 100% {
+        transform: scale(0.98);
+        opacity: 0.2;
+      }
+      50% {
+        transform: scale(1.05);
+        opacity: 0;
+      }
+    }
+
     @media (max-width: 720px) {
       .hud {
         top: 12px;
@@ -203,7 +325,7 @@
   <section class="hud" aria-label="afterimage study controls">
     <p class="eyebrow">signal garden side chamber</p>
     <h1>afterimage study</h1>
-    <p class="lede">Move the pointer and leave a little screen burn behind. Each trace is a ghost, not a feature. The screen remembers anyway.</p>
+    <p class="lede">Move the pointer and leave a little screen burn behind. Each trace is a ghost, not a feature. Press it into the Pollen Atlas when the residue is worth keeping.</p>
     <div class="stats" aria-live="polite">
       <div class="stat"><span>palette</span><strong id="paletteLabel">Phosphor Bloom</strong></div>
       <div class="stat"><span>ghosts</span><strong id="ghostCount">0</strong></div>
@@ -212,9 +334,21 @@
     <div class="controls">
       <button id="paletteBtn" type="button">cycle palette</button>
       <button id="pulseBtn" type="button">pulse the field</button>
+      <button id="captureBtn" type="button">press into atlas</button>
+      <button id="openAtlasBtn" type="button" disabled>open atlas</button>
+      <button id="exportBtn" type="button" disabled>export postcard</button>
+      <button id="sigilModeBtn" type="button" aria-pressed="false">sigil mode: off</button>
+      <button id="shareBtn" type="button" disabled>share postcard</button>
+      <button id="copyResidueLinkBtn" type="button" disabled>copy residue link</button>
+      <button id="permalinkBtn" type="button">copy link</button>
       <button id="resetBtn" type="button">wipe ghosts</button>
     </div>
-    <p class="hint">Pointer / tap: paint afterimages. Space: pulse. Click: cycle palette. R: reset. The garden hates empty silence.</p>
+    <div class="chamber-nav" aria-label="Signal Garden chambers">
+      <a class="link-button" href="../">open garden</a>
+      <a class="link-button" href="../pollen-atlas/">visit pollen atlas</a>
+    </div>
+    <p class="status" id="shareStatus" aria-live="polite"></p>
+    <p class="hint">Pointer / tap: paint afterimages. Space: pulse. Click: cycle palette. P: press into atlas. L: copy residue link. S: share postcard. E: export postcard. R: reset. The garden prefers a little static.</p>
   </section>
 
   <div class="corner"><strong>signal</strong> / afterimage chamber</div>
@@ -225,8 +359,16 @@
     const paletteLabel = document.getElementById('paletteLabel');
     const ghostCount = document.getElementById('ghostCount');
     const pulseState = document.getElementById('pulseState');
+    const shareStatus = document.getElementById('shareStatus');
     const paletteBtn = document.getElementById('paletteBtn');
     const pulseBtn = document.getElementById('pulseBtn');
+    const captureBtn = document.getElementById('captureBtn');
+    const openAtlasBtn = document.getElementById('openAtlasBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const shareBtn = document.getElementById('shareBtn');
+    const sigilModeBtn = document.getElementById('sigilModeBtn');
+    const copyResidueLinkBtn = document.getElementById('copyResidueLinkBtn');
+    const permalinkBtn = document.getElementById('permalinkBtn');
     const resetBtn = document.getElementById('resetBtn');
 
     const palettes = [
@@ -246,6 +388,7 @@
 
     const ghosts = [];
     const pulses = [];
+    const traceTrail = [];
     const pointer = { x: 0, y: 0, active: false, trailX: 0, trailY: 0 };
     let paletteIndex = 0;
     let lastStamp = 0;
@@ -255,6 +398,475 @@
     let frame = 0;
     let pulseTicker = 0;
     let reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const RESIDUE_STORAGE_KEY = 'signal-garden:pollen-atlas:residues';
+    const SIGIL_MODE_KEY = 'signal-garden:afterimage:sigil-mode';
+    const RESIDUE_STORAGE_LIMIT = 8;
+    const TRAIL_LIMIT = 24;
+    const SIGIL_CAPTIONS = [
+      'sigil held',
+      'sigil set',
+      'vow sealed',
+      'threshold crossed',
+      'ash remembered',
+      'lumen kept',
+    ];
+    let lastResidue = null;
+    let sigilMode = false;
+
+    function setStatus(message) {
+      shareStatus.textContent = message;
+      if (!message) return;
+      window.clearTimeout(setStatus._timer);
+      setStatus._timer = window.setTimeout(() => {
+        if (shareStatus.textContent === message) shareStatus.textContent = '';
+      }, 1800);
+    }
+
+    function parsePaletteFromHash() {
+      const match = location.hash.match(/palette=(\d+)/i);
+      if (!match) return null;
+      const index = Number(match[1]);
+      if (!Number.isInteger(index)) return null;
+      return ((index % palettes.length) + palettes.length) % palettes.length;
+    }
+
+    function syncHash() {
+      const nextUrl = new URL(location.href);
+      nextUrl.hash = `palette=${paletteIndex}`;
+      history.replaceState(null, '', nextUrl);
+    }
+
+    function normalizeTrailPoint(point) {
+      return {
+        x: Math.round(point.x * 10) / 10,
+        y: Math.round(point.y * 10) / 10,
+        at: Math.round(point.at),
+      };
+    }
+
+    function loadResidues() {
+      try {
+        const raw = localStorage.getItem(RESIDUE_STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function loadSigilMode() {
+      try {
+        const raw = localStorage.getItem(SIGIL_MODE_KEY);
+        if (raw === null) return false;
+        return JSON.parse(raw) === true;
+      } catch {
+        return localStorage.getItem(SIGIL_MODE_KEY) === 'true';
+      }
+    }
+
+    function saveResidues(residues) {
+      localStorage.setItem(RESIDUE_STORAGE_KEY, JSON.stringify(residues.slice(0, RESIDUE_STORAGE_LIMIT)));
+      return true;
+    }
+
+    function saveSigilMode(value) {
+      localStorage.setItem(SIGIL_MODE_KEY, JSON.stringify(Boolean(value)));
+    }
+
+    function syncSigilModeButton() {
+      sigilModeBtn.textContent = `sigil mode: ${sigilMode ? 'on' : 'off'}`;
+      sigilModeBtn.setAttribute('aria-pressed', sigilMode ? 'true' : 'false');
+    }
+
+    function toggleSigilMode() {
+      sigilMode = !sigilMode;
+      try {
+        saveSigilMode(sigilMode);
+      } catch {
+        setStatus('Could not save sigil mode preference in this browser.');
+      }
+      syncSigilModeButton();
+      setStatus(`sigil mode ${sigilMode ? 'enabled' : 'disabled'}.`);
+    }
+
+    function buildSigilCaption({
+      paletteName = 'Phosphor Bloom',
+      paletteOffset = 0,
+      trailLength = 0,
+      ghostCount = 0,
+      pulseCount = 0,
+    } = {}) {
+      const cadence = Math.abs(
+        Math.round(trailLength) + (ghostCount * 11) + (pulseCount * 17) + (paletteOffset * 29)
+      );
+      const phrase = SIGIL_CAPTIONS[cadence % SIGIL_CAPTIONS.length];
+      return `${paletteName}: ${phrase} at ${cadence % 97 + 1}`;
+    }
+
+    function buildSigilPayloadForPostcard(residue) {
+      if (!residue) {
+        return residue;
+      }
+      if (!sigilMode) {
+        return residue;
+      }
+      const trailLength = Array.isArray(residue?.trail)
+        ? residue.trail.reduce((sum, point, index) => {
+          if (index === 0) return sum;
+          const prev = residue.trail[index - 1];
+          return sum + Math.hypot(point.x - prev.x, point.y - prev.y);
+        }, 0)
+        : 0;
+      const ritualCaption = buildSigilCaption({
+        paletteName: residue.paletteName || currentPalette().name,
+        paletteOffset: Number.isInteger(residue.paletteIndex) ? residue.paletteIndex : paletteIndex,
+        trailLength,
+        ghostCount: Array.isArray(residue.ghosts) ? residue.ghosts.length : 0,
+        pulseCount: Array.isArray(residue.pulses) ? residue.pulses.length : 0,
+      });
+
+      return {
+        ...residue,
+        sigilMode,
+        caption: residue.sigilMode
+          ? residue.caption
+          : ritualCaption,
+        ritualCaption
+      };
+    }
+
+    function encodeBase64Url(text) {
+      const bytes = new TextEncoder().encode(String(text));
+      let binary = '';
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+      return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    }
+
+    function buildResidueCard() {
+      const now = new Date();
+      const palette = currentPalette();
+      const ghostSnapshot = ghosts.slice(-16).map((ghost) => ({
+        x: Math.round(ghost.x * 10) / 10,
+        y: Math.round(ghost.y * 10) / 10,
+        vx: Math.round(ghost.vx * 100) / 100,
+        vy: Math.round(ghost.vy * 100) / 100,
+        radius: Math.round(ghost.radius * 10) / 10,
+        life: Math.round(ghost.life),
+        hue: ghost.hue,
+        glow: Math.round(ghost.glow * 100) / 100,
+        glyph: ghost.glyph,
+      }));
+      const pulseSnapshot = pulses.slice(-6).map((pulse) => ({
+        x: Math.round(pulse.x * 10) / 10,
+        y: Math.round(pulse.y * 10) / 10,
+        radius: Math.round(pulse.radius * 10) / 10,
+        life: Math.round(pulse.life),
+        maxLife: Math.round(pulse.maxLife),
+      }));
+      const trailSnapshot = traceTrail.slice(-TRAIL_LIMIT).map(normalizeTrailPoint);
+      const trailLength = trailSnapshot.reduce((sum, point, index) => {
+        if (index === 0) return sum;
+        const prev = trailSnapshot[index - 1];
+        return sum + Math.hypot(point.x - prev.x, point.y - prev.y);
+      }, 0);
+      const caption = buildSigilCaption({
+        paletteName: palette.name,
+        paletteOffset: paletteIndex,
+        trailLength,
+        ghostCount: ghostSnapshot.length,
+        pulseCount: pulseSnapshot.length,
+      });
+
+      return {
+        id: `residue-${now.toISOString().replace(/[:.]/g, '-')}-${paletteIndex}`,
+        type: 'afterimage-residue',
+        name: `${palette.name} residue`,
+        family: 'afterimage residue',
+        season: 'freshly pressed',
+        color: palette.colors.join(' / '),
+        memory: `${ghostSnapshot.length} ghosts, ${pulseSnapshot.length} pulses, ${trailSnapshot.length} trail points`,
+        note: trailSnapshot.length
+          ? `Captured from a live afterimage trail. The pointer wandered about ${Math.round(trailLength)}px before it was pressed into the atlas.`
+          : 'Captured from a quiet chamber with the screen still glowing at the edges.',
+        caption: sigilMode ? caption : `Browser-local residue, pressed from the ${palette.name} palette.`,
+        ritualCaption: sigilMode ? caption : null,
+        sigilMode,
+        hue: (paletteIndex * 73 + trailSnapshot.length * 17 + ghostSnapshot.length * 11) % 360,
+        paletteName: palette.name,
+        paletteIndex,
+        capturedAt: now.toISOString(),
+        trail: trailSnapshot,
+        ghosts: ghostSnapshot,
+        pulses: pulseSnapshot,
+      };
+    }
+
+      function buildResidueLink(residue) {
+      const payload = {
+        kind: 'residue',
+        source: 'afterimage',
+        name: residue?.name,
+        family: residue?.family,
+        season: residue?.season,
+        color: residue?.color,
+        memory: residue?.memory,
+        note: residue?.note,
+        caption: residue?.caption,
+        ritualCaption: residue?.ritualCaption,
+        sigilMode: residue?.sigilMode === true,
+        hue: residue?.hue,
+        paletteName: residue?.paletteName,
+        paletteIndex: residue?.paletteIndex,
+        capturedAt: residue?.capturedAt,
+        trail: residue?.trail,
+        ghosts: residue?.ghosts,
+        pulses: residue?.pulses,
+        colors: residue?.colors,
+      };
+      const encoded = encodeBase64Url(JSON.stringify(payload));
+      const url = new URL('../pollen-atlas/', location.href);
+      url.hash = `residue=${encoded}`;
+      return url.toString();
+    }
+
+    function sanitize(text) {
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function residuePostcardSvg(residue) {
+      const trail = Array.isArray(residue?.trail) ? residue.trail : [];
+      const ghosts = Array.isArray(residue?.ghosts) ? residue.ghosts : [];
+      const pulses = Array.isArray(residue?.pulses) ? residue.pulses : [];
+      const hue = Number.isFinite(residue?.hue) ? residue.hue : (paletteIndex * 73) % 360;
+      const accent = `hsl(${hue}, 86%, 68%)`;
+      const softAccent = `hsla(${hue}, 86%, 68%, 0.16)`;
+      const paletteName = residue?.paletteName || currentPalette().name;
+      const sigilModeEnabled = residue?.sigilMode === true;
+      const caption = sanitize(residue?.caption || `Pressed from the ${paletteName} palette.`);
+      const ritualCaption = residue?.ritualCaption;
+      const trailLength = trail.reduce((sum, point, index) => {
+        if (index === 0) return sum;
+        const prev = trail[index - 1];
+        return sum + Math.hypot(point.x - prev.x, point.y - prev.y);
+      }, 0);
+      const trailPath = trail.length
+        ? `<path d="${trail.map((point, index) => `${index === 0 ? 'M' : 'L'} ${120 + point.x * 0.72} ${314 + point.y * 0.62}`).join(' ')}" fill="none" stroke="${accent}" stroke-opacity="0.34" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 12" />
+  ${trail.slice(-10).map((point, index) => `<circle cx="${120 + point.x * 0.72}" cy="${314 + point.y * 0.62}" r="${3 + (index % 3)}" fill="${accent}" fill-opacity="${0.16 + index * 0.02}" />`).join('\n  ')}`
+        : '';
+      const ghostHalo = ghosts.slice(0, 8).map((ghost, index) => `<circle cx="${160 + (ghost.x * 0.38 + index * 13) % 650}" cy="${380 + (ghost.y * 0.26 + index * 17) % 520}" r="${Math.max(6, ghost.radius * 0.28)}" fill="${accent}" fill-opacity="${0.06 + index * 0.02}" />`).join('\n  ');
+      const pulseHalo = pulses.slice(0, 6).map((pulse, index) => `<circle cx="${180 + (pulse.x * 0.34 + index * 19) % 620}" cy="${430 + (pulse.y * 0.22 + index * 11) % 440}" r="${Math.max(4, pulse.radius * 0.18)}" fill="${accent}" fill-opacity="${0.04 + index * 0.012}" />`).join('\n  ');
+      const captured = residue?.capturedAt
+        ? new Date(residue.capturedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+        : 'just now';
+
+      return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1240" viewBox="0 0 960 1240" role="img" aria-labelledby="title desc">
+  <title id="title">Signal Garden afterimage postcard</title>
+  <desc id="desc">A browser-local postcard exported from the afterimage chamber.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#071018" />
+      <stop offset="100%" stop-color="#050810" />
+    </linearGradient>
+    <radialGradient id="halo" cx="68%" cy="28%" r="58%">
+      <stop offset="0%" stop-color="${accent}" stop-opacity="0.35" />
+      <stop offset="55%" stop-color="${accent}" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="${accent}" stop-opacity="0" />
+    </radialGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" />
+    </filter>
+  </defs>
+  <rect width="100%" height="100%" rx="42" fill="url(#bg)" />
+  <rect x="42" y="42" width="876" height="1156" rx="32" fill="rgba(255,255,255,0.035)" stroke="rgba(255,255,255,0.12)" />
+  <rect x="88" y="88" width="784" height="1040" rx="26" fill="rgba(255,255,255,0.018)" stroke="rgba(255,255,255,0.08)" />
+  <ellipse cx="686" cy="316" rx="232" ry="210" fill="url(#halo)" filter="url(#soft)" />
+  ${ghostHalo}
+  ${pulseHalo}
+  ${trailPath}
+  <text x="110" y="140" fill="${sigilModeEnabled ? '#ffd3f0' : '#95ffcb'}" font-family="system-ui, sans-serif" font-size="26" letter-spacing="5">SIGNAL GARDEN / AFTERIMAGE</text>
+  <text x="110" y="206" fill="#eef6ff" font-family="system-ui, sans-serif" font-size="78" font-weight="700" letter-spacing="-3">${sanitize(residue?.name || 'afterimage residue')}</text>
+  <text x="110" y="258" fill="${sigilModeEnabled ? '#ffd7f0' : '#9fb5ce'}" font-family="system-ui, sans-serif" font-size="30">${caption}</text>
+  ${sigilModeEnabled && ritualCaption
+    ? `<text x="110" y="300" fill="#f6d3ea" font-family="system-ui, sans-serif" font-size="24">${sanitize(ritualCaption)}</text>`
+    : ''}
+  <text x="110" y="328" fill="${sigilModeEnabled ? '#ffd4f0' : '#95ffcb'}" font-family="system-ui, sans-serif" font-size="20" letter-spacing="4">${sigilModeEnabled ? 'SIGIL RESIDUE' : 'PRESSED RESIDUE'}</text>
+  <text x="110" y="382" fill="#9fb5ce" font-family="system-ui, sans-serif" font-size="24" letter-spacing="1">palette:</text>
+  <text x="300" y="382" fill="#eef6ff" font-family="system-ui, sans-serif" font-size="24">${sanitize(paletteName)}</text>
+  <text x="110" y="446" fill="#9fb5ce" font-family="system-ui, sans-serif" font-size="24" letter-spacing="1">captured:</text>
+  <text x="300" y="446" fill="#eef6ff" font-family="system-ui, sans-serif" font-size="24">${sanitize(captured)}</text>
+  <text x="110" y="510" fill="#9fb5ce" font-family="system-ui, sans-serif" font-size="24" letter-spacing="1">memory:</text>
+  <text x="300" y="510" fill="#eef6ff" font-family="system-ui, sans-serif" font-size="24">${sanitize(residue?.memory || 'screen burn, pressed into the atlas')}</text>
+  <text x="110" y="574" fill="#9fb5ce" font-family="system-ui, sans-serif" font-size="24" letter-spacing="1">trail:</text>
+  <text x="300" y="574" fill="#eef6ff" font-family="system-ui, sans-serif" font-size="24">${sanitize(`${trail.length} points, ${Math.round(trailLength)}px wander`)}</text>
+  <rect x="110" y="632" width="742" height="2" fill="${softAccent}" />
+  <text x="110" y="706" fill="#9fb5ce" font-family="system-ui, sans-serif" font-size="20" letter-spacing="4">BROWSER-LOCAL MEMORY</text>
+  <text x="110" y="752" fill="#eef6ff" font-family="system-ui, sans-serif" font-size="26">${sanitize(residue?.note || 'The screen still remembers what it lost.')}</text>
+  <text x="110" y="820" fill="#9fb5ce" font-family="system-ui, sans-serif" font-size="18">ghosts: ${ghosts.length} · pulses: ${pulses.length} · palette: ${sanitize(paletteName)}</text>
+  <text x="110" y="1116" fill="#9fb5ce" font-family="system-ui, sans-serif" font-size="18">press into atlas • open atlas • export postcard</text>
+</svg>`;
+    }
+
+    function downloadBlob(blob, filename) {
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    }
+
+    function exportResiduePostcard() {
+      if (!lastResidue) {
+        setStatus('Press a residue first, then export its postcard.');
+        return;
+      }
+
+      const svg = residuePostcardSvg(buildSigilPayloadForPostcard(lastResidue));
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, '-');
+      const filename = `signal-garden-afterimage-${lastResidue.paletteName || 'residue'}-${stamp}.svg`;
+      downloadBlob(blob, filename);
+      setStatus('Residue postcard exported as an SVG.');
+    }
+
+    async function shareResiduePostcard() {
+      if (!lastResidue) {
+        setStatus('Press a residue first, then share its postcard.');
+        return;
+      }
+      if (shareBtn.disabled) {
+        return;
+      }
+
+      const postcardResidue = buildSigilPayloadForPostcard(lastResidue);
+      const isSigilShare = postcardResidue?.sigilMode === true;
+      const svg = residuePostcardSvg(postcardResidue);
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, '-');
+      const filename = `signal-garden-afterimage-${lastResidue.paletteName || 'residue'}-${stamp}.svg`;
+      const shareUrl = buildResidueLink(postcardResidue);
+
+      shareBtn.disabled = true;
+      shareBtn.dataset.state = 'working';
+      shareBtn.textContent = 'packing postcard...';
+      shareBtn.classList.add('share-active');
+
+      try {
+        const sharePayload = {
+          title: `Signal Garden afterimage ${isSigilShare ? 'sigil postcard' : 'postcard'}`,
+          text: isSigilShare
+            ? `Sigil mode: ${lastResidue.name}. ${postcardResidue.ritualCaption || 'Ritual caption attached.'}`
+            : `Pressed ${lastResidue.name} into a Signal Garden residue postcard.`,
+          url: shareUrl,
+        };
+        if (navigator.share && (!navigator.canShare || navigator.canShare(sharePayload))) {
+          const file = new File([blob], filename, { type: 'image/svg+xml' });
+          sharePayload.files = [file];
+          await navigator.share(sharePayload);
+          setStatus('Residue postcard shared.');
+          shareBtn.dataset.state = 'done';
+          shareBtn.textContent = 'postcard shared';
+        } else {
+          downloadBlob(blob, filename);
+          try {
+            await navigator.clipboard.writeText(shareUrl);
+            setStatus('Residue postcard saved and link copied.');
+          } catch {
+            window.prompt('Copy this Pollen Atlas residue link:', shareUrl);
+            setStatus('Residue postcard saved. Copy the link manually.');
+          }
+          shareBtn.dataset.state = 'done';
+          shareBtn.textContent = 'saved + link copied';
+        }
+
+        window.clearTimeout(shareBtn.copyStateTimer);
+        shareBtn.copyStateTimer = window.setTimeout(() => {
+          shareBtn.dataset.state = 'idle';
+          shareBtn.textContent = 'share postcard';
+          syncAtlasButton();
+        }, 2200);
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          setStatus('Residue share canceled.');
+        } else {
+          console.error(error);
+          setStatus('Residue share hit a browser pothole. Export postcard still works.');
+        }
+        shareBtn.dataset.state = 'idle';
+        shareBtn.textContent = 'share postcard';
+        syncAtlasButton();
+      } finally {
+        shareBtn.classList.toggle('share-active', Boolean(lastResidue && !shareBtn.disabled));
+      }
+    }
+
+    async function copyResidueLink() {
+      if (!lastResidue) {
+        setStatus('Press a residue first, then copy its link.');
+        return;
+      }
+
+      const url = buildResidueLink(buildSigilPayloadForPostcard(lastResidue));
+      try {
+        await navigator.clipboard.writeText(url);
+        setStatus('Residue link copied.');
+      } catch {
+        window.prompt('Copy this Pollen Atlas residue link:', url);
+        setStatus('Residue link needs a manual copy.');
+      }
+    }
+
+    function syncAtlasButton() {
+      openAtlasBtn.disabled = !lastResidue;
+      exportBtn.disabled = !lastResidue;
+      shareBtn.disabled = !lastResidue;
+      copyResidueLinkBtn.disabled = !lastResidue;
+      shareBtn.classList.toggle('share-active', Boolean(lastResidue));
+      openAtlasBtn.textContent = lastResidue ? `open ${lastResidue.name}` : 'open atlas';
+      openAtlasBtn.title = lastResidue
+        ? `Open ${lastResidue.name} in the Pollen Atlas.`
+        : 'Press a residue into the atlas first.';
+      exportBtn.title = lastResidue
+        ? `Export ${lastResidue.name} as a postcard.`
+        : 'Press a residue into the atlas first.';
+      shareBtn.title = lastResidue
+        ? `Share ${lastResidue.name} as a postcard or save it with the matching link.`
+        : 'Press a residue into the atlas first.';
+      copyResidueLinkBtn.title = lastResidue
+        ? `Copy a residue link for ${lastResidue.name}.`
+        : 'Press a residue into the atlas first.';
+    }
+
+    function captureIntoAtlas() {
+      const residue = buildResidueCard();
+      lastResidue = residue;
+      syncAtlasButton();
+      let stored = false;
+      try {
+        const existing = loadResidues().filter((entry) => entry && entry.id !== residue.id);
+        stored = saveResidues([residue, ...existing]);
+      } catch {
+        stored = false;
+      }
+      setStatus(stored
+        ? `Pressed ${residue.ghosts.length} ghosts into a Pollen Atlas residue card.`
+        : `Pressed ${residue.ghosts.length} ghosts into a Pollen Atlas residue card. This browser could not save it locally, but the atlas link is still ready.`);
+      captureBtn.textContent = 'pressed';
+      window.clearTimeout(captureIntoAtlas._timer);
+      captureIntoAtlas._timer = window.setTimeout(() => {
+        captureBtn.textContent = 'press into atlas';
+      }, 1400);
+    }
 
     function resize() {
       dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
@@ -332,12 +944,14 @@
     function cyclePalette() {
       paletteIndex = (paletteIndex + 1) % palettes.length;
       updateHud();
+      syncHash();
       triggerPulse(pointer.x || width * 0.5, pointer.y || height * 0.5);
     }
 
     function resetField() {
       ghosts.length = 0;
       pulses.length = 0;
+      traceTrail.length = 0;
       pointer.active = false;
       pulseTicker = 0;
       pulseState.textContent = 'idle';
@@ -544,6 +1158,8 @@
         });
         lastStamp = Date.now();
       }
+      traceTrail.push({ x, y, at: performance.now() });
+      while (traceTrail.length > TRAIL_LIMIT) traceTrail.shift();
       pulseState.textContent = 'alive';
     }
 
@@ -574,7 +1190,19 @@
       } else if (event.key === 'r' || event.key === 'R') {
         event.preventDefault();
         resetField();
-      } else if (event.key === 'p' || event.key === 'P' || event.key === 'c' || event.key === 'C') {
+      } else if (event.key === 'p' || event.key === 'P') {
+        event.preventDefault();
+        captureIntoAtlas();
+      } else if (event.key === 'l' || event.key === 'L') {
+        event.preventDefault();
+        copyResidueLink();
+      } else if (event.key === 's' || event.key === 'S') {
+        event.preventDefault();
+        shareResiduePostcard();
+      } else if (event.key === 'e' || event.key === 'E') {
+        event.preventDefault();
+        exportResiduePostcard();
+      } else if (event.key === 'c' || event.key === 'C') {
         event.preventDefault();
         cyclePalette();
       }
@@ -582,13 +1210,47 @@
 
     paletteBtn.addEventListener('click', cyclePalette);
     pulseBtn.addEventListener('click', () => triggerPulse(pointer.x || width * 0.5, pointer.y || height * 0.5));
+    captureBtn.addEventListener('click', captureIntoAtlas);
+    openAtlasBtn.addEventListener('click', () => {
+      if (!lastResidue) {
+        setStatus('Press a residue first, then open its atlas link.');
+        return;
+      }
+
+      const url = buildResidueLink(buildSigilPayloadForPostcard(lastResidue));
+      window.location.href = url;
+    });
+    exportBtn.addEventListener('click', exportResiduePostcard);
+    shareBtn.addEventListener('click', shareResiduePostcard);
+    sigilModeBtn.addEventListener('click', toggleSigilMode);
+    copyResidueLinkBtn.addEventListener('click', copyResidueLink);
     resetBtn.addEventListener('click', resetField);
+    permalinkBtn.addEventListener('click', async () => {
+      syncHash();
+      try {
+        await navigator.clipboard.writeText(location.href);
+        setStatus('permalink copied');
+      } catch {
+        setStatus('could not copy automatically');
+      }
+    });
 
     window.addEventListener('resize', resize);
     window.addEventListener('blur', () => { pointer.active = false; });
 
+    const hashPalette = parsePaletteFromHash();
+    if (hashPalette !== null) {
+      paletteIndex = hashPalette;
+    }
+    sigilMode = loadSigilMode();
+    const storedResidues = loadResidues();
+    lastResidue = storedResidues[0] ?? null;
+    syncAtlasButton();
+    syncSigilModeButton();
+
     resize();
     updateHud();
+    syncHash();
     triggerPulse(width * 0.5, height * 0.5);
     animate();
   </script>

@@ -1,0 +1,9 @@
+{
+  "name": "signal-garden",
+  "private": true,
+  "scripts": {
+    "smoke:residue": "node scripts/residue-smoke.mjs",
+    "smoke": "npm run smoke:residue",
+    "test": "npm run smoke:residue"
+  }
+}

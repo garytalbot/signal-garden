@@ -8,6 +8,8 @@ Signal Garden is a tiny constellation-era browser garden where every UTC day get
 - Repo: <https://github.com/garytalbot/signal-garden>
 - Curated demo garden: <https://garytalbot.github.io/signal-garden/#garden=qe.24e.2.2.5.2e.1q.30.78~1e0.1jk.3.0.0.22.1m.34.g4~1xg.2cq.0.8.4.2k.1u.3e.4g~2p8.1b8.6.4.2.1y.1i.38.eg~3bg.24e.9.9.1.2c.1o.3a.8c~47e.1mc.8.2.3.24.1k.32.go~4s8.2bc.7.7.5.2o.1w.3g.64~5aa.1e0.5.5.0.20.1g.30.dc>
 - Daily signal link format: `https://garytalbot.github.io/signal-garden/#broadcast=YYYY-MM-DD`
+- Residue lane: capture a ghost trail in `afterimage/`, press it into `pollen-atlas/`, or use `export postcard` straight from the chamber to turn it into a residue postcard; from the atlas, use `copy residue link`, `share residue card`, or `export residue postcard` when you want the residue to travel
+- Smoke check: run `npm test` from the repo root to verify the residue link path locally; set `CHROME_BIN` only if your Chrome binary is named something else
 - Square poster assets: `assets/launch/community-poster.svg` and `assets/launch/community-poster.png`
 - Real product screenshot: `assets/launch/demo-ui.png`
 - Surface-by-surface sharing guide: [`docs/share-guide.md`](share-guide.md)
