@@ -13,6 +13,8 @@ MIR="${2:-/root/.openclaw/workspace/garytalbot.github.io/signal-garden}"
 ROUTES=(
   afterimage
   corridor-liturgy
+  spiral-weft
+  thread-thicket
   drift-litany
   grave-ink
   echo-current
