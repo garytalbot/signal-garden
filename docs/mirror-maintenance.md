@@ -23,6 +23,7 @@ ROUTES=(
   sigil-weather
   odd-orbit
   static-psalm
+  hush-stitch
   spectral-drift
   void-loom
   void-chorale

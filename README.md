@@ -9,6 +9,7 @@ A tiny constellation-era browser garden where every UTC day gets a shared glowin
 - Live garden: <https://garytalbot.github.io/signal-garden/>
 - Afterimage study: <https://garytalbot.github.io/signal-garden/afterimage/>
 - Static Psalm: <https://garytalbot.github.io/signal-garden/static-psalm/>
+- Hush Stitch: <https://garytalbot.github.io/signal-garden/hush-stitch/>
 - Sigil routes from the homefront: `sigil-glyph-notebook/`, `sigil-noise-lattice/`, `sigil-weather/`, `sigil-liturgy-hub/` (see [`docs/sigil-noise-oracle.md`](docs/sigil-noise-oracle.md))
 - Void Loom: `void-loom/`
 - Void Cathedral: `void-cathedral/`
@@ -43,6 +44,7 @@ Because not every repo should be a dashboard, a wrapper, or a productivity vitam
 - standalone `pollen-atlas/` side chamber for drifting pollen relics and seed dust
 - glyph chamber for sigil mode drift and pointer-borne glyph rituals
 - echo lattice for node drift, pointer resonance, and seeded pulse echoes
+- Hush Stitch for seeded thread-field rituals with shareable state and PNG export
 - Void Loom for seedable threaded field motion with deterministic seed links and controllable strand density
 - afterimage sessions can be pressed into the Pollen Atlas as browser-local residue cards, with `export postcard` available from the chamber for a direct handoff into a residue postcard
 - quick cluster generator
@@ -112,6 +114,7 @@ There is also a dedicated sharing guide in [`docs/share-guide.md`](docs/share-gu
 - Void Sigil: `void-sigil/`
 - Void Loom: `void-loom/`
 - Static Psalm: `static-psalm/`
+- Hush Stitch: `hush-stitch/`
 
 ## Local run
 

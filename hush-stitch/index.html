@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta
+    name="description"
+    content="Hush Stitch is a tiny strange-generative sketch where clicks spin silk-like threads, every state lives in the URL, and every finished field can be exported as PNG."
+  />
+  <title>Signal Garden — Hush Stitch</title>
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      --ink: #eef5ff;
+      --ghost: #9fa8ff;
+      --bg: #070912;
+      --panel: color-mix(in oklab, #171a37 80%, #000);
+      --line: #9ff1ff;
+      --line-soft: #b48fff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      background: radial-gradient(circle at 20% 10%, #1b1f4f 0%, var(--bg) 55%, #03040a 100%);
+      color: var(--ink);
+      font-family: "IBM Plex Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      overflow: hidden;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+    }
+
+    .control-panel {
+      position: fixed;
+      z-index: 5;
+      inset: 0.7rem 0.7rem auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      pointer-events: none;
+    }
+
+    .card {
+      pointer-events: auto;
+      max-width: min(900px, calc(100vw - 1.4rem));
+      border: 1px solid #4f45b0;
+      border-radius: 0.9rem;
+      background: color-mix(in oklab, var(--panel), #05050f 25%);
+      padding: 0.55rem 0.7rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      align-items: center;
+      box-shadow: 0 15px 30px #000000a2;
+    }
+
+    button,
+    .status,
+    .home,
+    input {
+      border-radius: 999px;
+      border: 1px solid #5f59b8;
+      background: #16163b;
+      color: var(--ink);
+      font-family: inherit;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 0.74rem;
+    }
+
+    button,
+    .home {
+      cursor: pointer;
+      padding: 0.38rem 0.78rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    button:hover,
+    .home:hover {
+      border-color: var(--line);
+      color: #ffffff;
+    }
+
+    label {
+      display: inline-flex;
+      gap: 0.45rem;
+      align-items: center;
+      padding: 0.38rem 0.56rem;
+      border: 1px solid #423f82;
+      border-radius: 999px;
+      background: #181940;
+      color: #b7d4ff;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    input[type='range'] {
+      width: 130px;
+      margin-left: 0.3rem;
+    }
+
+    .status {
+      padding: 0.34rem 0.7rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 56ch;
+      color: #d8d8ff;
+    }
+
+    .home {
+      margin-left: auto;
+    }
+
+    .footer {
+      position: fixed;
+      left: 0.7rem;
+      right: 0.7rem;
+      bottom: 0.7rem;
+      z-index: 5;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+      color: #9da8de;
+      font-size: 0.74rem;
+      letter-spacing: 0.03em;
+      text-wrap: balance;
+    }
+
+    .home-note {
+      pointer-events: auto;
+      background: #130f35;
+      border: 1px solid #5f57bd;
+      border-radius: 0.7rem;
+      padding: 0.4rem 0.6rem;
+      max-width: min(640px, calc(100vw - 1.4rem));
+    }
+
+    @media (max-width: 760px) {
+      .control-panel {
+        inset: 0.55rem;
+      }
+
+      .card {
+        width: 100%;
+      }
+
+      .home {
+        margin-left: 0;
+      }
+
+      input[type='range'] {
+        width: 88px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="loom" aria-label="Hush Stitch canvas"></canvas>
+
+  <div class="control-panel">
+    <div class="card">
+      <button id="seedBtn" type="button">new seed</button>
+      <button id="copyBtn" type="button">copy state link</button>
+      <button id="exportBtn" type="button">export PNG</button>
+      <button id="clearBtn" type="button">clear stitches</button>
+      <button id="regenBtn" type="button">reseed stitches</button>
+      <label>threads<input id="threadCount" type="range" min="8" max="34" step="1" value="20" /></label>
+      <label>drift<input id="driftAmount" type="range" min="18" max="120" step="2" value="54" /></label>
+      <span class="status" id="status">waiting for a whisper</span>
+    </div>
+    <div class="card">
+      <span class="status">Click to stitch a new thread. URL captures the exact field for replay.</span>
+      <a class="home" id="returnHome" href="../">return home</a>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span class="home-note" id="hint">A small ceremonial error: when the room gets too quiet, drag and click until noise returns as geometry.</span>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('loom');
+    const ctx = canvas.getContext('2d');
+    const seedBtn = document.getElementById('seedBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const regenBtn = document.getElementById('regenBtn');
+    const threadRange = document.getElementById('threadCount');
+    const driftRange = document.getElementById('driftAmount');
+    const status = document.getElementById('status');
+
+    const maxKnots = 40;
+    const palette = ['#9ff6ff', '#ff9fc8', '#b6ff9c', '#ffd47f', '#9cc5ff', '#ffdfff', '#a9ffd7'];
+
+    const state = {
+      seed: Date.now() & 0xffffffff,
+      threads: 20,
+      drift: 54,
+      time: 0,
+      knots: [],
+    };
+
+    let dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+    const statusLabel = status;
+
+    const parseBase64Json = (raw) => {
+      try {
+        const text = decodeURIComponent(escape(atob(raw)));
+        return JSON.parse(text);
+      } catch {
+        return null;
+      }
+    };
+
+    const stringifyBase64Json = (value) => {
+      const json = JSON.stringify(value);
+      return btoa(unescape(encodeURIComponent(json)));
+    };
+
+    const makeRng = (seed) => {
+      let n = seed >>> 0;
+      return () => {
+        n ^= (n << 13) >>> 0;
+        n ^= n >>> 17;
+        n ^= (n << 5) >>> 0;
+        return (n >>> 0) / 0xffffffff;
+      };
+    };
+
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+    const randomKnot = (rng, width, height, idx) => {
+      return {
+        x: Math.floor(rng() * width),
+        y: Math.floor(rng() * height),
+        radius: 24 + rng() * 72,
+        phase: rng() * Math.PI * 2,
+        speed: 0.001 + rng() * 0.004,
+        spin: 1 + rng() * 2,
+        limbs: 3 + Math.floor(rng() * 10),
+        hue: palette[Math.floor(rng() * palette.length)],
+        weight: 0.9 + rng() * 1.7,
+        jitter: rng() * 0.7 + 0.08,
+        seedIdx: idx,
+      };
+    };
+
+    const hydrateFromLocation = () => {
+      const params = new URLSearchParams(location.search);
+      const rawSeed = Number.parseInt(params.get('seed'), 10);
+      if (Number.isFinite(rawSeed)) {
+        state.seed = rawSeed >>> 0;
+      }
+
+      const rawThreads = Number.parseInt(params.get('threads'), 10);
+      if (Number.isFinite(rawThreads)) {
+        state.threads = clamp(rawThreads, 8, 34);
+      }
+
+      const rawDrift = Number.parseFloat(params.get('drift'));
+      if (Number.isFinite(rawDrift)) {
+        state.drift = clamp(rawDrift, 18, 120);
+      }
+
+      const packed = params.get('state');
+      if (packed) {
+        const data = parseBase64Json(packed);
+        if (data && Array.isArray(data.knots)) {
+          state.knots = data.knots.slice(0, maxKnots);
+          state.seed = Number.parseInt(data.seed, 10) >>> 0 || state.seed;
+          state.threads = clamp(Number.parseInt(data.threads, 10) || state.threads, 8, 34);
+          state.drift = clamp(Number.parseFloat(data.drift) || state.drift, 18, 120);
+          return;
+        }
+      }
+
+      reseedKnots(true);
+    };
+
+    const reseedKnots = (replaceAll = false) => {
+      const rng = makeRng(state.seed);
+      const width = canvas.width / dpr;
+      const height = canvas.height / dpr;
+
+      if (replaceAll) {
+        state.knots = [];
+      }
+
+      while (state.knots.length < state.threads) {
+        state.knots.push(randomKnot(rng, width, height, state.knots.length));
+      }
+      state.knots = state.knots.slice(0, state.threads);
+      state.time = 0;
+      statusLabel.textContent = `seed ${state.seed.toString(16)} · ${state.knots.length} threads`;
+      syncControls();
+    };
+
+    const syncControls = () => {
+      threadRange.value = String(state.threads);
+      driftRange.value = String(state.drift);
+    };
+
+    const addKnotAt = (x, y) => {
+      const local = Math.random();
+      const jitter = 1 + local * 2;
+      const seed = makeRng(state.seed ^ (x * 73856093) ^ (y * 19349663) ^ state.time);
+      const color = palette[Math.floor(seed() * palette.length)];
+      const knot = {
+        x,
+        y,
+        radius: 20 + seed() * 66,
+        phase: seed() * Math.PI * 2,
+        speed: 0.0009 + seed() * 0.004,
+        spin: 1 + seed() * 3,
+        limbs: 4 + Math.floor(seed() * 8),
+        hue: color,
+        weight: 0.8 + seed() * 1.9,
+        jitter: 0.3 + seed() * 1.0,
+        seedIdx: Math.floor(seed() * 1000),
+      };
+
+      state.knots.unshift({
+        ...knot,
+        x: clamp(x, 0, canvas.width / dpr),
+        y: clamp(y, 0, canvas.height / dpr),
+        xDrift: 0,
+        yDrift: 0,
+      });
+
+      while (state.knots.length > maxKnots) {
+        state.knots.pop();
+      }
+      state.threads = state.knots.length;
+      statusLabel.textContent = `added thread · total ${state.knots.length}`;
+    };
+
+    const resize = () => {
+      dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+      canvas.width = Math.floor(window.innerWidth * dpr);
+      canvas.height = Math.floor(window.innerHeight * dpr);
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (!state.knots.length) {
+        reseedKnots(true);
+      }
+    };
+
+    const animate = () => {
+      state.time += 1;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const width = canvas.width / dpr;
+      const height = canvas.height / dpr;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = 'rgba(6, 7, 16, 0.18)';
+      ctx.fillRect(0, 0, width, height);
+      ctx.globalCompositeOperation = 'lighter';
+
+      const now = state.time * 0.004;
+      for (const knot of state.knots) {
+        const spin = now * knot.speed * knot.spin;
+        const pulse = Math.sin(now * 0.6 + knot.phase) * 0.55;
+        const drift = (state.drift / 120) * (0.25 + knot.jitter + pulse);
+        const steps = 72;
+        ctx.beginPath();
+        for (let i = 0; i <= steps; i += 1) {
+          const t = i / steps;
+          const arm = ((i + knot.seedIdx) % knot.limbs) / knot.limbs;
+          const local = arm * Math.PI * 2;
+          const angle = t * Math.PI * 2 + Math.sin(spin + local) * 0.6 + knot.phase * 0.2;
+          const envelope = Math.pow(Math.max(0, Math.sin(Math.PI * t)), 1.05);
+          const radius = knot.radius * envelope + 6;
+          const wave = Math.sin(spin * 5 + t * 16 + knot.phase * 1.5) * 0.22;
+          const px = knot.x + Math.cos(angle) * radius * (1 + wave) + Math.cos(spin + local * 0.8) * drift * width * 0.01;
+          const py = knot.y + Math.sin(angle) * radius * (1 + wave * 0.5) + Math.sin(spin * 0.7 + local * 0.95) * drift * height * 0.01;
+          if (i === 0) {
+            ctx.moveTo(px, py);
+          } else {
+            ctx.lineTo(px, py);
+          }
+        }
+        ctx.closePath();
+        ctx.strokeStyle = knot.hue + 'cc';
+        ctx.lineWidth = Math.max(0.8, knot.weight);
+        ctx.shadowColor = `${knot.hue}80`;
+        ctx.shadowBlur = 7;
+        ctx.globalAlpha = 0.78;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.fillStyle = `${knot.hue}dd`;
+        ctx.arc(knot.x, knot.y, Math.max(0.8, knot.weight * 0.5), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.globalCompositeOperation = 'source-over';
+      requestAnimationFrame(animate);
+    };
+
+    const shareUrl = () => {
+      const payload = {
+        v: 1,
+        seed: state.seed >>> 0,
+        threads: state.threads,
+        drift: state.drift,
+        knots: state.knots.map((k) => ({
+          x: Number(k.x.toFixed(2)),
+          y: Number(k.y.toFixed(2)),
+          radius: Number(k.radius.toFixed(2)),
+          phase: Number(k.phase.toFixed(4)),
+          speed: Number(k.speed.toFixed(5)),
+          spin: Number(k.spin.toFixed(3)),
+          limbs: k.limbs,
+          hue: k.hue,
+          weight: Number(k.weight.toFixed(3)),
+          jitter: Number(k.jitter.toFixed(3)),
+          seedIdx: k.seedIdx,
+        })),
+      };
+      return `${location.origin}${location.pathname}?state=${encodeURIComponent(stringifyBase64Json(payload))}`;
+    };
+
+    const setSeed = () => {
+      state.seed = ((Date.now() * 13) ^ (Math.floor(Math.random() * 0xfffffff))) >>> 0;
+      reseedKnots(true);
+      updateAddressBar();
+    };
+
+    const updateAddressBar = () => {
+      const params = new URLSearchParams();
+      params.set('threads', String(state.threads));
+      params.set('drift', String(state.drift));
+      const packed = stringifyBase64Json({
+        v: 1,
+        seed: state.seed >>> 0,
+        threads: state.threads,
+        drift: state.drift,
+        knots: state.knots,
+      });
+      params.set('state', packed);
+      const next = `${location.pathname}?${params.toString()}`;
+      history.replaceState({}, '', next);
+    };
+
+    const handleCopy = async () => {
+      const url = shareUrl();
+      try {
+        await navigator.clipboard.writeText(url);
+        statusLabel.textContent = 'copied link to your clipboard';
+      } catch {
+        window.prompt('Copy this hush stitch URL:', url);
+      }
+    };
+
+    const handleExport = () => {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const link = document.createElement('a');
+      link.download = `signal-garden-hush-stitch-${stamp}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      statusLabel.textContent = 'png export requested';
+    };
+
+    const onPointer = (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = (event.clientX - rect.left);
+      const y = (event.clientY - rect.top);
+      addKnotAt(x, y);
+      updateAddressBar();
+    };
+
+    const onRange = () => {
+      state.threads = clamp(Number.parseInt(threadRange.value, 10), 8, 34);
+      state.drift = clamp(Number.parseFloat(driftRange.value), 18, 120);
+      while (state.knots.length < state.threads) {
+        const width = canvas.width / dpr;
+        const height = canvas.height / dpr;
+        const rng = makeRng((state.seed + state.knots.length + 1) >>> 0);
+        state.knots.push(randomKnot(rng, width, height, state.knots.length));
+      }
+      state.knots = state.knots.slice(0, state.threads);
+      statusLabel.textContent = `threads ${state.threads} · drift ${Math.round(state.drift)}`;
+      updateAddressBar();
+    };
+
+    seedBtn.addEventListener('click', () => {
+      setSeed();
+    });
+
+    copyBtn.addEventListener('click', handleCopy);
+    exportBtn.addEventListener('click', handleExport);
+    clearBtn.addEventListener('click', () => {
+      state.knots = [];
+      statusLabel.textContent = 'field cleared';
+      updateAddressBar();
+    });
+
+    regenBtn.addEventListener('click', () => {
+      reseedKnots(true);
+      updateAddressBar();
+    });
+
+    threadRange.addEventListener('input', onRange);
+    driftRange.addEventListener('input', onRange);
+
+    canvas.addEventListener('pointerdown', onPointer);
+    window.addEventListener('resize', resize);
+
+    hydrateFromLocation();
+    resize();
+    syncControls();
+    animate();
+  </script>
+</body>
+</html>
