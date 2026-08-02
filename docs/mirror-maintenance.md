@@ -16,6 +16,7 @@ ROUTES=(
   spiral-weft
   thread-thicket
   drift-litany
+  lumen-surge
   grave-ink
   echo-current
   echo-hush

@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Signal Garden - Lumen Surge</title>
+  <meta
+    name="description"
+    content="Lumen Surge is a generative oddity where pointer surges pull luminous arcs through a shared canvas, with exact-state links and PNG export kept live from the same scene."
+  />
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07060f;
+      --panel: #171132;
+      --ink: #eceeff;
+      --soft: #b4b7ff;
+      --line: #80ecff;
+      --accent: #ff85ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      width: 100%;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 20% 12%, #221249 0%, #0e0d21 48%, var(--bg) 100%);
+      color: var(--ink);
+      font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    .hud {
+      position: fixed;
+      inset: 0.75rem;
+      z-index: 2;
+      pointer-events: none;
+      display: grid;
+      gap: 0.55rem;
+      max-width: min(1220px, calc(100vw - 1.5rem));
+      margin: 0 auto;
+    }
+
+    .panel,
+    .note {
+      pointer-events: auto;
+      border: 1px solid #45368c;
+      border-radius: 0.85rem;
+      background: color-mix(in oklab, var(--panel), #000 24%);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
+      padding: 0.5rem 0.65rem;
+    }
+
+    .panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      align-items: center;
+    }
+
+    .label {
+      width: 100%;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #c8d4ff;
+      font-size: 0.72rem;
+      margin-bottom: 0.1rem;
+    }
+
+    button,
+    a,
+    input {
+      border: 1px solid #5e4bb5;
+      border-radius: 999px;
+      background: #1a1143;
+      color: var(--ink);
+      font: inherit;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.72rem;
+      min-height: 30px;
+      padding: 0.34rem 0.72rem;
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    button:hover,
+    a:hover {
+      border-color: #95ffff;
+      color: #ffffff;
+    }
+
+    button[aria-pressed='true'] {
+      border-color: #95ffc0;
+      color: #eafff0;
+      box-shadow: inset 0 0 0 1px rgba(149, 255, 192, 0.32);
+    }
+
+    .status {
+      margin-left: auto;
+      max-width: 52ch;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 0.7rem;
+      color: #d6ddff;
+      opacity: 0.96;
+    }
+
+    .home {
+      margin-left: auto;
+    }
+
+    label {
+      display: inline-flex;
+      gap: 0.35rem;
+      align-items: center;
+      color: #d7e4ff;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 0.68rem;
+    }
+
+    input[type='range'] {
+      width: 130px;
+      accent-color: var(--line);
+    }
+
+    .note {
+      color: #ced8ff;
+      border-style: dashed;
+      max-width: min(980px, calc(100vw - 1.5rem));
+      line-height: 1.45;
+      font-size: 0.72rem;
+    }
+
+    @media (max-width: 780px) {
+      .panel {
+        gap: 0.35rem;
+      }
+
+      .status {
+        margin-left: 0;
+        width: 100%;
+      }
+
+      input[type='range'] {
+        width: 95px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="surgeCanvas" aria-label="Lumen Surge canvas"></canvas>
+
+  <div class="hud" aria-live="polite">
+    <div class="panel">
+      <span class="label">lumen surge</span>
+      <button id="newSeed" type="button">new seed</button>
+      <button id="burst" type="button">release pulse</button>
+      <button id="toggleTrails" type="button" aria-pressed="true">trails: on</button>
+      <button id="pause" type="button" aria-pressed="false">pause: off</button>
+      <button id="copyBtn" type="button">copy share link</button>
+      <button id="exportBtn" type="button">export PNG</button>
+      <button id="clearBtn" type="button">clear field</button>
+      <label for="burstAmount">burst amount <span id="burstAmountLabel">38</span></label>
+      <input id="burstAmount" name="burstAmount" type="range" min="14" max="76" step="2" value="38" />
+      <label for="surgeSpeed">surge speed <span id="surgeSpeedLabel">1.20</span></label>
+      <input id="surgeSpeed" name="surgeSpeed" type="range" min="0.42" max="2.2" step="0.05" value="1.20" />
+      <a class="home" href="../" aria-label="Return to Signal Garden home">return home</a>
+      <span class="status" id="status">initializing...</span>
+    </div>
+    <p class="note" id="note">Move and hold to push the charge, click to seed a surge, and use copy link to preserve exact arcs and parameters. Exports are clean, single-frame PNG relics of the live canvas.</p>
+  </div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById('surgeCanvas');
+      const ctx = canvas.getContext('2d');
+      const newSeed = document.getElementById('newSeed');
+      const burst = document.getElementById('burst');
+      const toggleTrails = document.getElementById('toggleTrails');
+      const pause = document.getElementById('pause');
+      const copyBtn = document.getElementById('copyBtn');
+      const exportBtn = document.getElementById('exportBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const burstAmount = document.getElementById('burstAmount');
+      const burstAmountLabel = document.getElementById('burstAmountLabel');
+      const surgeSpeed = document.getElementById('surgeSpeed');
+      const surgeSpeedLabel = document.getElementById('surgeSpeedLabel');
+      const status = document.getElementById('status');
+      const note = document.getElementById('note');
+
+      let width = 0;
+      let height = 0;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      let seed = randomSeed();
+      let rngState = seed;
+      let running = true;
+      let paused = false;
+      let pointer = { down: false, x: -1, y: -1 };
+      let trailsEnabled = true;
+      let syncQueued = false;
+      const maxArcs = 900;
+      const arcs = [];
+      const settings = {
+        burstAmount: 38,
+        speed: 1.2,
+      };
+
+      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+      const toHex = (value) => (value >>> 0).toString(16).padStart(8, '0');
+
+      const randomSeed = () => {
+        if (window.crypto && window.crypto.getRandomValues) {
+          const values = new Uint32Array(1);
+          window.crypto.getRandomValues(values);
+          return values[0] >>> 0;
+        }
+        return (Date.now() * 1103515245 + 12345) >>> 0;
+      };
+
+      const randomFromSeed = () => {
+        rngState = (rngState * 1664525 + 1013904223) >>> 0;
+        return rngState / 0x100000000;
+      };
+
+      const normalizeState = (raw) => {
+        if (!raw) return null;
+        try {
+          const cleaned = String(raw).trim();
+          const decoded = decodeURIComponent(atob(cleaned));
+          return JSON.parse(decoded);
+        } catch (_error) {
+          return null;
+        }
+      };
+
+      const decodeLocation = () => {
+        const q = new URLSearchParams(location.search);
+        const raw = q.get('state');
+        if (!raw) return null;
+        return normalizeState(raw);
+      };
+
+      const loadState = (payload) => {
+        if (!payload || payload.v !== 1) return false;
+
+        const incomingSeed = Number.parseInt(payload.seed, 10);
+        const burstAmount = Number.parseInt(payload.burstAmount, 10);
+        const speed = Number.parseFloat(payload.speed);
+        if (!Number.isFinite(incomingSeed) || !Number.isFinite(burstAmount) || !Number.isFinite(speed)) {
+          return false;
+        }
+
+        seed = incomingSeed >>> 0;
+        rngState = seed;
+        settings.burstAmount = clamp(Math.trunc(burstAmount), 14, 76);
+        settings.speed = clamp(speed, 0.42, 2.2);
+
+        burstAmount.value = String(settings.burstAmount);
+        burstAmountLabel.textContent = String(settings.burstAmount);
+        surgeSpeed.value = String(settings.speed);
+        surgeSpeedLabel.textContent = settings.speed.toFixed(2);
+
+        arcs.length = 0;
+        if (Array.isArray(payload.arcs)) {
+          for (const point of payload.arcs) {
+            const x = Number.parseFloat(point.x);
+            const y = Number.parseFloat(point.y);
+            const vx = Number.parseFloat(point.vx);
+            const vy = Number.parseFloat(point.vy);
+            const hue = Number.parseFloat(point.h);
+            const age = Number.parseFloat(point.a);
+            const life = Number.parseInt(point.l, 10);
+            const arcWidth = Number.parseFloat(point.w);
+            const tailLength = Number.parseInt(point.t, 10);
+            const spread = Number.parseFloat(point.s);
+
+            if ([x, y, vx, vy].some((v) => !Number.isFinite(v))) continue;
+            if (!Number.isFinite(hue) || !Number.isFinite(age) || !Number.isFinite(life) || !Number.isFinite(arcWidth) || !Number.isFinite(tailLength) || !Number.isFinite(spread)) {
+              continue;
+            }
+
+            arcs.push({
+              x: clamp(x, 0, 1) * width,
+              y: clamp(y, 0, 1) * height,
+              px: clamp(x, 0, 1) * width,
+              py: clamp(y, 0, 1) * height,
+              vx,
+              vy,
+              age,
+              life,
+              hue: clamp(hue % 360, 0, 359.99),
+              size: clamp(arcWidth, 1.2, 8),
+              spread: clamp(spread, 0, 1),
+              tailLength: clamp(tailLength, 6, 18),
+              trail: [],
+            });
+          }
+        }
+
+        if (!arcs.length) {
+          seedField();
+          return true;
+        }
+
+        return true;
+      };
+
+      const toState = () => {
+        return {
+          v: 1,
+          seed: seed >>> 0,
+          burstAmount: settings.burstAmount,
+          speed: +settings.speed.toFixed(3),
+          arcs: arcs.slice(0, 160).map((arc) => ({
+            x: +(arc.x / width).toFixed(4),
+            y: +(arc.y / height).toFixed(4),
+            vx: +arc.vx.toFixed(5),
+            vy: +arc.vy.toFixed(5),
+            h: +arc.hue.toFixed(2),
+            a: +arc.age.toFixed(1),
+            l: arc.life,
+            w: +arc.size.toFixed(3),
+            t: arc.tailLength,
+            s: +arc.spread.toFixed(3),
+          })),
+        };
+      };
+
+      const syncShare = () => {
+        if (syncQueued) return;
+        syncQueued = true;
+        setTimeout(() => {
+          const payload = btoa(encodeURIComponent(JSON.stringify(toState())));
+          const q = new URLSearchParams(location.search);
+          q.set('state', payload);
+          const next = `${location.pathname}?${q.toString()}`;
+          history.replaceState(null, '', next);
+          status.textContent = `seed ${toHex(seed)} | arcs ${arcs.length}`;
+          syncQueued = false;
+        }, 130);
+      };
+
+      const resize = () => {
+        width = Math.max(320, Math.floor(window.innerWidth));
+        height = Math.max(180, Math.floor(window.innerHeight));
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      };
+
+      const makeArc = (x, y) => {
+        const angle = randomFromSeed() * Math.PI * 2;
+        const speed = 0.45 + randomFromSeed() * 2.3;
+        return {
+          x,
+          y,
+          px: x,
+          py: y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          age: 0,
+          life: 220 + Math.floor(randomFromSeed() * 420),
+          hue: Math.floor(randomFromSeed() * 360),
+          size: 1.8 + randomFromSeed() * 5.4,
+          spread: randomFromSeed() * 0.5,
+          tailLength: 8 + Math.floor(randomFromSeed() * 9),
+          trail: [],
+        };
+      };
+
+      const seedArc = (x, y) => {
+        const burstCount = 1 + Math.floor((settings.burstAmount * 0.45) + randomFromSeed() * (settings.burstAmount * 0.6));
+        for (let i = 0; i < burstCount; i++) {
+          const offset = randomFromSeed() * 14 - 7;
+          const arc = makeArc(x + Math.cos(i) * offset, y + Math.sin(i) * offset);
+          arc.vx *= settings.speed;
+          arc.vy *= settings.speed;
+          arcs.push(arc);
+        }
+
+        if (arcs.length > maxArcs) {
+          arcs.splice(0, arcs.length - maxArcs);
+        }
+        syncShare();
+      };
+
+      const seedField = () => {
+        arcs.length = 0;
+        for (let i = 0; i < settings.burstAmount; i++) {
+          seedArc(Math.random() * width, Math.random() * height);
+        }
+      };
+
+      const addFromPointer = () => {
+        if (!pointer.down) return;
+        seedArc(pointer.x, pointer.y);
+      };
+
+      const draw = () => {
+        if (trailsEnabled) {
+          ctx.fillStyle = 'rgba(7, 6, 15, 0.14)';
+          ctx.fillRect(0, 0, width, height);
+        } else {
+          ctx.clearRect(0, 0, width, height);
+        }
+
+        for (let i = arcs.length - 1; i >= 0; i--) {
+          const arc = arcs[i];
+          arc.age += 1;
+          arc.px = arc.x;
+          arc.py = arc.y;
+
+          const drift = Math.sin((arc.age + i) * 0.018) * arc.spread;
+          arc.vx += Math.cos(drift + i * 0.15) * 0.004 * settings.speed;
+          arc.vy += Math.sin(drift + i * 0.18) * 0.004 * settings.speed;
+
+          if (pointer.down) {
+            const dx = pointer.x - arc.x;
+            const dy = pointer.y - arc.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            const pull = clamp(1 / (dist + 18), 0, 0.012) * settings.speed * 1.6;
+            arc.vx += dx * pull;
+            arc.vy += dy * pull;
+          }
+
+          arc.vx *= 0.982;
+          arc.vy *= 0.982;
+          arc.x += arc.vx + Math.cos((arc.age + i) * 0.006) * 0.4;
+          arc.y += arc.vy + Math.sin((arc.age + i) * 0.006) * 0.4;
+
+          if (arc.x < 0) arc.x += width;
+          if (arc.x > width) arc.x -= width;
+          if (arc.y < 0) arc.y += height;
+          if (arc.y > height) arc.y -= height;
+
+          arc.trail.push({ x: arc.x, y: arc.y, age: arc.age });
+          if (arc.trail.length > arc.tailLength) {
+            arc.trail.shift();
+          }
+
+          const alpha = 1 - arc.age / arc.life;
+          if (alpha <= 0) {
+            arcs.splice(i, 1);
+            continue;
+          }
+
+          for (let j = 1; j < arc.trail.length; j++) {
+            const p0 = arc.trail[j - 1];
+            const p1 = arc.trail[j];
+            const progress = j / arc.trail.length;
+            const glow = (1 - arc.age / arc.life) * progress;
+            const color = `hsla(${arc.hue + j * 1.2}, 86%, ${50 + 18 * glow}%, ${0.08 + glow * 0.42})`;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = (arc.size * (0.25 + glow)) / Math.max(1, 1);
+            ctx.beginPath();
+            ctx.moveTo(p0.x, p0.y);
+            ctx.lineTo(p1.x, p1.y);
+            ctx.stroke();
+          }
+
+          if (arc.age === 80 && randomFromSeed() < 0.4) {
+            arcs.push({
+              ...makeArc(arc.x, arc.y),
+              vx: (arc.vx * 0.45) + (Math.random() - 0.5) * 0.3,
+              vy: (arc.vy * 0.45) + (Math.random() - 0.5) * 0.3,
+              life: arc.life * (0.55 + randomFromSeed() * 0.3),
+              hue: arc.hue + 40,
+            });
+          }
+        }
+
+        if (pointer.down && running) {
+          addFromPointer();
+        }
+
+        status.textContent = `${arcs.length} arcs | seed ${toHex(seed)} | ${paused ? 'paused' : 'running'}`;
+      };
+
+      const tick = () => {
+        if (!paused) {
+          draw();
+        }
+        if (running) {
+          requestAnimationFrame(tick);
+        }
+      };
+
+      const initShare = () => {
+        if (syncQueued) return;
+        const hashPayload = decodeLocation();
+        if (hashPayload && loadState(hashPayload)) {
+          note.textContent = 'Field restored from shared link. Press burst or move pointer to continue the surge.';
+          syncShare();
+          return;
+        }
+
+        seed = randomSeed();
+        rngState = seed;
+        settings.burstAmount = 38;
+        settings.speed = 1.2;
+        burstAmount.value = '38';
+        burstAmountLabel.textContent = '38';
+        surgeSpeed.value = '1.2';
+        surgeSpeedLabel.textContent = '1.20';
+        seedField();
+        syncShare();
+      };
+
+      const syncSettings = () => {
+        settings.burstAmount = clamp(Math.round(Number.parseFloat(burstAmount.value)), 14, 76);
+        settings.speed = clamp(Number.parseFloat(surgeSpeed.value), 0.42, 2.2);
+        burstAmountLabel.textContent = String(settings.burstAmount);
+        surgeSpeedLabel.textContent = settings.speed.toFixed(2);
+        syncShare();
+      };
+
+      const copyLink = () => {
+        const payload = btoa(encodeURIComponent(JSON.stringify(toState())));
+        const q = new URLSearchParams(location.search);
+        q.set('state', payload);
+        const link = `${location.origin}${location.pathname}?${q.toString()}`;
+        navigator.clipboard
+          .writeText(link)
+          .then(() => {
+            status.textContent = 'Share link copied';
+            note.textContent = 'The exact surge has been copied into your clipboard as a share-ready link.';
+          })
+          .catch(() => {
+            window.prompt('Copy this link:', link);
+          });
+      };
+
+      const exportPNG = () => {
+        const link = document.createElement('a');
+        link.download = `signal-garden-lumen-surge-${toHex(seed)}-${Date.now().toString(36)}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        status.textContent = 'PNG export started';
+      };
+
+      const clearField = () => {
+        arcs.length = 0;
+        note.textContent = 'Field cleared. Add a burst to start new light.';
+        syncShare();
+      };
+
+      const onPointerDown = (event) => {
+        const rect = canvas.getBoundingClientRect();
+        pointer.x = event.clientX - rect.left;
+        pointer.y = event.clientY - rect.top;
+        pointer.down = true;
+        canvas.setPointerCapture(event.pointerId);
+        seedArc(pointer.x, pointer.y);
+        syncShare();
+      };
+
+      const onPointerMove = (event) => {
+        if (!pointer.down) return;
+        const rect = canvas.getBoundingClientRect();
+        pointer.x = event.clientX - rect.left;
+        pointer.y = event.clientY - rect.top;
+      };
+
+      const onPointerUp = () => {
+        pointer.down = false;
+      };
+
+      const applyDefaults = () => {
+        burstAmountLabel.textContent = String(settings.burstAmount);
+        surgeSpeedLabel.textContent = settings.speed.toFixed(2);
+        burstAmount.value = String(settings.burstAmount);
+        surgeSpeed.value = String(settings.speed);
+      };
+
+      const bindEvents = () => {
+        canvas.addEventListener('pointerdown', onPointerDown);
+        canvas.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+        window.addEventListener('pointerleave', onPointerUp);
+
+        newSeed.addEventListener('click', () => {
+          seed = randomSeed();
+          rngState = seed;
+          seedField();
+          status.textContent = 'fresh seed generated';
+          syncShare();
+        });
+
+        burst.addEventListener('click', () => {
+          const rect = canvas.getBoundingClientRect();
+          seedArc(rect.width / 2, rect.height / 2);
+          status.textContent = 'manual pulse emitted';
+        });
+
+        clearBtn.addEventListener('click', clearField);
+        copyBtn.addEventListener('click', copyLink);
+        exportBtn.addEventListener('click', exportPNG);
+
+        toggleTrails.addEventListener('click', () => {
+          trailsEnabled = !trailsEnabled;
+          toggleTrails.setAttribute('aria-pressed', String(!trailsEnabled ? 'false' : 'true'));
+          toggleTrails.textContent = `trails: ${trailsEnabled ? 'on' : 'off'}`;
+          if (!trailsEnabled) {
+            ctx.clearRect(0, 0, width, height);
+          }
+          syncShare();
+        });
+
+        pause.addEventListener('click', () => {
+          paused = !paused;
+          pause.setAttribute('aria-pressed', String(paused));
+          pause.textContent = `pause: ${paused ? 'on' : 'off'}`;
+          if (!paused) {
+            requestAnimationFrame(tick);
+          }
+        });
+
+        burstAmount.addEventListener('input', syncSettings);
+        surgeSpeed.addEventListener('input', syncSettings);
+
+        window.addEventListener('resize', resize);
+        window.addEventListener('keydown', (event) => {
+          if (event.key.toLowerCase() === 'c') {
+            clearField();
+          }
+          if (event.key.toLowerCase() === ' ') {
+            event.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            seedArc(rect.width / 2, rect.height / 2);
+          }
+          if (event.key.toLowerCase() === 'p') {
+            paused = !paused;
+            pause.setAttribute('aria-pressed', String(paused));
+            pause.textContent = `pause: ${paused ? 'on' : 'off'}`;
+          }
+        });
+      };
+
+      const init = () => {
+        resize();
+        applyDefaults();
+        bindEvents();
+        initShare();
+        running = true;
+        status.textContent = 'ready';
+        requestAnimationFrame(tick);
+      };
+
+      init();
+    })();
+  </script>
+</body>
+</html>
